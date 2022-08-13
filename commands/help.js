@@ -1,28 +1,24 @@
-const fs = require("fs");
-const util = require("util");
-const guard = require("../resources/guard.js");
-
 const cmd = "help";
+
+const fs = require("fs");
 
 module.exports = {
     name: cmd,
-    description: "List the available commands",
-	args: [],
-	arginfo: [],
+    summary: "List the available commands",
+	arg: undefined,
+	
     execute(message, args)
     {
-		guard.add(args, guard.ARG_COUNT, 0);
-		
-        let speech = "";
+        let helpmsg = `>>> `;
         const commands = fs.readdirSync(__dirname);
+		//list each available command and explain its effect
         for(const file of commands)
         {
             const commandInfo = require(`${__dirname}/${file}`);
-            speech = util.format("%s**%s**:\t%s\n", speech, commandInfo.name, commandInfo.description);
+			helpmsg = `${helpmsg}\`${commandInfo.name}\`:\t${commandInfo.summary}\n`;
         }
-		speech = util.format("%s**shutdown**:\t Shut down the bot\n", speech);
-		speech = util.format(">>> %s", speech);
-		message.channel.send(speech);
-		message.channel.send(`Learn more about a command by typing '__${process.env.PREFIX} **commandName**__'`);
+		let placeholder = "__name__";
+		helpmsg = `${helpmsg}Learn about a command using '**${process.env.PREFIX} ${placeholder}**', replacing **${placeholder}** with your command of choice.`;
+		message.channel.send(helpmsg);
     }
 };

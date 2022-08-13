@@ -1,0 +1,140 @@
+#include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "Game.h"
+#include "Board.h"
+#include "Move.h"
+
+#define MAX_NUM_INPUTS 10
+#define MAX_INPUT_SIZE 100
+
+//Global variables shared by the main method and command methods
+char** inputs;
+struct Game* game;
+struct Board* board;
+struct Movelist* legals;
+int result;
+Place from, to;
+Piece target;
+Move move;
+//
+
+void makemove()
+{
+	char* chars = inputs[1];
+	legals = Game_get_available_moves(game, LEGALS);
+	
+	if((chars[0]<'a' || chars[0]>'h') | (chars[1]<'1' || chars[1]>'8') | (chars[2]<'a' || chars[2]>'h') | (chars[3]<'1' || chars[3]>'8'))
+	{
+		printf("ERROR: Illegal move");
+		return;
+	}
+	
+	from = Placify_char(chars[0], chars[1]);
+	to = Placify_char(chars[2], chars[3]);
+	target = Board_square_get(board, to);
+	move = Movify(Game_get_unmoved(game, Piece_unique_id(target)), target, from, to);
+	
+	if(Movelist_contains(legals, move))
+	{
+		Game_make_move(game, move);
+		Movelist_free(legals);
+	}
+	else
+	{
+		printf("ERROR: Illegal move");
+		//printf("ERROR: Illegal move\n");
+	}
+}
+
+void undomove()
+{
+	Game_undo_move(game);
+}
+
+#define NUM_COMMANDS 2
+const char* COMMANDS[NUM_COMMANDS] = {"MOVE", "UNMOVE"}; 
+void(* const COMMAND_FUNCTIONS[NUM_COMMANDS])() = {makemove, undomove};
+
+int streq(const char* a, const char* b)
+{
+	int i=0;
+	while(a[i]==b[i])
+	{
+		if(a[i++]==0)
+		{
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int strbegin(const char* a, const char* b)
+{
+	int i=0;
+	while(a[i]==b[i])
+	{
+		if(a[i]==0){return 1;}
+		i++;
+	}
+	return b[i]==0;
+}
+
+int strcontains(const char* a, const char* b)
+{	
+	int i=0;
+	while(a[i]!=0)
+	{
+		int j=0;
+		while(a[i+j]==b[j])
+		{
+			j++;
+			if(b[j]==0)
+			{
+				return 1;
+			}
+		}
+		i++;
+	}
+	return 0;
+}
+
+int main(int argc, char** argv)
+{
+	/*
+	srand((unsigned int)time(0));
+	inputs = malloc(sizeof(char*)*MAX_NUM_INPUTS);
+	for(int i=0; i<MAX_NUM_INPUTS; i++)
+	{
+		inputs[i] = malloc(sizeof(char)*MAX_INPUT_SIZE);
+	}
+	*/
+	game = Game_create_default();
+	board = game->board;
+	/*
+	
+	Board_print_Discord(board);
+	//Board_print(board);
+	
+	while (1)
+	{	
+		result = Game_mate(game);
+		if(result){printf("RESULT: %d", result);}
+		
+		scanf("%s %s", inputs[0], inputs[1]);
+		for(int cmd=0; cmd<NUM_COMMANDS; cmd++)
+		{
+			if(strbegin(inputs[0], COMMANDS[cmd]))
+			{
+				COMMAND_FUNCTIONS[cmd]();
+				
+				Board_print_Discord(board);
+				//Board_print(board);
+			}
+		}
+	}
+	*/
+	Board_print_Discord(board);
+	return 0;
+}
