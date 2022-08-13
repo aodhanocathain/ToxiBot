@@ -1,0 +1,36 @@
+This is a summary of how the chess program interfaces with the discord bot program.
+
+The chess program provides output in the format "{TYPE} {Data}", e.g. "BOARD mmmmmmm....." or "RESULT 1", etc.
+It takes input in the format "{COMMAND} {arg0} {arg1} {arg2} ...", e.g. "MOVE e2e4", "UNMOVE", etc.
+
+In the chess program's code, the board stores its squares in a one dimensional array.
+For all intents and purposes, though, it can be thought of as a two dimensional array instead, indexed in the first dimension by a square's file, then by its rank in the second dimension.
+(it would look like: squares[file][rank])
+On a conventional chessboard, vertical positioning is given with a rank ranging from 1-8, and horizontal positioning is given with a file, referred to by a letter in the range a to h.
+In the chess code, the a file is considered the 0th file, the b file is considered the 1st, and so on (for 0-based indexing).
+Rank "1" is considered the 0th rank, rank "2" is considered the 1st, and so on (for 0-based indexing).
+
+For example:
+e6 corrseponds to squares[4][5]
+e7 corresponds to squares[4][6]
+f7 corresponds to squares[5][6]
+
+Below is the board drawn from the white player's perspective, showing for each square its one-dimensional index (the 0-based files and ranks are annotated along the edges of the board):
+
+7  15  23  31  39  47  55  63		(rank=7)
+6  14  22  30  38  46  54  62		(rank=6)
+...and so on until
+0  8   16  24  32  40  48  56		(rank=0)
+-----------------------------
+0 | 1 | 2 | 3 | 4 | 5 | 6 | 7   	(files)
+
+The board is brought to output row by row from rank 7 down to rank 0 (the order of indices would be 7 15 23 31 39 47 55 63 6 14 22 30 ...)
+
+Each index indicates a square which indicates a piece, if any, which is present on that square.
+The output consists of the encoding for these pieces in the order that their squares would be drawn as described above.
+
+To pick an individual square on file F and rank R (F and R being 0-based) from the output, take the (7-Rth)set of 8 squares and choose the Fth square within.
+More generally for a board of width B, the index of a square of file F and R (again, 0-based) is (B*(B-1)) - (B*R) + F.
+
+The program recognizes 6 types of piece, and encodes each piece arithmetically as ASCII 'a' + the associated value of the piece's type, + 6 extra if it is a black piece.
+If no piece is present for a square, it outputs ASCII 'a' + 13.
