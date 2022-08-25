@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "Board.h"
 #include "Piece.h"
@@ -6,6 +8,7 @@
 #include "Team.h"
 #include "Colours.h"
 
+//private, helps Board_create_default set up the board
 void Board_put_piece(struct Board* board, Piece piece, Place place)
 {
 	Piece_part unique_id = Piece_unique_id(piece);
@@ -14,6 +17,10 @@ void Board_put_piece(struct Board* board, Piece piece, Place place)
 	Board_square_set(board, place, piece);
 }
 
+struct Board* Board_create()
+{
+	return malloc(sizeof(struct Board));
+}
 struct Board* Board_create_default()
 {
 	struct Board* board = Board_create();
@@ -35,9 +42,11 @@ struct Board* Board_create_default()
 
 	//kings
 	Board_put_piece(board, Piecify(WHITE_TEAM, 0, KING), Placify_char('e', '1'));
+	//Board_put_piece(board, Piecify(BLACK_TEAM, 0, KING), Placify_char('e', '8'));
 	Board_put_piece(board, Piecify(BLACK_TEAM, 0, KING), Placify_char('e', '8'));
 
 	//knights
+	/*
 	Board_put_piece(board, Piecify(WHITE_TEAM, 1, KNIGHT), Placify_char('a', '1'));
 	Board_put_piece(board, Piecify(WHITE_TEAM, 2, KNIGHT), Placify_char('b', '1'));
 	Board_put_piece(board, Piecify(WHITE_TEAM, 3, KNIGHT), Placify_char('c', '1'));
@@ -45,6 +54,7 @@ struct Board* Board_create_default()
 	Board_put_piece(board, Piecify(WHITE_TEAM, 5, KNIGHT), Placify_char('f', '1'));
 	Board_put_piece(board, Piecify(WHITE_TEAM, 6, KNIGHT), Placify_char('g', '1'));
 	Board_put_piece(board, Piecify(WHITE_TEAM, 7, KNIGHT), Placify_char('h', '1'));
+	*/
 	Board_put_piece(board, Piecify(WHITE_TEAM, 8, KNIGHT), Placify_char('a', '2'));
 	Board_put_piece(board, Piecify(WHITE_TEAM, 9, KNIGHT), Placify_char('b', '2'));
 	Board_put_piece(board, Piecify(WHITE_TEAM, 10, KNIGHT), Placify_char('c', '2'));
@@ -57,52 +67,71 @@ struct Board* Board_create_default()
 	return board;
 }
 
-void Board_print(struct Board* board)
+Place Board_place_get(struct Board* board, Piece_part unique_id)
 {
-	//print file names along the top of the board
-	colour(GRID_TEXT);
-	for (int file = 0; file < BOARD_WIDTH; file++)
-	{
-		printf(" %c ", file + 'a');
-	}
-	reset_colours();
-	printf("\n");
+	return board->places[unique_id];
+}
+Piece Board_square_get(struct Board* board, Place place)
+{
+	return board->squares[place];
+}
+Piece Board_piece_get(struct Board* board, Piece_part unique_id)
+{
+	return board->pieces[unique_id];
+}
 
-	//print each rank's contents, followed by their rank names
+void Board_place_set(struct Board* board, Piece_part unique_id, Place place)
+{
+	board->places[unique_id] = place;
+}
+void Board_square_set(struct Board* board, Place place, Piece piece)
+{
+	board->squares[place] = piece;
+}
+void Board_piece_set(struct Board* board, Piece_part unique_id, Piece piece)
+{
+	board->pieces[unique_id] = piece;
+}
+
+//Check that the file and rank of a square are within the grid
+int Board_contains_place(Place_Spec file, Place_Spec rank)
+{
+	return (file < BOARD_WIDTH) && (rank < BOARD_WIDTH);
+}
+
+#define BOARD_SQUARE_STRING_SHAPE COLOUR_APPLY_STRING_SHAPE " " PIECE_STRING_SHAPE COLOUR_APPLY_STRING_SHAPE " "
+char* Board_format(struct Board* board)
+{
+	char* bresetf = colourf(RESET_BACKGROUND);
+	int size =	//size = (num ranks * length per rank) + null terminator
+	//num ranks
+	(BOARD_WIDTH * (
+	//length per rank = (num files * length per square) + colour reset + newline character
+	(BOARD_WIDTH*strlen(BOARD_SQUARE_STRING_SHAPE)) + strlen(COLOUR_RESET_STRING_SHAPE) + strlen("\n")   ))
+	+1;	//+1 for the null terminator
+
+	char* format = malloc(sizeof(char) * size);	format[0] = 0;
+
+	char* helperf;
 	for (int rank = BOARD_WIDTH - 1; rank >= 0; rank--)
 	{
 		for (int file = 0; file < BOARD_WIDTH; file++)
 		{
-			//colour the square itself
-			if ((file + rank) % 2) { colour(BOARD_LIGHT_BACKGROUND); }
-			else { colour(BOARD_DARK_BACKGROUND); }
+			if ((file + rank) % 2) { helperf = colourf(BOARD_LIGHT_BACKGROUND); }
+			else { helperf = colourf(BOARD_DARK_BACKGROUND); }
+			sprintf(format, "%s%s ", format, helperf); free(helperf);
 
-			//print the square's piece, if it has one
-			printf(" ");
-			Piece_print(Board_square_get(board, Placify_int(file, rank)));
-			printf(" ");
+			Piece piece = Board_square_get(board, Placify_int(file, rank));
+			helperf = Piece_format(piece);
+			sprintf(format, "%s%s", format, helperf); free(helperf);
+
+			helperf = colourf(RESET_TEXT);
+			sprintf(format, "%s%s ", format, helperf); free(helperf);
 		}
-
-		//print the rank name
-		reset_colours();
-		colour(GRID_TEXT);
-		printf(" %c\n", rank + '1');
-		reset_colours();
+		helperf = resetf();
+		sprintf(format, "%s%s\n", format, helperf);
+		free(helperf);
 	}
-}
 
-void Board_print_Discord(struct Board* board)
-{
-	char boardstring[BOARD_SQUARES+1];
-	boardstring[BOARD_SQUARES] = 0;
-	char* preface = "GAME ";
-	int index=0;
-	for(int rank=7; rank>=0; rank--)
-	{
-		for(int file=0; file<8; file++)
-		{
-			boardstring[index++] = Piece_charify_Discord(Board_square_get(board, Placify_int(file, rank)));
-		}
-	}
-	printf("%s%s\n", preface, boardstring);
+	return format;
 }

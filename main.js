@@ -6,7 +6,9 @@ const Discord = require("discord.js");
 const fs = require("fs");
 const remark = require("./utilities/remark.js");
 const verifier = require("./utilities/verify.js");
+const {exec} = require("child_process");
 
+exec("./compile.sh");
 require("dotenv").config();
 
 let bot;
@@ -49,22 +51,22 @@ function configureBot()
 			let choices = args.slice(2);
 			let properties = bot.commands[command];
 			
-			const correction = verifier.verify(message, choices, properties);
-			if(correction)
+			const result = verifier.verify(message, choices, properties);
+			if(typeof result == "string")
 			{
 				message.react("❌");
-				message.reply(correction);
+				message.reply(result);
 			}
 			else
 			{
 				message.react("✅");
-				properties.execute(message, choices);
+				properties.execute(message, choices, result);
 			}
 		}
 		else
 		{
 			//probabilistically respond with a funny statement
-			if(remark.want()){remark.make(message.channel);}
+			if(remark.want()){remark.random(message.channel);}
 		}	
 	});
 }

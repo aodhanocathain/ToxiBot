@@ -1,14 +1,16 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "Movelist.h"
 #include "Move.h"
 #include "Place.h"
 
-#define MOVELIST_GROWTH_RATE 2
 void Movelist_grow(struct Movelist* movelist)
 {
+	#define MOVELIST_GROWTH_RATE 2	//just because
 	movelist->maxSize *= MOVELIST_GROWTH_RATE;
+	#undef MOVELIST_GROWTH_RATE
 
 	//allocate a new, bigger list
 	Move* biggerlist = malloc(sizeof(Move) * movelist->maxSize);
@@ -63,8 +65,7 @@ int Movelist_contains(struct Movelist* movelist, Move move)
 	}
 	return 0;
 }
-//find a move that targets a particular square
-int Movelist_find_to(struct Movelist* movelist, Place to)
+int Movelist_find_to(struct Movelist* movelist, Place to)	//find a move that targets a particular square
 {
 	for (int i = 0; i < movelist->usedSize; i++)
 	{
@@ -72,26 +73,31 @@ int Movelist_find_to(struct Movelist* movelist, Place to)
 		{
 			return 1;
 		}
-		else
-		{
-			//printf("Movelist_find_to | ");	Move_print(movelist->moves[i]);
-			//printf(" does not attack ");	Place_print(to);	printf("\n");
-			//printf(" because the move is %x, Move_to(that) is %x, to is %x\n", movelist->moves[i], Move_to(movelist->moves[i]), to);
-		}
 	}
 	return 0;
 }
 
-#define MOVES_PER_LINE 8
-void Movelist_print(struct Movelist* movelist)
+char* Movelist_format(struct Movelist* movelist)
 {
-	printf("Beginning Movelist_print:\n");
+	char* format = malloc
+	(
+		sizeof(char)*
+		(
+			//num moves * (length per move + 1 space after a move)
+			(movelist->usedSize * (strlen(MOVE_STRING_SHAPE) + 1)) + 1	// +1 again for the null terminator
+		)
+	);
+	format[0] = 0;
+	
+	char* movestr;
 	for (int i = 0; i < movelist->usedSize; i++)
 	{
-		Move_print(movelist->moves[i]);
-		printf("%c", ((i % MOVES_PER_LINE) == MOVES_PER_LINE-1 ? '\n' : '\t'));
+		//concatenate the existing format with the next move, and a space
+		movestr = Move_format(movelist->moves[i]);
+		sprintf(format, "%s%s ", format, movestr);
+		free(movestr);
 	}
-	printf("End of movelist.");
+	return format;
 }
 
 void Movelist_free(struct Movelist* movelist)

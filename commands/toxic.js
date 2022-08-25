@@ -1,21 +1,23 @@
-const remarks = require("../resources/remarks.js").remarks
-const util = require("util");
-const guard = require('../resources/guard.js');
+const remarks = require("../utilities/remark.js");
+const {RangeArg} = require("../utilities/args.js");
 
 const cmd = "toxic";
 
 module.exports = {
     name: cmd,
-    description: "Useless test command to say something mean",
-	args: ["index"],
-	arginfo: [`Integer with minimum value of 0 and maximum value of ${remarks.length-1}`],
+    summary: "Useless test command to say something mean",
+	arg: new RangeArg("index", `Integer with min value 0 and max value ${remarks.length()-1}`,
+	{
+		verify: (choice)=>
+		{
+			const num = +choice;
+			if(Number.isInteger(num)){if(num>=0 && num<remarks.length()){return true;}}
+			return false;
+		},
+		next: ()=>{return undefined;}
+	}),
     execute(message, choices)
     {
-		guard.add(choices, guard.ARG_COUNT, 1);
-		
-		const index = +choices[0]
-		guard.addAll(index, remarks.length-1);
-		
-		message.channel.send(remarks[index]);
+		remarks.make(message.channel, +choices[0]);
     },
 };

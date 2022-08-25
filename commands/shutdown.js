@@ -35,9 +35,14 @@ module.exports =
 		{
 			for(const key of Object.keys(bot.games))
 			{
-				games.stop(key);
+				try
+				{
+					games.stop(key);
+				}
+				catch(err){console.log(err);}
 			}
 			bot.destroy();
+			process.exit();
 		}
 	}
 }

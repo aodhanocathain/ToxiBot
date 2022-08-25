@@ -18,6 +18,6 @@ Move Movelist_remove(struct Movelist* movelist);
 int Movelist_contains(struct Movelist* movelist, Move move);
 int Movelist_find_to(struct Movelist* movelist, Place place);
 
-void Movelist_print(struct Movelist* movelist);
+char* Movelist_format(struct Movelist* movelist);
 
 void Movelist_free(struct Movelist* movelist);

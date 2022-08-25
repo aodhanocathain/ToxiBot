@@ -17,7 +17,7 @@ module.exports = {
             const commandInfo = require(`${__dirname}/${file}`);
 			helpmsg = `${helpmsg}\`${commandInfo.name}\`:\t${commandInfo.summary}\n`;
         }
-		let placeholder = "__name__";
+		let placeholder = "{name}";
 		helpmsg = `${helpmsg}Learn about a command using '**${process.env.PREFIX} ${placeholder}**', replacing **${placeholder}** with your command of choice.`;
 		message.channel.send(helpmsg);
     }

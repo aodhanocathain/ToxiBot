@@ -1,27 +1,20 @@
 const zombies = require("../resources/zombies.js");
 const util = require("util");
-
+const {EnumArg, Option} = require("../utilities/args.js");
 const cmd = "fnfal";
+
+function act(pick, index)
+{
+	message.channel.send(zombies[pick][index]);
+}
 
 module.exports = {
     name: cmd,
     summary: "COD zombies random picker",
-	arg: 
-	{
-		name: "selection",
-		explanation: "the aspect of zombies you want to randomly pick",
-		options:
-		{
-			"game":
-			{
-				summary: "pick a random zombies game",
-			},
-			"map":
-			{
-				summary: "pick a random zombies map",
-			},
-		}
-	},
+	arg: new EnumArg("selection", "the aspect of zombies you want to randomly pick", [
+		new Option("game", "pick a random zombies game"),
+		new Option("map", "pick a random zombies map"),
+	]),
     execute(message, choices)
     {
 		const possibilities = zombies[choices[0]];

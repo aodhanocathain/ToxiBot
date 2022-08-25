@@ -1,10 +1,10 @@
 This is a summary of how the chess program interfaces with the discord bot program.
 
 The chess program provides output in the format "{TYPE} {Data}", e.g. "BOARD mmmmmmm....." or "RESULT 1", etc.
-It takes input in the format "{COMMAND} {arg0} {arg1} {arg2} ...", e.g. "MOVE e2e4", "UNMOVE", etc.
+It takes input in the format "{COMMAND} {arg0} {arg1} {arg2} ...", e.g. "MOVE e2e4", "ADVISE best", etc.
 
-In the chess program's code, the board stores its squares in a one dimensional array.
-For all intents and purposes, though, it can be thought of as a two dimensional array instead, indexed in the first dimension by a square's file, then by its rank in the second dimension.
+In the chess program's code, the board stores its squares in a one dimensional array which can be thought of
+as a two dimensional array instead, indexed in the first dimension by a square's file, then by its rank in the second dimension.
 (it would look like: squares[file][rank])
 On a conventional chessboard, vertical positioning is given with a rank ranging from 1-8, and horizontal positioning is given with a file, referred to by a letter in the range a to h.
 In the chess code, the a file is considered the 0th file, the b file is considered the 1st, and so on (for 0-based indexing).
@@ -32,5 +32,5 @@ The output consists of the encoding for these pieces in the order that their squ
 To pick an individual square on file F and rank R (F and R being 0-based) from the output, take the (7-Rth)set of 8 squares and choose the Fth square within.
 More generally for a board of width B, the index of a square of file F and R (again, 0-based) is (B*(B-1)) - (B*R) + F.
 
-The program recognizes 6 types of piece, and encodes each piece arithmetically as ASCII 'a' + the associated value of the piece's type, + 6 extra if it is a black piece.
-If no piece is present for a square, it outputs ASCII 'a' + 13.
+The program recognizes the 5 types of piece in chess, and the pawns, and encodes each arithmetically as ASCII 'a' + the associated value of the piece's type, + 6 extra if it is a black piece.
+If no piece is present for a square, it outputs ASCII 'a' + 12.
