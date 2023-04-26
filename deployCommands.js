@@ -3,7 +3,7 @@ require("dotenv").config();
 const FileSystem = require("fs");
 const Discord = require("discord.js");
 
-const commandsDirectory = "./commands";
+const commandsDirectory = process.env.COMMANDS_DIRECTORY;
 const commandFileNames = FileSystem.readdirSync(commandsDirectory);
 
 const commands = [];
