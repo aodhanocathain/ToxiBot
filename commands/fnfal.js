@@ -3,19 +3,19 @@ const Discord = require("discord.js");
 const gameCommand = (command) => {
 	return command
 	.setName("game")
-	.setDescription("pick a random game");
+	.setDescription("Randomly pick a random COD zombies game");
 };
 
 const mapCommand = (command) => {
 	return command
 	.setName("map")
-	.setDescription("pick a random map")
+	.setDescription("Randomly pick a map")
 }
 
 const expCommand = (command) => {
 	return command
 	.setName("experience")
-	.setDescription("pick a random map and one of its modes");
+	.setDescription("Randomly pick a COD zombies map and one of its modes");
 };
 
 const ZombiesGames = {
@@ -73,9 +73,11 @@ const pickRandomArrayElement = (array) => {
 	return array[Math.floor(Math.random()*array.length)]
 };
 
+const commandName = "fnfal";
+
 module.exports = {
-	name: "fnfal",
-	discordCommand : new Discord.SlashCommandBuilder().setName("fnfal").setDescription("randomly pick COD zombies")
+	name: commandName,
+	discordCommand : new Discord.SlashCommandBuilder().setName(commandName).setDescription("Randomly pick something to play in COD zombies")
 	.addSubcommand(gameCommand)
 	.addSubcommand(mapCommand)
 	.addSubcommand(expCommand),
