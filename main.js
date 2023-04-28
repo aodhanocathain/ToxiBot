@@ -6,6 +6,7 @@ const Discord = require("discord.js");
 const {DirectMessages, GuildMessages, Guilds, MessageContent} = Discord.GatewayIntentBits;
 const bot = new Discord.Client({intents: [DirectMessages, GuildMessages, Guilds, MessageContent]});
 
+//load command functionalities
 bot.commandHandlers={};
 const commandsDirectory = process.env.COMMANDS_DIRECTORY;
 const commandFileNames = FileSystem.readdirSync(commandsDirectory);
@@ -17,6 +18,7 @@ for(const commandFileName of commandFileNames)
 
 bot.login(process.env.DISCORD_TOKEN);
 
+//send a message to a special channel, indicating readiness
 bot.once(Discord.Events.ClientReady, (readyEvent)=>{
 	bot.channels.fetch(process.env.WAKE_CHANNEL).then((channel)=>{
 		channel.send("I am online.");
@@ -24,11 +26,7 @@ bot.once(Discord.Events.ClientReady, (readyEvent)=>{
 });
 
 bot.on(Discord.Events.MessageCreate, (message)=>{
-	//no functionality other than interactions for now, just log out when I send a text message
-	if(message.author.id == process.env.OWNER_ID)
-	{
-		bot.destroy();
-	}
+	//no functionality other than interactions for now
 });
 
 bot.on(Discord.Events.InteractionCreate, (interaction)=>{

@@ -3,23 +3,31 @@ const Canvas = require("canvas");
 const FileSystem = require("fs");
 
 const ROW_SQUARES = 8;
-const SQUARE_PIXELS = 40;
+const SQUARE_PIXELS = 50;
 const LIGHT_COLOUR = "#e0d0b0";
 const DARK_COLOUR = "#e0a070";
+const FONT_COLOUR = "#0000ff";
 
 const boardToPngFile = async () => {
 	const canvas = Canvas.createCanvas(ROW_SQUARES*SQUARE_PIXELS, ROW_SQUARES*SQUARE_PIXELS);
 	const context = canvas.getContext("2d");
+	context.font = `${SQUARE_PIXELS/4}px Arial`;	//SQUARE_PIXELS/4 is an arbitrarily chosen size
 
 	const myimage = await Canvas.loadImage("./images/chess/white/king.png");
-	for(let row=0; row<ROW_SQUARES; row++)
+	for(let rank=ROW_SQUARES-1; rank>=0; rank--)
 	{
 		for(let file=0; file<ROW_SQUARES; file++)
 		{
-			context.fillStyle = (((row+file)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
-			const x = ((ROW_SQUARES-1)-file) * SQUARE_PIXELS;
-			const y = row*SQUARE_PIXELS;
-			context.fillRect(((ROW_SQUARES-1)-file)*SQUARE_PIXELS, row*SQUARE_PIXELS, SQUARE_PIXELS, SQUARE_PIXELS);
+			//draw the current square according to its indices
+			context.fillStyle = (((rank+file)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
+			const x = file*SQUARE_PIXELS;
+			const y = ((ROW_SQUARES-1)-rank)*SQUARE_PIXELS;
+			context.fillRect(x, y, SQUARE_PIXELS, SQUARE_PIXELS);
+			
+			//draw the square name e.g. "f3"
+			context.fillStyle = FONT_COLOUR;
+			const squareName = `${String.fromCharCode('a'.charCodeAt(0)+file)}${String.fromCharCode('1'.charCodeAt(0)+rank)}`;
+			context.fillText(squareName, x, y+SQUARE_PIXELS);
 			context.drawImage(myimage, x, y, SQUARE_PIXELS, SQUARE_PIXELS);
 		}
 	}
