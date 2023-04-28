@@ -34,6 +34,13 @@ bot.on(Discord.Events.MessageCreate, (message)=>{
 bot.on(Discord.Events.InteractionCreate, (interaction)=>{
 	if(interaction.isChatInputCommand())
 	{
-		bot.commandHandlers[interaction.commandName](interaction);
+		try
+		{
+			bot.commandHandlers[interaction.commandName](interaction);
+		}
+		catch(error)
+		{
+			interaction.reply("error");
+		}
 	}
 });
