@@ -14,6 +14,10 @@ for(const commandFileName of commandFileNames)
 {
 	const commandProperties = require(`${commandsDirectory}/${commandFileName}`);
 	bot.commandHandlers[commandProperties.name] = commandProperties.execute;
+	if(commandProperties.configure)
+	{
+		commandProperties.configure(bot);
+	}
 }
 
 bot.login(process.env.DISCORD_TOKEN);
