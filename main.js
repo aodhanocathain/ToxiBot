@@ -38,11 +38,16 @@ bot.on(Discord.Events.InteractionCreate, (interaction)=>{
 	{
 		try
 		{
-			bot.commandHandlers[interaction.commandName](interaction);
+			const response = bot.commandHandlers[interaction.commandName](interaction);
+			if(!response)
+			{
+				interaction.reply("Ok");
+			}
 		}
 		catch(error)
 		{
 			interaction.reply("error");
+			console.error("error");
 		}
 	}
 });

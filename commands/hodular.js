@@ -6,6 +6,6 @@ module.exports = {
 	name: commandName,
 	discordCommand : new Discord.SlashCommandBuilder().setName(commandName).setDescription("Who is hodular?"),
 	execute: (interaction) => {
-		interaction.reply("Kaiwhungus and Moyler");
+		return interaction.reply("Kaiwhungus and Moyler");
 	}
 };

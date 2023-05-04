@@ -6,6 +6,6 @@ module.exports = {
 	name: commandName,
 	discordCommand : new Discord.SlashCommandBuilder().setName(commandName).setDescription("Prompt acknowledgement by the bot"),
 	execute: (interaction) => {
-		interaction.reply("Test");
+		return interaction.reply("Test");
 	}
 };

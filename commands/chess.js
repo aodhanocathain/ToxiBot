@@ -7,7 +7,11 @@ const actionOption = (option) => {
 	.setName("action")
 	.setDescription("take action")
 	.setRequired(true)
-	.addChoices({name: "gamecreate", value:"gamecreate"});
+	.addChoices(
+	{name: "gamecreate", value:"gamecreate"},
+	{name: "gameshow", value:"gameshow"},
+	{name: "gameend", value:"gameend"}
+	);
 }
 
 const commandName = "chess";
@@ -25,32 +29,39 @@ module.exports = {
 		{
 			if(interaction.client.games[`${interaction.user.id}`])
 			{
-				interaction.reply("You already have an active game");
+				return interaction.reply("You already have an active game");
 			}
 			else
 			{
 				interaction.client.games[`${interaction.user.id}`] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1\n";
+				return;
 			}
 		}
 		else if(action == "gameshow")
 		{
-			
+			if(interaction.client.games[`${interaction.user.id}`])
+			{
+				const buffer = FEN.StringToPNGBuffer(interaction.client.games[`${interaction.user.id}`]);
+				return buffer.then((value)=>{
+					interaction.reply({files: [value]});
+				});
+			}
+			else
+			{
+				return interaction.reply("You have no active game to show");
+			}
 		}
-		else
+		else if(action == "gameend")
 		{
-			console.log(`The action option was ${action}`);
-		}
-			
-		if(interaction.client.games[`${interaction.user.id}`])
-		{
-			const buffer = FEN.StringToPNGBuffer(interaction.client.games[`${interaction.user.id}`]);
-			buffer.then((value)=>{
-				interaction.reply({files: [value]});
-			});
-		}
-		else
-		{
-			console.log(`no ${interaction.user.username} game in client.games: ${client.games}`);
+			if(interaction.client.games[`${interaction.user.id}`])
+			{
+				delete interaction.client.games[`${interaction.user.id}`];
+				return;
+			}
+			else
+			{
+				return interaction.reply("You have no active game to end");
+			}
 		}
 	}
 };

@@ -85,17 +85,17 @@ module.exports = {
 		const subcommand = interaction.options.getSubcommand();
 		if(subcommand=="game")
 		{
-			interaction.reply(pickRandomArrayElement(Object.keys(ZombiesGames)));
+			return interaction.reply(pickRandomArrayElement(Object.keys(ZombiesGames)));
 		}
 		else if(subcommand=="map")
 		{
-			interaction.reply(pickRandomArrayElement(items.map((item)=>{return item.map;})));
+			return interaction.reply(pickRandomArrayElement(items.map((item)=>{return item.map;})));
 		}
 		else if(subcommand=="experience")
 		{
 			const item = pickRandomArrayElement(items);
 			const mode = pickRandomArrayElement(item.modes);
-			interaction.reply(`${item.map} (${mode})`);
+			return interaction.reply(`${item.map} (${mode})`);
 		}
 	}
 };
