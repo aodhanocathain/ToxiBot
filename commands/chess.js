@@ -1,6 +1,6 @@
 const Discord = require("discord.js");
 const FileSystem = require("fs");
-const FEN = require("../FEN.js");
+const Chess = require("../chess.js");
 
 const actionOption = (option) => {
 	return option
@@ -33,7 +33,8 @@ module.exports = {
 			}
 			else
 			{
-				interaction.client.games[`${interaction.user.id}`] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1\n";
+				//interaction.client.games[`${interaction.user.id}`] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1\n";
+				interaction.client.games[`${interaction.user.id}`] = "4k3/8/8/8/8/8/8/4K3 w KQkq - 0 1\n";
 				return;
 			}
 		}
@@ -41,7 +42,7 @@ module.exports = {
 		{
 			if(interaction.client.games[`${interaction.user.id}`])
 			{
-				const buffer = FEN.StringToPNGBuffer(interaction.client.games[`${interaction.user.id}`]);
+				const buffer = Chess.FENStringToPNGBuffer(interaction.client.games[`${interaction.user.id}`]);
 				return buffer.then((value)=>{
 					interaction.reply({files: [value]});
 				});

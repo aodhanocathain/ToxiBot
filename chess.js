@@ -24,9 +24,52 @@ const chessPieceImages = {
 	"p": Canvas.loadImage(`./images/chess/black/pawn.png`)
 };
 
+const FENStringToGame = (FENString) => {
+	const game = {
+		board: [],
+		turn: null,
+		castleRights: [],
+		enPassantable: null,
+		halfMove: null,
+		fullMove: null		
+	};
+	const FENparts = FENString.split(" ");
+	const boardString = FENparts[0];
+	let charIndex=0;
+	while(charIndex < boardString.length)
+	{
+		const character = boardString.charAt(charIndex);
+		const index = Object.keys(chessPieceImages).indexOf(character);
+		if(index>=0)	//current character from FENstring indicates a piece, e.g. "k"
+		{
+			game.board.push(character);
+		}
+		else	//current character either indicates a number of empty squares or a new rank
+		{
+			if(character!="/")	//must indicate a number of empty squares
+			{
+				for(let i=0; i<parseInt(character); i++)
+				{
+					game.board.push(null);
+				}
+			}
+		}
+		charIndex++;
+	}
+	
+	//"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1\n"
+	game.turn = FENparts[1];
+	game.castleRights = FENparts[2].split("");
+	game.enPassantable = FENparts[3];
+	game.halfMove = parseInt(FENparts[4]);
+	game.fullMove = parseInt(FENparts[5]);	
+	
+	return game;
+};
+
 module.exports = 
 {
-	StringToPNGBuffer : (FENstring) => {
+	FENStringToPNGBuffer : (FENString) => {
 		const canvas = Canvas.createCanvas(RANK_SQUARES*SQUARE_PIXELS, RANK_SQUARES*SQUARE_PIXELS);
 		const context = canvas.getContext("2d");
 		context.font = `${SQUARE_PIXELS/4}px Arial`;//SQUARE_PIXELS/4 is an arbitrarily chosen size
@@ -49,7 +92,7 @@ module.exports =
 			}
 		}
 			
-		const FENparts = FENstring.split(" ");
+		const FENparts = FENString.split(" ");
 		//draw pieces on certain squares given the FEN string
 		return Promise.all(Object.values(chessPieceImages)).then((resolvedChessPieceImages)=>{
 			//scan the section that describes the board
@@ -59,7 +102,7 @@ module.exports =
 			{
 				const character = boardString.charAt(charIndex);
 				const imageIndex = Object.keys(chessPieceImages).indexOf(character);
-				if(imageIndex>=0)	//current character from FENstring indicates a piece, e.g. "k"
+				if(imageIndex>=0)	//current character from FENString indicates a piece, e.g. "k"
 				{
 					//FEN strings list files in ascending order, in rows of descending order
 					//squareIndex variable increases by 1 per file in a row, so by 8 per row in the board
