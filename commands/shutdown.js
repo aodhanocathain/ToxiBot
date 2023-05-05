@@ -9,7 +9,7 @@ module.exports = {
 		//only shut down if the owner uses the command
 		if(interaction.user.id == process.env.OWNER_ID)
 		{
-			interaction.reply("Ok")
+			return interaction.reply("Ok")
 			.then(()=>{
 				interaction.client.destroy(); process.exit();
 			});
