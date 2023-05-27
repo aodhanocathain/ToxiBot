@@ -26,53 +26,29 @@ const chessPieceImages = {
 
 module.exports = 
 {
-	FENStringToGame : (FENString) => {
-		const game = {
-			board: [],
-			turn: null,
-			castleRights: [],
-			enPassantable: null,
-			halfMove: null,
-			fullMove: null		
-		};
+	FENStringToGame : (FENString) => {		
 		const FENparts = FENString.split(" ");
+		
 		const boardString = FENparts[0];
-		const ranks = boardString.split("/");
-		//FEN strings start at the 8th rank
-		//Scan ranks array in descending indices to construct board from ascending ranks
-		for(let rankIndex=NUM_RANKS-1; rankIndex>=0; rankIndex--)
-		{
-			let charIndex=0;
-			const rank = ranks[rankIndex];
-			while(charIndex < ranks[rankIndex].length)
-			{
-				const character = rank.charAt(charIndex);
-				const keyIndex = Object.keys(chessPieceImages).indexOf(character);
-				if(keyIndex>=0)	//current character from FENstring indicates a piece, e.g. "k"
-				{
-					game.board.push(character);
-				}
-				else	//current character either indicates a number of empty squares or a new rank
-				{
-					if(character!="/")	//must indicate a number of empty squares
-					{
-						for(let i=0; i<parseInt(character); i++)
-						{
-							game.board.push(null);
-						}
-					}
-				}
-				charIndex++;
-			}
+		//ranks are delimitted by "/" in FEN strings
+		const rankStrings = boardString.split("/");
+		//FEN strings give ranks in descending order, must reverse to construct board in ascending rank order
+		const board = rankStrings.reverse().map((rankString)=>{
+			const characters = rankString.split("");
+			return characters.map((character)=>{
+				//current character either denotes a piece or a number of empty squares
+				return character in chessPieceImages? character : Array(parseInt(character)).fill(null);
+			}).flat(1);
+		})
+		
+		return {
+			board: board,
+			turn: FENparts[1],
+			castleRights: FENparts[2].split(""),
+			enPassantable: FENparts[3],
+			halfMove: parseInt(FENparts[4]),
+			fullMove: parseInt(FENparts[5])
 		}
-		
-		game.turn = FENparts[1];
-		game.castleRights = FENparts[2];
-		game.enPassantable = FENparts[3];
-		game.halfMove = parseInt(FENparts[4]);
-		game.fullMove = parseInt(FENparts[5]);	
-		
-		return game;
 	},
 	
 	KingMovesInGame : (game) => {
