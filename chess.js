@@ -114,29 +114,24 @@ module.exports =
 	},
 	
 	GameToFENString : (game) => {
-		let boardString = ``;
-		for(let rank = NUM_RANKS - 1; rank >= 0; rank--)
-		{
+		const boardString = game.board.map((rank)=>{
 			let emptySquares = 0;
-			for(let file = 0; file < NUM_FILES; file++)
-			{
-				const index = (rank * NUM_FILES) + file;
-				const character = game.board[index];
-				if(character == null)
+			return rank.reduce((accumulator, character)=>{
+				if(character in chessPieceImages)
 				{
-					emptySquares++;
-					continue;
+					accumulator = accumulator.append(`${emptySquares>0? emptySquares : ""}${character}`);
+					emptySquares = 0;
+					return accumulator;
 				}
 				else
 				{
-					boardString = `${boardString}${emptySquares>0?emptySquares:""}${character}`;
-					emptySquares = 0;
+					emptySquares++;
+					return accumulator;
 				}
-			}
-			
-			boardString = `${boardString}${emptySquares>0?emptySquares:""}${rank>0? "/" : ""}`;
-		}
-		return boardString;
+			}, "");
+			.append(`${emptySquares>0? emptySquares:""}`);
+		}).join("/");
+		return [boardString, game.turn, game.castleRights, game.enPassantable, game.halfMove, game.fullMove].join(" ");
 	},
 	
 	FENStringToPNGBuffer : (FENString) => {
