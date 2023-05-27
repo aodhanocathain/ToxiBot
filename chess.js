@@ -20,19 +20,19 @@ const teamSetters = {
 };
 
 const chessPieceImages = {
-	[white(KING)] : Canvas.loadImage(`./images/chess/white/king.png`),
-	[black(KING)] : Canvas.loadImage(`./images/chess/black/king.png`),
+	[teamSetters[WHITE](KING)] : Canvas.loadImage(`./images/chess/white/king.png`),
+	[teamSetters[BLACK](KING)] : Canvas.loadImage(`./images/chess/black/king.png`)
 };
 
 const START_FILE = "a";
 const START_RANK = "1";
 
-const asciiOffset(character, offset)
+function asciiOffset(character, offset)
 {
 	return String.fromCharCode(character.charCodeAt(0) + offset);
 }
 
-const asciiDistance(character, baseCharacter)
+function asciiDistance(character, baseCharacter)
 {
 	return character.charCodeAt(0) - baseCharacter.charCodeAt(0);
 }
@@ -67,7 +67,7 @@ module.exports =
 	KingMovesInGame : (game) => {
 		const movingKing = teamSetters[game.turn](KING);
 		const rank = game.board.findIndex((rank)=>{return rank.includes(movingKing);});
-		const file = game.board[rankIndex].indexOf(movingKing);
+		const file = game.board[rank].indexOf(movingKing);
 		
 		//the king can move up to 1 square up or down and up to 1 square left or right
 		return [-1,0,1].map((fileOffset)=>{
@@ -86,7 +86,7 @@ module.exports =
 		})
 		.map(([rank, file])=>{
 			const capture = game.board[rank][file]!=null;
-			return `${KING}${capture?"x":""]}${asciiOffset(START_RANK,rank)}${asciiOffset(START_FILE,file)}`;
+			return `${KING}${capture?"x":""}${asciiOffset(START_FILE,file)}${asciiOffset(START_RANK,rank)}`;
 		});
 	},
 	
@@ -110,7 +110,7 @@ module.exports =
 		game.turn = (game.turn == WHITE ? BLACK : WHITE);
 		game.board.enPassantable = "-";
 		game.halfMove++;
-		game.fullMove = Math.floor(halfMove/2);
+		game.fullMove = 1 + Math.floor(game.halfMove/2);
 	},
 	
 	GameToFENString : (game) => {
@@ -119,7 +119,7 @@ module.exports =
 			return rank.reduce((accumulator, character)=>{
 				if(character in chessPieceImages)
 				{
-					accumulator = accumulator.append(`${emptySquares>0? emptySquares : ""}${character}`);
+					accumulator = accumulator.concat(`${emptySquares>0? emptySquares : ""}${character}`);
 					emptySquares = 0;
 					return accumulator;
 				}
@@ -128,10 +128,10 @@ module.exports =
 					emptySquares++;
 					return accumulator;
 				}
-			}, "");
-			.append(`${emptySquares>0? emptySquares:""}`);
+			}, "")
+			.concat(`${emptySquares>0? emptySquares:""}`);
 		}).join("/");
-		return [boardString, game.turn, game.castleRights, game.enPassantable, game.halfMove, game.fullMove].join(" ");
+		return [boardString, game.turn, game.castleRights.join(""), game.enPassantable, game.halfMove, game.fullMove].join(" ");
 	},
 	
 	FENStringToPNGBuffer : (FENString) => {
@@ -157,7 +157,7 @@ module.exports =
 			}
 		}
 		
-		const game = this.FENStringToGame(FENString);
+		const game = module.exports.FENStringToGame(FENString);
 			
 		return Promise.all(Object.values(chessPieceImages)).then((resolvedChessPieceImages)=>{
 			game.board.forEach((rank, rankIndex)=>{
@@ -166,7 +166,8 @@ module.exports =
 					if(character in chessPieceImages)
 					{
 						const x = fileIndex*SQUARE_PIXELS;
-						const y = ((NUM_RANKS-1)-rankIndex)*SQUARE_PIXELS;
+						//const y = ((NUM_RANKS-1)-rankIndex)*SQUARE_PIXELS;
+						const y = rankIndex*SQUARE_PIXELS;
 						const imageIndex = Object.keys(chessPieceImages).indexOf(character);
 						context.drawImage(resolvedChessPieceImages[imageIndex], x, y, SQUARE_PIXELS, SQUARE_PIXELS);
 					}
