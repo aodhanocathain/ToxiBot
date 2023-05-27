@@ -9,9 +9,19 @@ const LIGHT_COLOUR = "#e0d0b0";
 const DARK_COLOUR = "#e0a070";
 const FONT_COLOUR = "#0000ff";
 
+const WHITE = "w";
+const BLACK = "b";
+
+const KING = "K";
+
+const teamSetters = {
+	[WHITE] : function(piece){return piece.toUpperCase();},
+	[BLACK] : function(piece){return piece.toLowerCase();}
+};
+
 const chessPieceImages = {
-	"K": Canvas.loadImage(`./images/chess/white/king.png`),
-	"k": Canvas.loadImage(`./images/chess/black/king.png`),
+	[white(KING)] : Canvas.loadImage(`./images/chess/white/king.png`),
+	[black(KING)] : Canvas.loadImage(`./images/chess/black/king.png`),
 };
 
 module.exports = 
@@ -57,7 +67,7 @@ module.exports =
 		}
 		
 		game.turn = FENparts[1];
-		game.castleRights = FENparts[2].split("");
+		game.castleRights = FENparts[2];
 		game.enPassantable = FENparts[3];
 		game.halfMove = parseInt(FENparts[4]);
 		game.fullMove = parseInt(FENparts[5]);	
@@ -66,7 +76,7 @@ module.exports =
 	},
 	
 	KingMovesInGame : (game) => {
-		const squareIndex = game.board.indexOf(game.turn=="w"? "K" : "k");
+		const squareIndex = game.board.indexOf(teamSetters[game.turn](KING));
 		const file = squareIndex % NUM_FILES;
 		const rank = (NUM_FILES - 1) - Math.floor(squareIndex / NUM_FILES);
 		return [-1,0,1].map((fileOffset)=>{
@@ -84,9 +94,9 @@ module.exports =
 	},
 	
 	MakeMoveInGame : (move, game) => {
-		const funcName = (game.turn == "w"? "toUpperCase" : "toLowerCase");
-		const movingPiece = move.charAt(0)[funcName]();
-		if(movingPiece == "K"[funcName]())
+		const movingTeamSetter = teamSetters[game.turn];
+		const movingPiece = movingTeamSetter(move.charAt(0));
+		if(movingPiece == movingTeamSetter(KING))
 		{
 			const fromSquareIndex = game.board.indexOf(movingPiece);
 			const toSquareCharIndex = move.charAt(1)=="x"? 2 : 1;
@@ -99,12 +109,12 @@ module.exports =
 			game.board[toSquareIndex] = movingPiece;
 			game.board.enPassantable = null;
 			game.castleRights = game.castleRights.filter((wing) => {
-				return wing != ("k"[funcname]()) && wing != ("q"[funcname]());
+				return wing != movingTeamSetter(KING);
 			});
 		}
 		game.halfMove++;
 		game.fullMove = Math.floor(halfMove/2);
-		game.turn = (game.turn == "w" ? "b" : "w");
+		game.turn = (game.turn == WHITE ? BLACK : WHITE);
 	},
 	
 	GameToFENString : (game) => {
