@@ -52,9 +52,11 @@ module.exports =
 	},
 	
 	KingMovesInGame : (game) => {
-		const squareIndex = game.board.indexOf(teamSetters[game.turn](KING));
-		const file = squareIndex % NUM_FILES;
-		const rank = (NUM_FILES - 1) - Math.floor(squareIndex / NUM_FILES);
+		const movingKing = teamSetters[game.turn](KING);
+		const rank = game.board.findIndex((rank)=>{return rank.includes(movingKing);});
+		const file = game.board[rankIndex].indexOf(movingKing);
+		
+		//the king can move up to 1 square up or down and up to 1 square left or right
 		return [-1,0,1].map((fileOffset)=>{
 			return [-1,0,1].map((rankOffset)=>{
 				return [rank+rankOffset, file+fileOffset];
@@ -62,11 +64,17 @@ module.exports =
 		})
 		.flat(1)
 		.filter(([newRank, newFile]) => {
-			return 0 <= newRank && newRank <= NUM_RANKS && 0 <= newFile && newFile <= NUM_FILES;
+			//must not exceed the boundaries of the board
+			return 0 <= newRank && newRank < NUM_RANKS && 0 <= newFile && newFile < NUM_FILES;
 		})
 		.filter(([newRank, newFile]) => {
+			//can't move from a square to itself
 			return newRank != rank || newFile != file;
 		})
+		.map(([rank, file])=>{
+			const capture = game.board[rank][file]!=null;
+			return `${KING}${capture?"x":""]}${rank}${file}`;
+		});
 	},
 	
 	MakeMoveInGame : (move, game) => {
