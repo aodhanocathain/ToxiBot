@@ -14,6 +14,7 @@ const BLACK = "b";
 
 const KING = "K";
 
+//FEN strings denote white pieces in uppercase and black pieces in lowercase
 const teamSetters = {
 	[WHITE] : function(piece){return piece.toUpperCase();},
 	[BLACK] : function(piece){return piece.toLowerCase();}
@@ -65,6 +66,7 @@ module.exports =
 	},
 	
 	KingMovesInGame : (game) => {
+		//find the king that is moving
 		const movingKing = teamSetters[game.turn](KING);
 		const rank = game.board.findIndex((rank)=>{return rank.includes(movingKing);});
 		const file = game.board[rank].indexOf(movingKing);
@@ -100,9 +102,12 @@ module.exports =
 			const newFile = asciiDistance(move.charAt(1), START_FILE);
 			const newRank = asciiDistance(move.charAt(2), START_RANK);
 			
+			//remove from old square
 			game.board[oldRank][oldFile] = null;
+			//place in new square
 			game.board[newRank][newFile] = movingPiece;
-
+			
+			//moving king forfeits all castle rights
 			game.castleRights = game.castleRights.filter((wing) => {
 				return movingTeamSetter(wing) != wing;
 			});
@@ -158,7 +163,7 @@ module.exports =
 		}
 		
 		const game = module.exports.FENStringToGame(FENString);
-			
+		//draw pieces, if present
 		return Promise.all(Object.values(chessPieceImages)).then((resolvedChessPieceImages)=>{
 			game.board.forEach((rank, rankIndex)=>{
 				rank.forEach((file, fileIndex)=>{
@@ -166,7 +171,6 @@ module.exports =
 					if(character in chessPieceImages)
 					{
 						const x = fileIndex*SQUARE_PIXELS;
-						//const y = ((NUM_RANKS-1)-rankIndex)*SQUARE_PIXELS;
 						const y = rankIndex*SQUARE_PIXELS;
 						const imageIndex = Object.keys(chessPieceImages).indexOf(character);
 						context.drawImage(resolvedChessPieceImages[imageIndex], x, y, SQUARE_PIXELS, SQUARE_PIXELS);
