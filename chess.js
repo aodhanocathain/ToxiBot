@@ -11,17 +11,7 @@ const FONT_COLOUR = "#0000ff";
 
 const chessPieceImages = {
 	"K": Canvas.loadImage(`./images/chess/white/king.png`),
-	"Q": Canvas.loadImage(`./images/chess/white/queen.png`),
-	"R": Canvas.loadImage(`./images/chess/white/rook.png`),
-	"B": Canvas.loadImage(`./images/chess/white/bishop.png`),
-	"N": Canvas.loadImage(`./images/chess/white/knight.png`),
-	"P": Canvas.loadImage(`./images/chess/white/pawn.png`),
 	"k": Canvas.loadImage(`./images/chess/black/king.png`),
-	"q": Canvas.loadImage(`./images/chess/black/queen.png`),
-	"r": Canvas.loadImage(`./images/chess/black/rook.png`),
-	"b": Canvas.loadImage(`./images/chess/black/bishop.png`),
-	"n": Canvas.loadImage(`./images/chess/black/knight.png`),
-	"p": Canvas.loadImage(`./images/chess/black/pawn.png`)
 };
 
 module.exports = 
