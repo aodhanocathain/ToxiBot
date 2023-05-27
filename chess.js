@@ -24,6 +24,19 @@ const chessPieceImages = {
 	[black(KING)] : Canvas.loadImage(`./images/chess/black/king.png`),
 };
 
+const START_FILE = "a";
+const START_RANK = "1";
+
+const asciiOffset(character, offset)
+{
+	return String.fromCharCode(character.charCodeAt(0) + offset);
+}
+
+const asciiDistance(character, baseCharacter)
+{
+	return character.charCodeAt(0) - baseCharacter.charCodeAt(0);
+}
+
 module.exports = 
 {
 	FENStringToGame : (FENString) => {		
@@ -73,7 +86,7 @@ module.exports =
 		})
 		.map(([rank, file])=>{
 			const capture = game.board[rank][file]!=null;
-			return `${KING}${capture?"x":""]}${rank}${file}`;
+			return `${KING}${capture?"x":""]}${asciiOffset(START_RANK,rank)}${asciiOffset(START_FILE,file)}`;
 		});
 	},
 	
@@ -82,23 +95,22 @@ module.exports =
 		const movingPiece = movingTeamSetter(move.charAt(0));
 		if(movingPiece == movingTeamSetter(KING))
 		{
-			const fromSquareIndex = game.board.indexOf(movingPiece);
-			const toSquareCharIndex = move.charAt(1)=="x"? 2 : 1;
-			const newSquareName = move.slice(toSquareCharIndex, toSquareCharIndex + 2);
-			const toSquareIndex = 
-			((newSquareName.charCodeAt(1)-'1'.charCodeAt(0)) * NUM_FILES) + 
-			(newSquareName.charCodeAt(0)-'a'.charCodeAt(0));
+			const oldRank = game.board.findIndex((rank)=>{return rank.includes(movingPiece);});
+			const oldFile = game.board[oldRank].indexOf(movingPiece);
+			const newFile = asciiDistance(move.charAt(1), START_FILE);
+			const newRank = asciiDistance(move.charAt(2), START_RANK);
 			
-			game.board[fromSquareIndex] = null;
-			game.board[toSquareIndex] = movingPiece;
-			game.board.enPassantable = null;
+			game.board[oldRank][oldFile] = null;
+			game.board[newRank][newFile] = movingPiece;
+
 			game.castleRights = game.castleRights.filter((wing) => {
-				return wing != movingTeamSetter(KING);
+				return movingTeamSetter(wing) != wing;
 			});
 		}
+		game.turn = (game.turn == WHITE ? BLACK : WHITE);
+		game.board.enPassantable = "-";
 		game.halfMove++;
 		game.fullMove = Math.floor(halfMove/2);
-		game.turn = (game.turn == WHITE ? BLACK : WHITE);
 	},
 	
 	GameToFENString : (game) => {
