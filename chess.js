@@ -138,9 +138,9 @@ module.exports =
 		const canvas = Canvas.createCanvas(NUM_FILES*SQUARE_PIXELS, NUM_RANKS*SQUARE_PIXELS);
 		const context = canvas.getContext("2d");
 		context.font = `${SQUARE_PIXELS/4}px Arial`;//SQUARE_PIXELS/4 is an arbitrarily chosen size
-		
+				
 		//draw the board first
-		for(let rank=NUM_RANKS-1; rank>=0; rank--)
+		for(let rank=0; rank<NUM_RANKS; rank++)
 		{
 			for(let file=0; file<NUM_FILES; file++)
 			{
@@ -152,44 +152,26 @@ module.exports =
 				
 				//annotate the square name e.g. "f3"
 				context.fillStyle = FONT_COLOUR;
-				const squareName = `${String.fromCharCode('a'.charCodeAt(0)+file)}${String.fromCharCode('1'.charCodeAt(0)+rank)}`;
+				const squareName = `${asciiOffset(START_FILE, file)}${asciiOffset(START_RANK, rank)}`;
 				context.fillText(squareName, x, y+SQUARE_PIXELS);
 			}
 		}
+		
+		const game = this.FENStringToGame(FENString);
 			
-		const FENparts = FENString.split(" ");
-		//draw pieces on certain squares given the FEN string
 		return Promise.all(Object.values(chessPieceImages)).then((resolvedChessPieceImages)=>{
-			//scan the section that describes the board
-			const boardString = FENparts[0];
-			let squareIndex=0; let charIndex=0;
-			while(charIndex < boardString.length)
-			{
-				const character = boardString.charAt(charIndex);
-				const imageIndex = Object.keys(chessPieceImages).indexOf(character);
-				if(imageIndex>=0)	//current character from FENString indicates a piece, e.g. "k"
-				{
-					//FEN strings list files in ascending order, in rows of descending order
-					//squareIndex variable increases by 1 per file in a row, so by 8 per row in the board
-					const file = squareIndex % NUM_FILES;
-					const rank = (NUM_RANKS - 1) - Math.floor((squareIndex / NUM_FILES));						
-					//coordinates for current square
-					const x = file*SQUARE_PIXELS;
-					const y = ((NUM_RANKS-1)-rank)*SQUARE_PIXELS;
-						
-					//draw piece at coordinantes
-					context.drawImage(resolvedChessPieceImages[imageIndex], x, y, SQUARE_PIXELS, SQUARE_PIXELS);
-					squareIndex++;
-				}
-				else	//current character either indicates a number of empty squares or a new rank
-				{
-					if(character!="/")	//must indicate a number of empty squares
+			game.board.forEach((rank, rankIndex)=>{
+				rank.forEach((file, fileIndex)=>{
+					const character = game.board[rankIndex][fileIndex];
+					if(character in chessPieceImages)
 					{
-						squareIndex+=parseInt(character);
+						const x = fileIndex*SQUARE_PIXELS;
+						const y = ((NUM_RANKS-1)-rankIndex)*SQUARE_PIXELS;
+						const imageIndex = Object.keys(chessPieceImages).indexOf(character);
+						context.drawImage(resolvedChessPieceImages[imageIndex], x, y, SQUARE_PIXELS, SQUARE_PIXELS);
 					}
-				}
-				charIndex++;
-			}
+				});
+			});
 			return canvas.toBuffer("image/png");
 		});
 	}
