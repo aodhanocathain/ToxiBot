@@ -43,8 +43,18 @@ module.exports = {
 			if(interaction.client.games[`${interaction.user.id}`])
 			{
 				const buffer = Chess.FENStringToPNGBuffer(interaction.client.games[`${interaction.user.id}`]);
+				const moveList = Chess.KingMovesInGame(Chess.FENStringToGame(interaction.client.games[`${interaction.user.id}`]));
+				const moveSelectMenu = new Discord.StringSelectMenuBuilder().setCustomId("move").setPlaceholder("Choose a move")
+				.addOptions(...moveList.map((move)=>{
+						return new Discord.StringSelectMenuOptionBuilder().setLabel(move).setValue(move)
+					})
+				)
+				
 				return buffer.then((value)=>{
-					interaction.reply({files: [value]});
+					interaction.reply({
+						files: [value],
+						components: [new Discord.ActionRowBuilder().addComponents(moveSelectMenu)]
+					});
 				});
 			}
 			else

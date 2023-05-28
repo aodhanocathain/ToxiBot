@@ -47,7 +47,7 @@ bot.on(Discord.Events.InteractionCreate, (interaction)=>{
 		catch(error)
 		{
 			interaction.reply("error");
-			console.error("error");
+			console.error(error);
 		}
 	}
 });
