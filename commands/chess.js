@@ -63,9 +63,11 @@ module.exports = {
 						files: [value],
 						components: [new Discord.ActionRowBuilder().addComponents(moveSelectMenu)]
 					})
-					.then((nextSelection)=>{
-						nextSelection.awaitMessageComponent().then((choice)=>{
-							const [move] = choice.values;
+					.then((response)=>{
+						const collector = response.createMessageComponentCollector();
+						
+						collector.on("collect", (selection)=>{
+							const [move] = selection.values;
 							const game = Chess.FENStringToGame(interaction.client.games[`${interaction.user.id}`]);
 							Chess.MakeMoveInGame(move, game);
 							interaction.client.games[`${interaction.user.id}`] = Chess.GameToFENString(game);
@@ -77,12 +79,12 @@ module.exports = {
 							})
 							)
 							buffer.then((value)=>{
-								choice.update({
+								selection.update({
 									files: [value],
 									components: [new Discord.ActionRowBuilder().addComponents(moveSelectMenu)]
 								});
 							});
-						});
+						})
 					});
 				});
 			}
@@ -95,6 +97,7 @@ module.exports = {
 		{
 			if(interaction.client.games[`${interaction.user.id}`])
 			{
+				interaction.client.interactions[`${interaction.user.id}`].deleteReply();
 				delete interaction.client.games[`${interaction.user.id}`];
 				return;
 			}
@@ -114,5 +117,8 @@ module.exports = {
 				return interaction.reply("You have no active game from which to obtain a FEN string");
 			}
 		}
+	},
+	exiter: (client)=>{
+		
 	}
 };

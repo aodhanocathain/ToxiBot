@@ -8,12 +8,17 @@ const bot = new Discord.Client({intents: [DirectMessages, GuildMessages, Guilds,
 
 //load command functionalities
 bot.commandHandlers={};
+bot.exiters={};
 const commandsDirectory = process.env.COMMANDS_DIRECTORY;
 const commandFileNames = FileSystem.readdirSync(commandsDirectory);
 for(const commandFileName of commandFileNames)
 {
 	const commandProperties = require(`${commandsDirectory}/${commandFileName}`);
 	bot.commandHandlers[commandProperties.name] = commandProperties.execute;
+	if(commandProperties.exiter)
+	{
+		bot.exiters[commandProperties.name] = commandProperties.exiter;
+	}
 	if(commandProperties.configure)
 	{
 		commandProperties.configure(bot);

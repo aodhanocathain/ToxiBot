@@ -9,6 +9,9 @@ module.exports = {
 		//only shut down if the owner uses the command
 		if(interaction.user.id == process.env.OWNER_ID)
 		{
+			Object.values(interaction.client.exiters).forEach((exiter)=>{
+				exiter(interaction.client);
+			});
 			return interaction.reply("Ok")
 			.then(()=>{
 				interaction.client.destroy(); process.exit();
