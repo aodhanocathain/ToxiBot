@@ -119,7 +119,8 @@ module.exports =
 	},
 	
 	GameToFENString : (game) => {
-		const boardString = game.board.map((rank)=>{
+		//game stores ranks in ascending order, must reverse for descending order in FEN string
+		const boardString = game.board.reverse().map((rank)=>{
 			let emptySquares = 0;
 			return rank.reduce((accumulator, character)=>{
 				if(character in chessPieceImages)
@@ -171,7 +172,7 @@ module.exports =
 					if(character in chessPieceImages)
 					{
 						const x = fileIndex*SQUARE_PIXELS;
-						const y = rankIndex*SQUARE_PIXELS;
+						const y = ((NUM_FILES-1)-rankIndex)*SQUARE_PIXELS;
 						const imageIndex = Object.keys(chessPieceImages).indexOf(character);
 						context.drawImage(resolvedChessPieceImages[imageIndex], x, y, SQUARE_PIXELS, SQUARE_PIXELS);
 					}
