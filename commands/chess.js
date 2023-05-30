@@ -19,6 +19,7 @@ const commandName = "chess";
 module.exports = {
 	name: commandName,
 	configure: (client) => {
+		client.interactions = {};
 		client.games = {};
 	},
 	discordCommand : new Discord.SlashCommandBuilder().setName(commandName).setDescription("Utilize chess functionality")
@@ -40,6 +41,12 @@ module.exports = {
 		}
 		else if(action == "gameshow")
 		{
+			if(interaction.client.interactions[`${interaction.user.id}`])
+			{
+				interaction.client.interactions[`${interaction.user.id}`].deleteReply();
+			}
+			interaction.client.interactions[`${interaction.user.id}`] = interaction;
+						
 			if(interaction.client.games[`${interaction.user.id}`])
 			{
 				const buffer = Chess.FENStringToPNGBuffer(interaction.client.games[`${interaction.user.id}`]);
