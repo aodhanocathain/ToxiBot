@@ -10,7 +10,8 @@ const actionOption = (option) => {
 	.addChoices(
 	{name: "gamecreate", value:"gamecreate"},
 	{name: "gameshow", value:"gameshow"},
-	{name: "gameend", value:"gameend"}
+	{name: "gameend", value:"gameend"},
+	{name: "getFEN", value:"getFEN"}
 	);
 }
 
@@ -61,6 +62,27 @@ module.exports = {
 					interaction.reply({
 						files: [value],
 						components: [new Discord.ActionRowBuilder().addComponents(moveSelectMenu)]
+					})
+					.then((nextSelection)=>{
+						nextSelection.awaitMessageComponent().then((choice)=>{
+							const [move] = choice.values;
+							const game = Chess.FENStringToGame(interaction.client.games[`${interaction.user.id}`]);
+							Chess.MakeMoveInGame(move, game);
+							interaction.client.games[`${interaction.user.id}`] = Chess.GameToFENString(game);
+							const buffer = Chess.FENStringToPNGBuffer(interaction.client.games[`${interaction.user.id}`]);
+							const moveList = Chess.KingMovesInGame(Chess.FENStringToGame(interaction.client.games[`${interaction.user.id}`]));
+							const moveSelectMenu = new Discord.StringSelectMenuBuilder().setCustomId("move").setPlaceholder("Choose a move")
+							.addOptions(...moveList.map((move)=>{
+								return new Discord.StringSelectMenuOptionBuilder().setLabel(move).setValue(move)
+							})
+							)
+							buffer.then((value)=>{
+								choice.update({
+									files: [value],
+									components: [new Discord.ActionRowBuilder().addComponents(moveSelectMenu)]
+								});
+							});
+						});
 					});
 				});
 			}
@@ -79,6 +101,17 @@ module.exports = {
 			else
 			{
 				return interaction.reply("You have no active game to end");
+			}
+		}
+		else if(action == "getFEN")
+		{
+			if(interaction.client.games[`${interaction.user.id}`])
+			{
+				return interaction.reply(interaction.client.games[`${interaction.user.id}`]);
+			}
+			else
+			{
+				return interaction.reply("You have no active game from which to obtain a FEN string");
 			}
 		}
 	}
