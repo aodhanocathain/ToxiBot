@@ -68,8 +68,8 @@ function FENStringToGame(FENString)
 
 function GameToFENString(game)
 {
-	//game stores ranks in ascending order, must reverse for descending order in FEN string
-	const boardString = game.board.toReversed().map((rank)=>{
+	//game stores ranks in ascending order, must reverse a copy for descending order in FEN string
+	const boardString = game.board.slice().reverse().map((rank)=>{
 		let emptySquares = 0;
 		return rank.reduce((accumulator, character)=>{
 			if(character in chessPieceImages)
