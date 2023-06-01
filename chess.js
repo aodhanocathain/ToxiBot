@@ -69,7 +69,7 @@ function FENStringToGame(FENString)
 function GameToFENString(game)
 {
 	//game stores ranks in ascending order, must reverse for descending order in FEN string
-	const boardString = game.board.reverse().map((rank)=>{
+	const boardString = game.board.toReversed().map((rank)=>{
 		let emptySquares = 0;
 		return rank.reduce((accumulator, character)=>{
 			if(character in chessPieceImages)
@@ -91,7 +91,7 @@ function GameToFENString(game)
 
 function FENStringToPNGBuffer(FENString)
 {
-		const canvas = Canvas.createCanvas(NUM_FILES*SQUARE_PIXELS, NUM_RANKS*SQUARE_PIXELS);
+	const canvas = Canvas.createCanvas(NUM_FILES*SQUARE_PIXELS, NUM_RANKS*SQUARE_PIXELS);
 	const context = canvas.getContext("2d");
 	context.font = `${SQUARE_PIXELS/4}px Arial`;//SQUARE_PIXELS/4 is an arbitrarily chosen size
 			
@@ -134,12 +134,12 @@ function FENStringToPNGBuffer(FENString)
 
 function KingMovesInGame(game)
 {
-		//find the king that is moving
+	//find the king that is moving
 	const movingKing = teamSetters[game.turn](KING);
+	//console.log(`movingKing in ${GameToFENString(game)} is ${movingKing}`);
 	const rank = game.board.findIndex((rank)=>{return rank.includes(movingKing);});
-	if(rank<0){console.log(game.board);}
 	const file = game.board[rank].indexOf(movingKing);
-	
+	console.log(`movingKing is currently at rank ${rank} and file ${file}`);
 	//the king can move up to 1 square up or down and up to 1 square left or right
 	return [-1,0,1].map((fileOffset)=>{
 		return [-1,0,1].map((rankOffset)=>{
@@ -155,10 +155,11 @@ function KingMovesInGame(game)
 		//can't move from a square to itself
 		return newRank != rank || newFile != file;
 	})
-	.map(([rank, file])=>{
+	.map(([newRank, newFile])=>{
 		//const capture = game.board[rank][file]!=null;
 		const capture = false;
-		return `${KING}${capture?"x":""}${asciiOffset(START_FILE,file)}${asciiOffset(START_RANK,rank)}`;
+		console.log(`can move to rank ${newRank} and file ${newFile}`);
+		return `${KING}${capture?"x":""}${asciiOffset(START_FILE,newFile)}${asciiOffset(START_RANK,newRank)}`;
 	});
 }
 
@@ -218,6 +219,8 @@ function MakeMoveInGame(move, game)
 
 module.exports = 
 {
+	DEFAULT_FEN_STRING : "4k3/8/8/8/8/8/8/4K3 w KQkq - 0 1",
+	
 	FENStringToGame : FENStringToGame,
 	GameToFENString : GameToFENString,
 	
