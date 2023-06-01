@@ -168,7 +168,6 @@ function KingLegalsInGame(game)
 	const FENString = GameToFENString(game);
 	let progressedGame;
 	let potentialReplies;
-	/*
 	return KingMovesInGame(game).filter((moveString)=>{
 		progressedGame = FENStringToGame(FENString);
 		MakeMoveInGame(moveString, progressedGame);
@@ -176,8 +175,6 @@ function KingLegalsInGame(game)
 		console.log(`move ${moveString} could be met by ${potentialReplies}`);
 		return potentialReplies.includes(moveString) == false;
 	});
-	*/
-	return KingMovesInGame(game);
 }
 
 function AllMovesInGame(game)
