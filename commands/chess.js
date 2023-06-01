@@ -10,7 +10,6 @@ const actionOption = (option) => {
 	.addChoices(
 	{name: "gamecreate", value:"gamecreate"},
 	{name: "gameend", value:"gameend"},
-	{name: "getFEN", value:"getFEN"}
 	);
 }
 
