@@ -9,7 +9,6 @@ const actionOption = (option) => {
 	.setRequired(true)
 	.addChoices(
 	{name: "gamecreate", value:"gamecreate"},
-	{name: "gameshow", value:"gameshow"},
 	{name: "gameend", value:"gameend"},
 	{name: "getFEN", value:"getFEN"}
 	);
@@ -17,11 +16,36 @@ const actionOption = (option) => {
 
 const commandName = "chess";
 
+function interactionReplyFromMove(interaction, move)
+{
+	const game = Chess.FENStringToGame(interaction.client.FENs[`${interaction.user.id}`]);
+	if(move)
+	{
+		Chess.MakeMoveInGame(move, game);
+		interaction.client.FENs[`${interaction.user.id}`] = Chess.GameToFENString(game);
+	}
+	const buffer = Chess.FENStringToPNGBuffer(interaction.client.FENs[`${interaction.user.id}`]);
+	let moveList = Chess.KingLegalsInGame(game);
+	let moveSelectMenu = new Discord.StringSelectMenuBuilder().setCustomId("move").setPlaceholder("Choose a move")
+	.addOptions(
+		...moveList.map((move)=>{
+			return new Discord.StringSelectMenuOptionBuilder().setLabel(move).setValue(move)
+		})
+	)
+	
+	return buffer.then((b)=>{
+		return {
+			content: interaction.client.FENs[`${interaction.user.id}`],
+			files: [b],
+			components: [new Discord.ActionRowBuilder().addComponents(moveSelectMenu)]
+		}
+	});
+}
+
 module.exports = {
 	name: commandName,
 	configure: (client) => {
-		client.interactions = {};
-		client.games = {};
+		client.FENs = {};
 	},
 	discordCommand : new Discord.SlashCommandBuilder().setName(commandName).setDescription("Utilize chess functionality")
 	.addStringOption(actionOption),
@@ -29,76 +53,33 @@ module.exports = {
 		const action = interaction.options.getString("action");
 		if(action == "gamecreate")
 		{
-			if(interaction.client.games[`${interaction.user.id}`])
+			if(interaction.client.FENs[`${interaction.user.id}`])
 			{
 				return interaction.reply("You already have an active game");
 			}
-			else
-			{
-				//interaction.client.games[`${interaction.user.id}`] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1\n";
-				interaction.client.games[`${interaction.user.id}`] = "4k3/8/8/8/8/8/8/4K3 w KQkq - 0 1\n";
-				return;
-			}
-		}
-		else if(action == "gameshow")
-		{
-			if(interaction.client.interactions[`${interaction.user.id}`])
-			{
-				interaction.client.interactions[`${interaction.user.id}`].deleteReply();
-			}
-			interaction.client.interactions[`${interaction.user.id}`] = interaction;
-						
-			if(interaction.client.games[`${interaction.user.id}`])
-			{
-				const buffer = Chess.FENStringToPNGBuffer(interaction.client.games[`${interaction.user.id}`]);
-				const moveList = Chess.KingMovesInGame(Chess.FENStringToGame(interaction.client.games[`${interaction.user.id}`]));
-				const moveSelectMenu = new Discord.StringSelectMenuBuilder().setCustomId("move").setPlaceholder("Choose a move")
-				.addOptions(...moveList.map((move)=>{
-						return new Discord.StringSelectMenuOptionBuilder().setLabel(move).setValue(move)
-					})
-				)
-				
-				return buffer.then((value)=>{
-					interaction.reply({
-						files: [value],
-						components: [new Discord.ActionRowBuilder().addComponents(moveSelectMenu)]
-					})
-					.then((response)=>{
-						const collector = response.createMessageComponentCollector();
-						
-						collector.on("collect", (selection)=>{
-							const [move] = selection.values;
-							const game = Chess.FENStringToGame(interaction.client.games[`${interaction.user.id}`]);
-							Chess.MakeMoveInGame(move, game);
-							interaction.client.games[`${interaction.user.id}`] = Chess.GameToFENString(game);
-							const buffer = Chess.FENStringToPNGBuffer(interaction.client.games[`${interaction.user.id}`]);
-							const moveList = Chess.KingMovesInGame(Chess.FENStringToGame(interaction.client.games[`${interaction.user.id}`]));
-							const moveSelectMenu = new Discord.StringSelectMenuBuilder().setCustomId("move").setPlaceholder("Choose a move")
-							.addOptions(...moveList.map((move)=>{
-								return new Discord.StringSelectMenuOptionBuilder().setLabel(move).setValue(move)
-							})
-							)
-							buffer.then((value)=>{
-								selection.update({
-									files: [value],
-									components: [new Discord.ActionRowBuilder().addComponents(moveSelectMenu)]
-								});
-							});
-						})
+			interaction.client.FENs[`${interaction.user.id}`] = Chess.DEFAULT_FEN_STRING;
+			
+			return Promise.all([interactionReplyFromMove(interaction, null)])
+			.then(([message])=>{
+				return interaction.reply(message)
+				.then((response)=>{
+					const collector = response.createMessageComponentCollector();
+					collector.on("collect", (selection)=>{
+						const [move] = selection.values;
+						Promise.all([interactionReplyFromMove(interaction, move)])
+						.then(([message])=>{
+							selection.update(message);
+						});
 					});
 				});
-			}
-			else
-			{
-				return interaction.reply("You have no active game to show");
-			}
+			});
 		}
 		else if(action == "gameend")
 		{
-			if(interaction.client.games[`${interaction.user.id}`])
+			if(interaction.client.FENs[`${interaction.user.id}`])
 			{
 				interaction.client.interactions[`${interaction.user.id}`].deleteReply();
-				delete interaction.client.games[`${interaction.user.id}`];
+				delete interaction.client.FENs[`${interaction.user.id}`];
 				return;
 			}
 			else
@@ -108,9 +89,9 @@ module.exports = {
 		}
 		else if(action == "getFEN")
 		{
-			if(interaction.client.games[`${interaction.user.id}`])
+			if(interaction.client.FENs[`${interaction.user.id}`])
 			{
-				return interaction.reply(interaction.client.games[`${interaction.user.id}`]);
+				return interaction.reply(interaction.client.FENs[`${interaction.user.id}`]);
 			}
 			else
 			{
