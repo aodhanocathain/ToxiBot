@@ -17,14 +17,17 @@ const commandName = "chess";
 
 function interactionReplyFromMove(interaction, move)
 {
+	//apply the move in the user's game and return the necessary update to the original reply
+	
 	const game = Chess.FENStringToGame(interaction.client.FENs[`${interaction.user.id}`]);
 	if(move)
 	{
 		Chess.MakeMoveInGame(move, game);
 		interaction.client.FENs[`${interaction.user.id}`] = Chess.GameToFENString(game);
 	}
+	//image of the board
 	const buffer = Chess.FENStringToPNGBuffer(interaction.client.FENs[`${interaction.user.id}`]);
-	let moveList = Chess.KingLegalsInGame(game);
+	let moveList = Chess.AllLegalsInGame(game);
 	let moveSelectMenu = new Discord.StringSelectMenuBuilder().setCustomId("move").setPlaceholder("Choose a move")
 	.addOptions(
 		...moveList.map((move)=>{
@@ -57,18 +60,24 @@ module.exports = {
 				return interaction.reply("You already have an active game");
 			}
 			interaction.client.FENs[`${interaction.user.id}`] = Chess.DEFAULT_FEN_STRING;
+			interaction.client.interactions[`${interaction.user.id}`] = interaction;
 			
 			return Promise.all([interactionReplyFromMove(interaction, null)])
 			.then(([message])=>{
+				//reply with an interactive message that collects responses and updates the board
 				return interaction.reply(message)
 				.then((response)=>{
 					const collector = response.createMessageComponentCollector();
 					collector.on("collect", (selection)=>{
-						const [move] = selection.values;
-						Promise.all([interactionReplyFromMove(interaction, move)])
-						.then(([message])=>{
-							selection.update(message);
-						});
+						//only respond to the active game, not to previously ended games
+						if(interaction.id == interaction.client.FENs[`${interaction.user.id}`].id)
+						{
+							const [move] = selection.values;
+							Promise.all([interactionReplyFromMove(interaction, move)])
+							.then(([message])=>{
+								selection.update(message);
+							});
+						}
 					});
 				});
 			});
@@ -77,24 +86,13 @@ module.exports = {
 		{
 			if(interaction.client.FENs[`${interaction.user.id}`])
 			{
-				interaction.client.interactions[`${interaction.user.id}`].deleteReply();
+				delete interaction.client.interactions[`${interaction.user.id}`];
 				delete interaction.client.FENs[`${interaction.user.id}`];
 				return;
 			}
 			else
 			{
 				return interaction.reply("You have no active game to end");
-			}
-		}
-		else if(action == "getFEN")
-		{
-			if(interaction.client.FENs[`${interaction.user.id}`])
-			{
-				return interaction.reply(interaction.client.FENs[`${interaction.user.id}`]);
-			}
-			else
-			{
-				return interaction.reply("You have no active game from which to obtain a FEN string");
 			}
 		}
 	},
