@@ -48,6 +48,7 @@ module.exports = {
 	name: commandName,
 	configure: (client) => {
 		client.FENs = {};
+		client.interactions = {};
 	},
 	discordCommand : new Discord.SlashCommandBuilder().setName(commandName).setDescription("Utilize chess functionality")
 	.addStringOption(actionOption),
@@ -70,7 +71,7 @@ module.exports = {
 					const collector = response.createMessageComponentCollector();
 					collector.on("collect", (selection)=>{
 						//only respond to the active game, not to previously ended games
-						if(interaction.id == interaction.client.FENs[`${interaction.user.id}`].id)
+						if(selection.message.interaction.id == interaction.client.interactions[`${interaction.user.id}`].id)
 						{
 							const [move] = selection.values;
 							Promise.all([interactionReplyFromMove(interaction, move)])
