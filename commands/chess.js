@@ -35,9 +35,12 @@ function interactionReplyFromMove(interaction, move)
 		})
 	)
 	
+	const moveHistory = interaction.client.histories[`${interaction.user.id}`].join(" ");
+	const FENString = interaction.client.FENs[`${interaction.user.id}`];
+	
 	return buffer.then((b)=>{
 		return {
-			content: interaction.client.FENs[`${interaction.user.id}`],
+			content: `Moves: ${moveHistory}\nFEN String: ${FENString}`,
 			files: [b],
 			components: [new Discord.ActionRowBuilder().addComponents(moveSelectMenu)]
 		}
@@ -49,6 +52,7 @@ module.exports = {
 	configure: (client) => {
 		client.FENs = {};
 		client.interactions = {};
+		client.histories = {};
 	},
 	discordCommand : new Discord.SlashCommandBuilder().setName(commandName).setDescription("Utilize chess functionality")
 	.addStringOption(actionOption),
@@ -62,6 +66,7 @@ module.exports = {
 			}
 			interaction.client.FENs[`${interaction.user.id}`] = Chess.DEFAULT_FEN_STRING;
 			interaction.client.interactions[`${interaction.user.id}`] = interaction;
+			interaction.client.histories[`${interaction.user.id}`] = [];
 			
 			return Promise.all([interactionReplyFromMove(interaction, null)])
 			.then(([message])=>{
@@ -71,9 +76,10 @@ module.exports = {
 					const collector = response.createMessageComponentCollector();
 					collector.on("collect", (selection)=>{
 						//only respond to the active game, not to previously ended games
-						if(selection.message.interaction.id == interaction.client.interactions[`${interaction.user.id}`].id)
+						if(selection.message.interaction.id == (interaction.client.interactions[`${interaction.user.id}`]??{id:null}).id)
 						{
 							const [move] = selection.values;
+							interaction.client.histories[`${interaction.user.id}`].push(move);
 							Promise.all([interactionReplyFromMove(interaction, move)])
 							.then(([message])=>{
 								selection.update(message);
@@ -89,6 +95,7 @@ module.exports = {
 			{
 				delete interaction.client.interactions[`${interaction.user.id}`];
 				delete interaction.client.FENs[`${interaction.user.id}`];
+				delete interaction.client.histories[`${interaction.user.id}`];
 				return;
 			}
 			else
