@@ -40,6 +40,28 @@ function asciiDistance(character, baseCharacter)
 
 //CHESS FUNCTIONS
 
+function moveDestination(move)
+{
+	const pieceType = move.charAt(0);
+	if(pieceType==KING)
+	{
+		const capture = move.charAt(1)=="x";
+		if(capture)
+		{
+			return move.slice(2);
+		}
+		else
+		{
+			return move.slice(1);
+		}
+	}
+}
+
+function isPiece(piece)
+{
+	return piece in chessPieceImages;
+}
+
 function FENStringToGame(FENString)
 {
 	const FENparts = FENString.split(" ");
@@ -69,10 +91,11 @@ function FENStringToGame(FENString)
 function GameToFENString(game)
 {
 	//game stores ranks in ascending order, must reverse a copy for descending order in FEN string
-	const boardString = game.board.slice().reverse().map((rank)=>{
+	const boardCopy = game.board.slice();
+	const boardString = boardCopy.reverse().map((rank)=>{
 		let emptySquares = 0;
 		return rank.reduce((accumulator, character)=>{
-			if(character in chessPieceImages)
+			if(isPiece(character))
 			{
 				accumulator = accumulator.concat(`${emptySquares>0? emptySquares : ""}${character}`);
 				emptySquares = 0;
@@ -89,40 +112,37 @@ function GameToFENString(game)
 	return [boardString, game.turn, game.castleRights.join(""), game.enPassantable, game.halfMove, game.fullMove].join(" ");
 }
 
+function GameCopy(game)
+{
+	return FENStringToGame(GameToFENString(game));
+}
+
 function FENStringToPNGBuffer(FENString)
 {
 	const canvas = Canvas.createCanvas(NUM_FILES*SQUARE_PIXELS, NUM_RANKS*SQUARE_PIXELS);
 	const context = canvas.getContext("2d");
 	context.font = `${SQUARE_PIXELS/4}px Arial`;//SQUARE_PIXELS/4 is an arbitrarily chosen size
-			
-	//draw the board first
-	for(let rank=0; rank<NUM_RANKS; rank++)
-	{
-		for(let file=0; file<NUM_FILES; file++)
-		{
-			//draw the current square according to its indices
-			context.fillStyle = (((rank+file)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
-			const x = file*SQUARE_PIXELS;
-			const y = ((NUM_RANKS-1)-rank)*SQUARE_PIXELS;
-			context.fillRect(x, y, SQUARE_PIXELS, SQUARE_PIXELS);
-			
-			//annotate the square name e.g. "f3"
-			context.fillStyle = FONT_COLOUR;
-			const squareName = `${asciiOffset(START_FILE, file)}${asciiOffset(START_RANK, rank)}`;
-			context.fillText(squareName, x, y+SQUARE_PIXELS);
-		}
-	}
 	
 	const game = FENStringToGame(FENString);
 	//draw pieces, if present
 	return Promise.all(Object.values(chessPieceImages)).then((resolvedChessPieceImages)=>{
 		game.board.forEach((rank, rankIndex)=>{
 			rank.forEach((file, fileIndex)=>{
+				//colour this square
+				context.fillStyle = (((rankIndex+fileIndex)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
+				const x = fileIndex*SQUARE_PIXELS;
+				const y = ((NUM_RANKS-1)-rankIndex)*SQUARE_PIXELS;
+				context.fillRect(x, y, SQUARE_PIXELS, SQUARE_PIXELS);
+			
+				//annotate the square name e.g. "f3"
+				context.fillStyle = FONT_COLOUR;
+				const squareName = `${asciiOffset(START_FILE, fileIndex)}${asciiOffset(START_RANK, rankIndex)}`;
+				context.fillText(squareName, x, y+SQUARE_PIXELS);
+
+				//draw a piece if one is present
 				const character = game.board[rankIndex][fileIndex];
-				if(character in chessPieceImages)
+				if(isPiece(character))
 				{
-					const x = fileIndex*SQUARE_PIXELS;
-					const y = ((NUM_FILES-1)-rankIndex)*SQUARE_PIXELS;
 					const imageIndex = Object.keys(chessPieceImages).indexOf(character);
 					context.drawImage(resolvedChessPieceImages[imageIndex], x, y, SQUARE_PIXELS, SQUARE_PIXELS);
 				}
@@ -136,10 +156,8 @@ function KingMovesInGame(game)
 {
 	//find the king that is moving
 	const movingKing = teamSetters[game.turn](KING);
-	//console.log(`movingKing in ${GameToFENString(game)} is ${movingKing}`);
 	const rank = game.board.findIndex((rank)=>{return rank.includes(movingKing);});
 	const file = game.board[rank].indexOf(movingKing);
-	console.log(`movingKing is currently at rank ${rank} and file ${file}`);
 	//the king can move up to 1 square up or down and up to 1 square left or right
 	return [-1,0,1].map((fileOffset)=>{
 		return [-1,0,1].map((rankOffset)=>{
@@ -158,22 +176,19 @@ function KingMovesInGame(game)
 	.map(([newRank, newFile])=>{
 		//const capture = game.board[rank][file]!=null;
 		const capture = false;
-		console.log(`can move to rank ${newRank} and file ${newFile}`);
 		return `${KING}${capture?"x":""}${asciiOffset(START_FILE,newFile)}${asciiOffset(START_RANK,newRank)}`;
 	});
 }
 
 function KingLegalsInGame(game)
 {
-	const FENString = GameToFENString(game);
-	let progressedGame;
-	let potentialReplies;
-	return KingMovesInGame(game).filter((moveString)=>{
-		progressedGame = FENStringToGame(FENString);
-		MakeMoveInGame(moveString, progressedGame);
+	//check which moves leave the king vulnerable to capture
+	return KingMovesInGame(game).filter((move)=>{
+		const progressedGame = GameCopy(game);
+		MakeMoveInGame(move, progressedGame);
 		potentialReplies = AllMovesInGame(progressedGame);
-		console.log(`move ${moveString} could be met by ${potentialReplies}`);
-		return potentialReplies.includes(moveString) == false;
+		//king is vulnerable to capture if the reply's destination square is where the king moved to
+		return potentialReplies.map(moveDestination).includes(moveDestination(move))==false;
 	});
 }
 
