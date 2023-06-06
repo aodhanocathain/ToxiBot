@@ -40,26 +40,29 @@ function asciiDistance(character, baseCharacter)
 
 //CHESS FUNCTIONS
 
-function moveDestination(move)
-{
-	const pieceType = move.charAt(0);
-	if(pieceType==KING)
-	{
-		const capture = move.charAt(1)=="x";
-		if(capture)
-		{
-			return move.slice(2);
-		}
-		else
-		{
-			return move.slice(1);
-		}
-	}
-}
-
 function isPiece(piece)
 {
 	return piece in chessPieceImages;
+}
+
+function moveComponents(move)
+{
+	const piece = `[${KING}]`;
+	const originFile = `[${START_FILE}-${asciiOffset(START_FILE, NUM_FILES)}]`;
+	const originRank = `[${START_RANK}-${asciiOffset(START_RANK, NUM_RANKS)}]`;
+	const capture = "x";
+	const destinationFile = originFile;
+	const destinationRank = originRank;
+	
+	const reg = new RegExp(`(${piece})(${originFile}?)(${originRank}?)(x?)(${destinationFile}${destinationRank})`);
+	const components = move.match(reg);
+	return {
+		piece: components[1],
+		originFile: components[2],
+		originRank: components[3],
+		capture: components[4],
+		destination: components[5]
+	};
 }
 
 function FENStringToGame(FENString)
@@ -188,7 +191,8 @@ function KingLegalsInGame(game)
 		MakeMoveInGame(move, progressedGame);
 		potentialReplies = AllMovesInGame(progressedGame);
 		//king is vulnerable to capture if the reply's destination square is where the king moved to
-		return potentialReplies.map(moveDestination).includes(moveDestination(move))==false;
+		return potentialReplies.map(moveComponents).map(({destination})=>{return destination})
+		.includes(moveComponents(move).destination)==false;
 	});
 }
 
@@ -205,13 +209,15 @@ function AllLegalsInGame(game)
 function MakeMoveInGame(move, game)
 {
 	const movingTeamSetter = teamSetters[game.turn];
-	const movingPiece = movingTeamSetter(move.charAt(0));
+	const components = moveComponents(move);
+	const movingPiece = movingTeamSetter(components.piece);
 	if(movingPiece == movingTeamSetter(KING))
 	{
 		const oldRank = game.board.findIndex((rank)=>{return rank.includes(movingPiece);});
 		const oldFile = game.board[oldRank].indexOf(movingPiece);
-		const newFile = asciiDistance(move.charAt(1), START_FILE);
-		const newRank = asciiDistance(move.charAt(2), START_RANK);
+		const destination = components.destination;
+		const newFile = asciiDistance(destination.charAt(0), START_FILE);
+		const newRank = asciiDistance(destination.charAt(1), START_RANK);
 		
 		//remove from old square
 		game.board[oldRank][oldFile] = null;
