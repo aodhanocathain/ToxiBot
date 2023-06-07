@@ -75,6 +75,22 @@ function moveComponents(move)
 	};
 }
 
+function pieceLocationsInGame(piece, game)
+{
+	let locations = [];
+	for(let rank=0; rank<NUM_RANKS; rank++)
+	{
+		for(let file=0; file<NUM_FILES; file++)
+		{
+			if(game.board[rank][file]==piece)
+			{
+				locations.push({"rank":rank, "file":file});
+			}
+		}
+	}
+	return locations;
+}
+
 //CHESS FUNCTIONS
 
 function FENStringToGame(FENString)
@@ -180,8 +196,7 @@ function KingMovesInGame(game)
 {
 	//find the king that is moving
 	const movingKing = teamSetters[game.turn](KING);
-	const rank = game.board.findIndex((rank)=>{return rank.includes(movingKing);});
-	const file = game.board[rank].indexOf(movingKing);
+	const [{rank, file}] = pieceLocationsInGame(movingKing, game);
 	//the king can move up to 1 square up or down and up to 1 square left or right
 	return [-1,0,1].map((fileOffset)=>{
 		return [-1,0,1].map((rankOffset)=>{
