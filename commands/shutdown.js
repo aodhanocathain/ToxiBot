@@ -15,8 +15,8 @@ module.exports = {
 			return interaction.reply("Ok")
 			.then(()=>{
 				interaction.client.destroy()
-				.then(()=>{process.exit();});
-			});
+			})
+			.then(()=>{process.exit();});
 		}
 		else
 		{
