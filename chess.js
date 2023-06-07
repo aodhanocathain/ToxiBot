@@ -5,6 +5,9 @@ const NUM_FILES = 8;
 const NUM_RANKS = 8;
 const SQUARE_PIXELS = 50;
 
+const START_FILE = "a";
+const START_RANK = "1";
+
 const LIGHT_COLOUR = "#e0d0b0";
 const DARK_COLOUR = "#e0a070";
 const FONT_COLOUR = "#0000ff";
@@ -20,13 +23,13 @@ const teamSetters = {
 	[BLACK] : function(piece){return piece.toLowerCase();}
 };
 
+//every chess piece needs an image
 const chessPieceImages = {
 	[teamSetters[WHITE](KING)] : Canvas.loadImage(`./images/chess/white/king.png`),
 	[teamSetters[BLACK](KING)] : Canvas.loadImage(`./images/chess/black/king.png`)
 };
 
-const START_FILE = "a";
-const START_RANK = "1";
+//helpful functions
 
 function asciiOffset(character, offset)
 {
@@ -38,10 +41,16 @@ function asciiDistance(character, baseCharacter)
 	return character.charCodeAt(0) - baseCharacter.charCodeAt(0);
 }
 
-//CHESS FUNCTIONS
+function squareName({rank, file})
+{
+	const rankName = asciiOffset(START_RANK, rank);
+	const fileName = asciiOffset(START_FILE, file);
+	return `${fileName}${rankName}`;
+}
 
 function isPiece(piece)
 {
+	//every piece has an image
 	return piece in chessPieceImages;
 }
 
@@ -54,6 +63,7 @@ function moveComponents(move)
 	const destinationFile = originFile;
 	const destinationRank = originRank;
 	
+	//capture parts of a move string
 	const reg = new RegExp(`(${piece})(${originFile}?)(${originRank}?)(x?)(${destinationFile}${destinationRank})`);
 	const components = move.match(reg);
 	return {
@@ -64,6 +74,8 @@ function moveComponents(move)
 		destination: components[5]
 	};
 }
+
+//CHESS FUNCTIONS
 
 function FENStringToGame(FENString)
 {
@@ -95,28 +107,38 @@ function GameToFENString(game)
 {
 	//game stores ranks in ascending order, must reverse a copy for descending order in FEN string
 	const boardCopy = game.board.slice();
-	const boardString = boardCopy.reverse().map((rank)=>{
+	const boardString = boardCopy.reverse().map((rankPieces)=>{
 		let emptySquares = 0;
-		return rank.reduce((accumulator, character)=>{
-			if(isPiece(character))
+		let rankString = rankPieces.reduce((accumulator, piece)=>{
+			if(isPiece(piece))
 			{
-				accumulator = accumulator.concat(`${emptySquares>0? emptySquares : ""}${character}`);
-				emptySquares = 0;
-				return accumulator;
+				if(emptySquares>0)
+				{
+					//denote how many empty squares separate pieces
+					accumulator = accumulator.concat(`${emptySquares}`);
+					emptySquares = 0;
+				}
+				accumulator = accumulator.concat(`${piece}`);
 			}
 			else
 			{
 				emptySquares++;
-				return accumulator;
 			}
+			return accumulator;
 		}, "")
-		.concat(`${emptySquares>0? emptySquares:""}`);
+		if(emptySquares > 0)
+		{
+			//denote how many empty squares remain in the rank after the final piece
+			rankString = rankString.concat(`${emptySquares}`);
+		}
+		return rankString;
 	}).join("/");
 	return [boardString, game.turn, game.castleRights.join(""), game.enPassantable, game.halfMove, game.fullMove].join(" ");
 }
 
 function GameCopy(game)
 {
+	//create a completely independent copy of the game
 	return FENStringToGame(GameToFENString(game));
 }
 
@@ -129,21 +151,20 @@ function FENStringToPNGBuffer(FENString)
 	const game = FENStringToGame(FENString);
 	//draw pieces, if present
 	return Promise.all(Object.values(chessPieceImages)).then((resolvedChessPieceImages)=>{
-		game.board.forEach((rank, rankIndex)=>{
-			rank.forEach((file, fileIndex)=>{
+		game.board.forEach((rankPieces, rank)=>{
+			rankPieces.forEach((piece, file)=>{
 				//colour this square
-				context.fillStyle = (((rankIndex+fileIndex)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
-				const x = fileIndex*SQUARE_PIXELS;
-				const y = ((NUM_RANKS-1)-rankIndex)*SQUARE_PIXELS;
+				context.fillStyle = (((rank+file)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
+				const x = file*SQUARE_PIXELS;
+				const y = ((NUM_RANKS-1)-rank)*SQUARE_PIXELS;
 				context.fillRect(x, y, SQUARE_PIXELS, SQUARE_PIXELS);
 			
 				//annotate the square name e.g. "f3"
 				context.fillStyle = FONT_COLOUR;
-				const squareName = `${asciiOffset(START_FILE, fileIndex)}${asciiOffset(START_RANK, rankIndex)}`;
-				context.fillText(squareName, x, y+SQUARE_PIXELS);
+				context.fillText(squareName({"rank":rank,"file":file}), x, y+SQUARE_PIXELS);
 
 				//draw a piece if one is present
-				const character = game.board[rankIndex][fileIndex];
+				const character = game.board[rank][file];
 				if(isPiece(character))
 				{
 					const imageIndex = Object.keys(chessPieceImages).indexOf(character);
