@@ -48,6 +48,21 @@ function squareName({rank, file})
 	return `${fileName}${rankName}`;
 }
 
+function Square(rank, file)
+{
+	return {"rank":rank, "file":file};
+}
+
+function sameSquare(square1,square2)
+{
+	return (square1.rank==square2.rank) && (square1.file==square2.file);
+}
+
+function validSquare({rank, file})
+{
+	return (0 <= rank) && (rank < NUM_RANKS) && (0 <= file) && (file < NUM_FILES);
+}
+
 function isPiece(piece)
 {
 	//every piece has an image
@@ -56,7 +71,12 @@ function isPiece(piece)
 
 function moveComponents(move)
 {
-	const piece = `[${KING}]`;
+	const piecesArray = [KING];
+	const whitePiecesString = piecesArray.map(teamSetters[WHITE]);
+	const blackPiecesString = piecesArray.map(teamSetters[BLACK]);
+	const piecesString = whitePiecesString.concat(blackPiecesString).join("");
+	
+	const piece = `[${piecesString}]`;
 	const originFile = `[${START_FILE}-${asciiOffset(START_FILE, NUM_FILES)}]`;
 	const originRank = `[${START_RANK}-${asciiOffset(START_RANK, NUM_RANKS)}]`;
 	const capture = "x";
@@ -84,7 +104,7 @@ function pieceLocationsInGame(piece, game)
 		{
 			if(game.board[rank][file]==piece)
 			{
-				locations.push({"rank":rank, "file":file});
+				locations.push(Square(rank, file));
 			}
 		}
 	}
@@ -177,7 +197,7 @@ function FENStringToPNGBuffer(FENString)
 			
 				//annotate the square name e.g. "f3"
 				context.fillStyle = FONT_COLOUR;
-				context.fillText(squareName({"rank":rank,"file":file}), x, y+SQUARE_PIXELS);
+				context.fillText(squareName(Square(rank,file)), x, y+SQUARE_PIXELS);
 
 				//draw a piece if one is present
 				const character = game.board[rank][file];
@@ -192,30 +212,90 @@ function FENStringToPNGBuffer(FENString)
 	});
 }
 
+function KingDestinationsFromSquare({rank, file})
+{
+	//the king can move to any adjacent square
+	return {
+		inGame: (game)=>{
+			//the king's pattern doesn't depend on the game position anyway
+			return [
+				Square(rank-1,file-1),
+				Square(rank-1,file),
+				Square(rank-1,file+1),
+				Square(rank,file-1),
+				Square(rank,file+1),
+				Square(rank+1,file-1),
+				Square(rank+1,file),
+				Square(rank+1,file+1),
+			]
+			.filter(validSquare);
+		}
+	};
+}
+
+function distinguishTransitions(fullTransitions)
+{
+	/*
+	fullTransitions is an array of transitions by pieces of the same type.
+	Each transition has before.rank, before.file, after.rank and after.file and pertains to only one piece.
+	
+	In cases where pieces of the same type could move to the same square,
+	move strings consisting of only the piece type and destination square
+	would be ambiguous, because they would not describe which of the pieces moved.
+	
+	The point of this function is to remove any of the "before" components that are
+	not required to unambiguously describe a move, by retaining what differs between
+	the "before" components of transitions that have the same "after" components (destination).
+	*/
+	
+	
+	return fullTransitions.map((pieceTransition)=>{
+		//find the transitions of other pieces that have the same destination
+		const otherPieceTransitions = fullTransitions.filter((t)=>{
+			//other pieces are on different squares
+			return !sameSquare(t.before, pieceTransition.before);
+		});
+		const sameDestinationTransitions = otherPieceTransitions.filter((t)=>{
+			return sameSquare(t.after, pieceTransition.after);
+		});
+		
+		const distinguishedTransition = {before:{},after:pieceTransition.after};
+		
+		const sameOriginFiles = sameDestinationTransitions.filter((t)=>{return t.before.file==pieceTransition.before.file});
+		if(sameOriginFiles.length>0)	//other transitions starting in the same file
+		{
+			//differentiate by rank, since other transitions dont start on the same square as pieceTransition
+			distinguishedTransition.before.rank=pieceTransition.rank;
+		}
+		const sameOriginRanks = sameDestinationTransitions.filter((t)=>{return t.before.rank==pieceTransition.before.rank});
+		if(sameOriginRanks.length>0)	//other transitions starting in the same rank
+		{
+			//differentiate by file, since other transitions dont start on the same square as pieceTransition
+			distinguishedTransition.before.file=pieceTransition.file;
+		}
+		return distinguishedTransition;
+	});
+}
+
 function KingMovesInGame(game)
 {
-	//find the king that is moving
 	const movingKing = teamSetters[game.turn](KING);
-	const [{rank, file}] = pieceLocationsInGame(movingKing, game);
-	//the king can move up to 1 square up or down and up to 1 square left or right
-	return [-1,0,1].map((fileOffset)=>{
-		return [-1,0,1].map((rankOffset)=>{
-			return [rank+rankOffset, file+fileOffset];
-		})
+	const [square] = pieceLocationsInGame(movingKing, game);
+	const fullTransitions = KingDestinationsFromSquare(square).inGame(game)
+	.map((destinationSquare)=>{
+		return {"before":square,"after":destinationSquare};
 	})
-	.flat(1)
-	.filter(([newRank, newFile]) => {
-		//must not exceed the boundaries of the board
-		return 0 <= newRank && newRank < NUM_RANKS && 0 <= newFile && newFile < NUM_FILES;
-	})
-	.filter(([newRank, newFile]) => {
-		//can't move from a square to itself
-		return newRank != rank || newFile != file;
-	})
-	.map(([newRank, newFile])=>{
-		//const capture = game.board[rank][file]!=null;
-		const capture = false;
-		return `${KING}${capture?"x":""}${asciiOffset(START_FILE,newFile)}${asciiOffset(START_RANK,newRank)}`;
+	.flat(1);
+	const distinguishedTransitions = distinguishTransitions(fullTransitions);
+	
+	return distinguishedTransitions.map((t)=>{
+		//convert the transition to a move string
+		const startFile = t.before.file? asciiOffset(START_FILE, t.before.file) : "";
+		const startRank = t.before.rank? asciiOffset(START_RANK, t.before.rank) : "";
+		const capture = game.board[t.after.rank][t.after.file] ?? "";
+		const endFile = asciiOffset(START_FILE, t.after.file);
+		const endRank = asciiOffset(START_RANK, t.after.rank);
+		return `${KING}${startFile}${startRank}${capture}${endFile}${endRank}`;
 	});
 }
 
@@ -249,8 +329,9 @@ function MakeMoveInGame(move, game)
 	const movingPiece = movingTeamSetter(components.piece);
 	if(movingPiece == movingTeamSetter(KING))
 	{
-		const oldRank = game.board.findIndex((rank)=>{return rank.includes(movingPiece);});
-		const oldFile = game.board[oldRank].indexOf(movingPiece);
+		const [square] = pieceLocationsInGame(movingTeamSetter(KING), game);
+		const oldFile = square.file;
+		const oldRank = square.rank;
 		const destination = components.destination;
 		const newFile = asciiDistance(destination.charAt(0), START_FILE);
 		const newRank = asciiDistance(destination.charAt(1), START_RANK);
