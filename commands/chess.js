@@ -28,6 +28,8 @@ function interactionReplyFromMove(interaction, move)
 	//image of the board
 	const buffer = Chess.FENStringToPNGBuffer(interaction.client.FENs[`${interaction.user.id}`]);
 	let moveList = Chess.AllLegalsInGame(game);
+	console.log(moveList);
+	moveList = Array.from(new Set(moveList));
 	let moveSelectMenu = new Discord.StringSelectMenuBuilder().setCustomId("move").setPlaceholder("Choose a move")
 	.addOptions(
 		...moveList.map((move)=>{

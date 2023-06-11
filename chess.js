@@ -16,6 +16,9 @@ const WHITE = "w";
 const BLACK = "b";
 
 const KING = "K";
+const KNIGHT = "N";
+
+const pieceLetters = [KING,KNIGHT];
 
 //FEN strings denote white pieces in uppercase and black pieces in lowercase
 const teamSetters = {
@@ -26,7 +29,9 @@ const teamSetters = {
 //every chess piece needs an image
 const chessPieceImages = {
 	[teamSetters[WHITE](KING)] : Canvas.loadImage(`./images/chess/white/king.png`),
-	[teamSetters[BLACK](KING)] : Canvas.loadImage(`./images/chess/black/king.png`)
+	[teamSetters[BLACK](KING)] : Canvas.loadImage(`./images/chess/black/king.png`),
+	[teamSetters[WHITE](KNIGHT)] : Canvas.loadImage(`./images/chess/white/knight.png`),
+	[teamSetters[BLACK](KNIGHT)] : Canvas.loadImage(`./images/chess/black/knight.png`)
 };
 
 //helpful functions
@@ -71,9 +76,8 @@ function isPiece(piece)
 
 function moveComponents(move)
 {
-	const piecesArray = [KING];
-	const whitePiecesString = piecesArray.map(teamSetters[WHITE]);
-	const blackPiecesString = piecesArray.map(teamSetters[BLACK]);
+	const whitePiecesString = pieceLetters.map(teamSetters[WHITE]);
+	const blackPiecesString = pieceLetters.map(teamSetters[BLACK]);
 	const piecesString = whitePiecesString.concat(blackPiecesString).join("");
 	
 	const piece = `[${piecesString}]`;
@@ -233,6 +237,27 @@ function KingDestinationsFromSquare({rank, file})
 	};
 }
 
+function KnightDestinationsFromSquare({rank,file})
+{
+	//the knight moves in an L shape (2 squares in a straight direction, then 1 square in a perpendicular direction)
+	return {
+		inGame: (game)=>{
+			//the knight's pattern doesn't depend on the game position anyway
+			return [
+				Square(rank-2,file-1),
+				Square(rank-2,file+1),
+				Square(rank-1,file-2),
+				Square(rank-1,file+2),
+				Square(rank+1,file-2),
+				Square(rank+1,file+2),
+				Square(rank+2,file-1),
+				Square(rank+2,file+1),
+			]
+			.filter(validSquare);
+		}
+	};
+}
+
 function distinguishTransitions(fullTransitions)
 {
 	/*
@@ -248,8 +273,10 @@ function distinguishTransitions(fullTransitions)
 	the "before" components of transitions that have the same "after" components (destination).
 	*/
 	
-	
+	console.log("starting distinguish transitions");
 	return fullTransitions.map((pieceTransition)=>{
+		console.log("investigating transition:")
+		console.log(pieceTransition);
 		//find the transitions of other pieces that have the same destination
 		const otherPieceTransitions = fullTransitions.filter((t)=>{
 			//other pieces are on different squares
@@ -259,20 +286,36 @@ function distinguishTransitions(fullTransitions)
 			return sameSquare(t.after, pieceTransition.after);
 		});
 		
+		console.log("transitions by other pieces to same destination:")
+		console.log(sameDestinationTransitions);
+		
 		const distinguishedTransition = {before:{},after:pieceTransition.after};
+		if(sameDestinationTransitions.length==0){
+			//no other piece can reach the same destination, therefore move is already distinguished
+			return distinguishedTransition;
+		}
 		
 		const sameOriginFiles = sameDestinationTransitions.filter((t)=>{return t.before.file==pieceTransition.before.file});
-		if(sameOriginFiles.length>0)	//other transitions starting in the same file
-		{
-			//differentiate by rank, since other transitions dont start on the same square as pieceTransition
-			distinguishedTransition.before.rank=pieceTransition.rank;
-		}
 		const sameOriginRanks = sameDestinationTransitions.filter((t)=>{return t.before.rank==pieceTransition.before.rank});
-		if(sameOriginRanks.length>0)	//other transitions starting in the same rank
+		
+		if(sameOriginFiles.length==0)	//can uniquely identify piece by its file
 		{
-			//differentiate by file, since other transitions dont start on the same square as pieceTransition
-			distinguishedTransition.before.file=pieceTransition.file;
+			console.log("can uniquely identify piece by its file");
+			distinguishedTransition.before.file=pieceTransition.before.file;
 		}
+		else if(sameOriginRanks.length==0)	//can uniquely identify piece by its rank
+		{
+			console.log("can uniquely identify piece by its rank");
+			distinguishedTransition.before.rank=pieceTransition.before.rank;
+		}
+		else	//have to fully identify the square the piece is on
+		{
+			console.log("have to fully identify the square the piece is on");
+			distinguishedTransition.before.file=pieceTransition.before.file;
+			distinguishedTransition.before.rank=pieceTransition.before.rank;
+		}
+		console.log(`distinguishedTransition is:`)
+		console.log(distinguishedTransition);
 		return distinguishedTransition;
 	});
 }
@@ -282,6 +325,12 @@ function KingMovesInGame(game)
 	const movingKing = teamSetters[game.turn](KING);
 	const [square] = pieceLocationsInGame(movingKing, game);
 	const fullTransitions = KingDestinationsFromSquare(square).inGame(game)
+	.filter(({rank,file})=>{
+		const capturedPiece = game.board[rank][file];
+		return capturedPiece ?	//if the move would capture a piece of the same colour, it is forbidden
+		capturedPiece != teamSetters[game.turn](capturedPiece) :
+		true;
+	})
 	.map((destinationSquare)=>{
 		return {"before":square,"after":destinationSquare};
 	})
@@ -299,6 +348,61 @@ function KingMovesInGame(game)
 	});
 }
 
+function KnightMovesInGame(game)
+{
+	console.log(`\nstarting knight moves in game`)
+	const movingKnight = teamSetters[game.turn](KNIGHT);
+	const locations = pieceLocationsInGame(movingKnight, game);
+	const fullTransitions = locations.map((square)=>{
+		return KnightDestinationsFromSquare(square).inGame(game)
+		.filter(({rank,file})=>{
+			const capturedPiece = game.board[rank][file];
+			return capturedPiece ?	//if the move would capture a piece of the same colour, it is forbidden
+			capturedPiece != teamSetters[game.turn](capturedPiece) :
+			true;
+		})
+		.map((destinationSquare)=>{
+			return {"before":square,"after":destinationSquare};
+		})
+	})
+	.flat(1)
+	
+	console.log(`fullTransitions:`);
+	console.log(fullTransitions);
+
+	const distinguishedTransitions = distinguishTransitions(fullTransitions);
+	
+	console.log(`distinguished transitions:`);
+	console.log(distinguishedTransitions);
+	
+	return distinguishedTransitions.map((t)=>{
+		//convert the transition to a move string
+		let startFile;
+		if(t.before.file)
+		{
+			startFile = asciiOffset(START_FILE, t.before.file);
+		}
+		else
+		{
+			startFile = "";
+		}
+		
+		let startRank;
+		if(t.before.rank)
+		{
+			startRank = asciiOffset(START_FILE, t.before.rank);
+		}
+		else
+		{
+			startRank = "";
+		}
+		const capture = game.board[t.after.rank][t.after.file] ?? "";
+		const endFile = asciiOffset(START_FILE, t.after.file);
+		const endRank = asciiOffset(START_RANK, t.after.rank);
+		return `${KNIGHT}${startFile}${startRank}${capture}${endFile}${endRank}`;
+	});
+}
+
 function KingLegalsInGame(game)
 {
 	//check which moves leave the king vulnerable to capture
@@ -312,14 +416,32 @@ function KingLegalsInGame(game)
 	});
 }
 
+function KnightLegalsInGame(game)
+{
+	const movingTeamKing = teamSetters[game.turn](KING);
+	const [kingLocation] = pieceLocationsInGame(movingTeamKing, game);
+	const kingSquareName = squareName(kingLocation);
+	//check which moves leave the king vulnerable to capture
+	return KnightMovesInGame(game).filter((move)=>{
+		const progressedGame = GameCopy(game);
+		MakeMoveInGame(move, progressedGame);
+		potentialReplies = AllMovesInGame(progressedGame);
+		//king is vulnerable to capture if the reply's destination square is where the king moved to
+		return potentialReplies.map(moveComponents).map(({destination})=>{return destination})
+		.includes(kingSquareName)==false;
+	});
+}
+
 function AllMovesInGame(game)
 {
-	return KingMovesInGame(game);
+	return KingMovesInGame(game)
+	.concat(KnightMovesInGame(game));
 }
 
 function AllLegalsInGame(game)
 {
-	return KingLegalsInGame(game);
+	return KingLegalsInGame(game)
+	.concat(KnightLegalsInGame(game));
 }
 
 function MakeMoveInGame(move, game)
@@ -346,6 +468,44 @@ function MakeMoveInGame(move, game)
 			return movingTeamSetter(wing) != wing;
 		});
 	}
+	else if(movingPiece == movingTeamSetter(KNIGHT))
+	{
+		const destinationName = components.destination;
+		const newFile = asciiDistance(destinationName.charAt(0), START_FILE);
+		const newRank = asciiDistance(destinationName.charAt(1), START_RANK);
+		const destinationSquare = Square(newRank, newFile);
+		
+		//with multiple knights potentially able to move to the same square,
+		//check if the move has specified the square where the moving piece originates
+		//and filter all the locations to include just the moving piece's location
+		const fileFilter = components.originFile? 
+		({rank,file})=>{return file==asciiDistance(components.originFile,START_FILE);} : (file)=>{return true;}
+		const rankFilter = components.originRank?
+		({rank,file})=>{return rank==asciiDistance(components.originRank,START_RANK);} : (rank)=>{return true;}
+		
+		const locations = pieceLocationsInGame(movingPiece, game)
+		.filter(rankFilter)
+		.filter(fileFilter);
+		
+		//if only the destination was given in the move, then all the knights are still accounted for in locations
+		//this means only 1 knight is actually able to reach the move destination
+		
+		const [origin] = locations.filter((square)=>{
+			const availableDestinations = KnightDestinationsFromSquare(square).inGame(game);
+			const canReachDestination = availableDestinations.findIndex((dest)=>{
+				return sameSquare(dest, destinationSquare);
+			}) >= 0;
+			return canReachDestination;
+		})
+		
+		const oldRank = origin.rank;
+		const oldFile = origin.file;
+		
+		//remove from old square
+		game.board[oldRank][oldFile] = null;
+		//place in new square
+		game.board[newRank][newFile] = movingPiece;
+	}
 	game.turn = (game.turn == WHITE ? BLACK : WHITE);
 	game.enPassantable = "-";
 	game.halfMove++;
@@ -354,7 +514,7 @@ function MakeMoveInGame(move, game)
 
 module.exports = 
 {
-	DEFAULT_FEN_STRING : "4k3/8/8/8/8/8/8/4K3 w KQkq - 0 1",
+	DEFAULT_FEN_STRING : "1n2k1n1/8/8/8/8/8/8/1N2K1N1 w KQkq - 0 1",
 	
 	FENStringToGame : FENStringToGame,
 	GameToFENString : GameToFENString,
