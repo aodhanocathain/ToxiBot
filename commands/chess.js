@@ -27,22 +27,28 @@ function interactionReplyFromMove(interaction, move)
 	}
 	//image of the board
 	const buffer = Chess.FENStringToPNGBuffer(interaction.client.FENs[`${interaction.user.id}`]);
-	let moveList = Chess.AllLegalsInGame(game);
-	console.log(moveList);
-	moveList = Array.from(new Set(moveList));
-	let moveSelectMenu = new Discord.StringSelectMenuBuilder().setCustomId("move").setPlaceholder("Choose a move")
+	const moveList = Chess.AllLegalsInGame(game);
+	const moveSelectMenu = new Discord.StringSelectMenuBuilder().setCustomId("move").setPlaceholder("Choose a move")
 	.addOptions(
 		...moveList.map((move)=>{
 			return new Discord.StringSelectMenuOptionBuilder().setLabel(move).setValue(move)
 		})
 	)
 	
-	const moveHistory = interaction.client.histories[`${interaction.user.id}`].join(" ");
+	const moveHistory = interaction.client.histories[`${interaction.user.id}`].reduce((accumulator, move, index)=>{
+		//give the full move counter at the start of each full move
+		if(index%2==0)
+		{
+			const fullMoveCounter = (index+2)/2;
+			accumulator = accumulator.concat(`\n${fullMoveCounter}.`);
+		}
+		return accumulator.concat(`\t${move}`);
+	},"");
 	const FENString = interaction.client.FENs[`${interaction.user.id}`];
 	
 	return buffer.then((b)=>{
 		return {
-			content: `Moves: ${moveHistory}\nFEN String: ${FENString}`,
+			content: `**Moves**:${moveHistory}\n**FEN String**: ${FENString}`,
 			files: [b],
 			components: [new Discord.ActionRowBuilder().addComponents(moveSelectMenu)]
 		}
@@ -80,12 +86,16 @@ module.exports = {
 						//only respond to the active game, not to previously ended games
 						if(selection.message.interaction.id == (interaction.client.interactions[`${interaction.user.id}`]??{id:null}).id)
 						{
-							const [move] = selection.values;
-							interaction.client.histories[`${interaction.user.id}`].push(move);
-							Promise.all([interactionReplyFromMove(interaction, move)])
-							.then(([message])=>{
-								selection.update(message);
-							});
+							//only allow the user who created the game to interact with it
+							if(selection.user.id==interaction.user.id)
+							{
+								const [move] = selection.values;
+								interaction.client.histories[`${interaction.user.id}`].push(move);
+								Promise.all([interactionReplyFromMove(interaction, move)])
+								.then(([message])=>{
+									selection.update(message);
+								});
+							}
 						}
 					});
 				});
