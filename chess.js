@@ -129,7 +129,7 @@ function FENStringToGame(FENString)
 		const characters = rankString.split("");
 		return characters.map((character)=>{
 			//current character either denotes a piece or a number of empty squares
-			return character in chessPieceImages? character : Array(parseInt(character)).fill(null);
+			return isPiece(character)? character : Array(parseInt(character)).fill(null);
 		}).flat(1);
 	})
 	
@@ -189,7 +189,6 @@ function FENStringToPNGBuffer(FENString)
 	context.font = `${SQUARE_PIXELS/4}px Arial`;//SQUARE_PIXELS/4 is an arbitrarily chosen size
 	
 	const game = FENStringToGame(FENString);
-	//draw pieces, if present
 	return Promise.all(Object.values(chessPieceImages)).then((resolvedChessPieceImages)=>{
 		game.board.forEach((rankPieces, rank)=>{
 			rankPieces.forEach((piece, file)=>{
@@ -380,47 +379,51 @@ function MakeMoveInGame(move, game)
 	const movingTeamSetter = teamSetters[game.turn];
 	const components = moveComponents(move);
 	const movingPiece = movingTeamSetter(components.piece);
-	if(movingPiece == movingTeamSetter(KING))
+	if(components.piece == KING)
 	{
-		const [square] = pieceLocationsInGame(movingTeamSetter(KING), game);
+		const [square] = pieceLocationsInGame(movingPiece, game);
 		const oldFile = square.file;
 		const oldRank = square.rank;
-		const destination = components.destination;
-		const newFile = asciiDistance(destination.charAt(0), START_FILE);
-		const newRank = asciiDistance(destination.charAt(1), START_RANK);
+		const destinationName = components.destination;
+		const newFile = asciiDistance(destinationName.charAt(0), START_FILE);
+		const newRank = asciiDistance(destinationName.charAt(1), START_RANK);
 		
 		//remove from old square
 		game.board[oldRank][oldFile] = null;
 		//place in new square
 		game.board[newRank][newFile] = movingPiece;
 		
-		//moving king forfeits all castle rights
+		//moving king forfeits castle rights
 		game.castleRights = game.castleRights.filter((wing) => {
+			//retain the castle rights of the other team
 			return movingTeamSetter(wing) != wing;
 		});
 	}
-	else if(movingPiece == movingTeamSetter(KNIGHT))
+	else if(components.piece == KNIGHT)
 	{
 		const destinationName = components.destination;
 		const newFile = asciiDistance(destinationName.charAt(0), START_FILE);
 		const newRank = asciiDistance(destinationName.charAt(1), START_RANK);
 		const destinationSquare = Square(newRank, newFile);
 		
-		//with multiple knights potentially able to move to the same square,
-		//check if the move has specified the square where the moving piece originates
-		//and filter all the locations to include just the moving piece's location
+		/*
+		with multiple knights potentially able to move to the same square,
+		check if the move has specified the square where the moving piece originates
+		*/
 		const fileFilter = components.originFile? 
 		({rank,file})=>{return file==asciiDistance(components.originFile,START_FILE);} : (file)=>{return true;}
 		const rankFilter = components.originRank?
 		({rank,file})=>{return rank==asciiDistance(components.originRank,START_RANK);} : (rank)=>{return true;}
 		
+		//filter out all the locations except the one that matches the origin square	
 		const locations = pieceLocationsInGame(movingPiece, game)
 		.filter(rankFilter)
 		.filter(fileFilter);
 		
-		//if only the destination was given in the move, then all the knights are still accounted for in locations
+		//if only the destination was given in the move string, then all the knights are still accounted for
 		//this means only 1 knight is actually able to reach the move destination
 		
+		//find the 1 knight whose possible destinations includes the move destination
 		const [origin] = locations.filter((square)=>{
 			const availableDestinations = PieceDestinationsFromSquare[KNIGHT](square).inGame(game);
 			const canReachDestination = availableDestinations.findIndex((dest)=>{
