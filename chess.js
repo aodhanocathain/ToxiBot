@@ -216,46 +216,45 @@ function FENStringToPNGBuffer(FENString)
 	});
 }
 
-function KingDestinationsFromSquare({rank, file})
-{
-	//the king can move to any adjacent square
-	return {
-		inGame: (game)=>{
-			//the king's pattern doesn't depend on the game position anyway
-			return [
-				Square(rank-1,file-1),
-				Square(rank-1,file),
-				Square(rank-1,file+1),
-				Square(rank,file-1),
-				Square(rank,file+1),
-				Square(rank+1,file-1),
-				Square(rank+1,file),
-				Square(rank+1,file+1),
-			]
-			.filter(validSquare);
-		}
-	};
-}
-
-function KnightDestinationsFromSquare({rank,file})
-{
-	//the knight moves in an L shape (2 squares in a straight direction, then 1 square in a perpendicular direction)
-	return {
-		inGame: (game)=>{
-			//the knight's pattern doesn't depend on the game position anyway
-			return [
-				Square(rank-2,file-1),
-				Square(rank-2,file+1),
-				Square(rank-1,file-2),
-				Square(rank-1,file+2),
-				Square(rank+1,file-2),
-				Square(rank+1,file+2),
-				Square(rank+2,file-1),
-				Square(rank+2,file+1),
-			]
-			.filter(validSquare);
-		}
-	};
+const PieceDestinationsFromSquare = {
+	[KING] : ({rank, file})=>{
+		//the king can move to any adjacent square
+		return {
+			inGame: (game)=>{
+				//the king's pattern doesn't depend on the game position anyway
+				return [
+					Square(rank-1,file-1),
+					Square(rank-1,file),
+					Square(rank-1,file+1),
+					Square(rank,file-1),
+					Square(rank,file+1),
+					Square(rank+1,file-1),
+					Square(rank+1,file),
+					Square(rank+1,file+1),
+				]
+				.filter(validSquare);
+			}
+		};
+	},
+	[KNIGHT] : ({rank, file})=>{
+		//the knight moves in an L shape (2 squares in a straight direction, then 1 square in a perpendicular direction)
+		return {
+			inGame: (game)=>{
+				//the knight's pattern doesn't depend on the game position anyway
+				return [
+					Square(rank-2,file-1),
+					Square(rank-2,file+1),
+					Square(rank-1,file-2),
+					Square(rank-1,file+2),
+					Square(rank+1,file-2),
+					Square(rank+1,file+2),
+					Square(rank+2,file-1),
+					Square(rank+2,file+1),
+				]
+				.filter(validSquare);
+			}
+		};
+	}
 }
 
 function distinguishTransitions(fullTransitions)
@@ -273,10 +272,7 @@ function distinguishTransitions(fullTransitions)
 	the "before" components of transitions that have the same "after" components (destination).
 	*/
 	
-	console.log("starting distinguish transitions");
 	return fullTransitions.map((pieceTransition)=>{
-		console.log("investigating transition:")
-		console.log(pieceTransition);
 		//find the transitions of other pieces that have the same destination
 		const otherPieceTransitions = fullTransitions.filter((t)=>{
 			//other pieces are on different squares
@@ -285,10 +281,7 @@ function distinguishTransitions(fullTransitions)
 		const sameDestinationTransitions = otherPieceTransitions.filter((t)=>{
 			return sameSquare(t.after, pieceTransition.after);
 		});
-		
-		console.log("transitions by other pieces to same destination:")
-		console.log(sameDestinationTransitions);
-		
+				
 		const distinguishedTransition = {before:{},after:pieceTransition.after};
 		if(sameDestinationTransitions.length==0){
 			//no other piece can reach the same destination, therefore move is already distinguished
@@ -300,61 +293,27 @@ function distinguishTransitions(fullTransitions)
 		
 		if(sameOriginFiles.length==0)	//can uniquely identify piece by its file
 		{
-			console.log("can uniquely identify piece by its file");
 			distinguishedTransition.before.file=pieceTransition.before.file;
 		}
 		else if(sameOriginRanks.length==0)	//can uniquely identify piece by its rank
 		{
-			console.log("can uniquely identify piece by its rank");
 			distinguishedTransition.before.rank=pieceTransition.before.rank;
 		}
 		else	//have to fully identify the square the piece is on
 		{
-			console.log("have to fully identify the square the piece is on");
 			distinguishedTransition.before.file=pieceTransition.before.file;
 			distinguishedTransition.before.rank=pieceTransition.before.rank;
 		}
-		console.log(`distinguishedTransition is:`)
-		console.log(distinguishedTransition);
 		return distinguishedTransition;
 	});
 }
 
-function KingMovesInGame(game)
+function PieceMovesInGame(pieceConstant, game)
 {
-	const movingKing = teamSetters[game.turn](KING);
-	const [square] = pieceLocationsInGame(movingKing, game);
-	const fullTransitions = KingDestinationsFromSquare(square).inGame(game)
-	.filter(({rank,file})=>{
-		const capturedPiece = game.board[rank][file];
-		return capturedPiece ?	//if the move would capture a piece of the same colour, it is forbidden
-		capturedPiece != teamSetters[game.turn](capturedPiece) :
-		true;
-	})
-	.map((destinationSquare)=>{
-		return {"before":square,"after":destinationSquare};
-	})
-	.flat(1);
-	const distinguishedTransitions = distinguishTransitions(fullTransitions);
-	
-	return distinguishedTransitions.map((t)=>{
-		//convert the transition to a move string
-		const startFile = t.before.file? asciiOffset(START_FILE, t.before.file) : "";
-		const startRank = t.before.rank? asciiOffset(START_RANK, t.before.rank) : "";
-		const capture = game.board[t.after.rank][t.after.file] ?? "";
-		const endFile = asciiOffset(START_FILE, t.after.file);
-		const endRank = asciiOffset(START_RANK, t.after.rank);
-		return `${KING}${startFile}${startRank}${capture}${endFile}${endRank}`;
-	});
-}
-
-function KnightMovesInGame(game)
-{
-	console.log(`\nstarting knight moves in game`)
-	const movingKnight = teamSetters[game.turn](KNIGHT);
-	const locations = pieceLocationsInGame(movingKnight, game);
+	const movingPiece = teamSetters[game.turn](pieceConstant);
+	const locations = pieceLocationsInGame(movingPiece, game);
 	const fullTransitions = locations.map((square)=>{
-		return KnightDestinationsFromSquare(square).inGame(game)
+		return PieceDestinationsFromSquare[pieceConstant](square).inGame(game)
 		.filter(({rank,file})=>{
 			const capturedPiece = game.board[rank][file];
 			return capturedPiece ?	//if the move would capture a piece of the same colour, it is forbidden
@@ -366,82 +325,54 @@ function KnightMovesInGame(game)
 		})
 	})
 	.flat(1)
-	
-	console.log(`fullTransitions:`);
-	console.log(fullTransitions);
 
 	const distinguishedTransitions = distinguishTransitions(fullTransitions);
 	
-	console.log(`distinguished transitions:`);
-	console.log(distinguishedTransitions);
-	
 	return distinguishedTransitions.map((t)=>{
 		//convert the transition to a move string
-		let startFile;
-		if(t.before.file)
-		{
-			startFile = asciiOffset(START_FILE, t.before.file);
-		}
-		else
-		{
-			startFile = "";
-		}
-		
-		let startRank;
-		if(t.before.rank)
-		{
-			startRank = asciiOffset(START_FILE, t.before.rank);
-		}
-		else
-		{
-			startRank = "";
-		}
-		const capture = game.board[t.after.rank][t.after.file] ?? "";
+		const startFile = t.before.file? asciiOffset(START_FILE, t.before.file) : "";
+		const startRank = t.before.rank? asciiOffset(START_RANK, t.before.rank) : "";
+		const capture = game.board[t.after.rank][t.after.file] ? "x" : "";
 		const endFile = asciiOffset(START_FILE, t.after.file);
 		const endRank = asciiOffset(START_RANK, t.after.rank);
-		return `${KNIGHT}${startFile}${startRank}${capture}${endFile}${endRank}`;
+		return `${pieceConstant}${startFile}${startRank}${capture}${endFile}${endRank}`;
 	});
 }
 
-function KingLegalsInGame(game)
+function PieceLegalsInGame(pieceConstant, game)
 {
-	//check which moves leave the king vulnerable to capture
-	return KingMovesInGame(game).filter((move)=>{
-		const progressedGame = GameCopy(game);
-		MakeMoveInGame(move, progressedGame);
-		potentialReplies = AllMovesInGame(progressedGame);
-		//king is vulnerable to capture if the reply's destination square is where the king moved to
-		return potentialReplies.map(moveComponents).map(({destination})=>{return destination})
-		.includes(moveComponents(move).destination)==false;
-	});
-}
-
-function KnightLegalsInGame(game)
-{
+	//legality here is defined as a move not leaving the king vulnerable to capture
+	
+	//the king that could potentially be captured
 	const movingTeamKing = teamSetters[game.turn](KING);
-	const [kingLocation] = pieceLocationsInGame(movingTeamKing, game);
-	const kingSquareName = squareName(kingLocation);
-	//check which moves leave the king vulnerable to capture
-	return KnightMovesInGame(game).filter((move)=>{
+	
+	//determine legality by making a move and seeing if it leaves the king vulnerable
+	return PieceMovesInGame(pieceConstant, game).filter((move)=>{
+		//make the move in a copy of the game
 		const progressedGame = GameCopy(game);
 		MakeMoveInGame(move, progressedGame);
-		potentialReplies = AllMovesInGame(progressedGame);
-		//king is vulnerable to capture if the reply's destination square is where the king moved to
-		return potentialReplies.map(moveComponents).map(({destination})=>{return destination})
-		.includes(kingSquareName)==false;
+		//find where the king is
+		const [kingLocation] = pieceLocationsInGame(movingTeamKing, progressedGame);
+		const kingSquareName = squareName(kingLocation);
+		//see if a reply by the other team can occupy the king's square
+		const potentialReplies = AllMovesInGame(progressedGame);
+		const replyDestinations = potentialReplies.map(moveComponents).map(({destination})=>{return destination});
+		return replyDestinations.includes(kingSquareName)==false;
 	});
 }
 
 function AllMovesInGame(game)
 {
-	return KingMovesInGame(game)
-	.concat(KnightMovesInGame(game));
+	return pieceLetters.reduce((accumulator, letter)=>{
+		return accumulator.concat(PieceMovesInGame(letter,game));
+	}, []);
 }
 
 function AllLegalsInGame(game)
 {
-	return KingLegalsInGame(game)
-	.concat(KnightLegalsInGame(game));
+	return pieceLetters.reduce((accumulator, letter)=>{
+		return accumulator.concat(PieceLegalsInGame(letter,game));
+	}, []);
 }
 
 function MakeMoveInGame(move, game)
@@ -491,7 +422,7 @@ function MakeMoveInGame(move, game)
 		//this means only 1 knight is actually able to reach the move destination
 		
 		const [origin] = locations.filter((square)=>{
-			const availableDestinations = KnightDestinationsFromSquare(square).inGame(game);
+			const availableDestinations = PieceDestinationsFromSquare[KNIGHT](square).inGame(game);
 			const canReachDestination = availableDestinations.findIndex((dest)=>{
 				return sameSquare(dest, destinationSquare);
 			}) >= 0;
@@ -521,8 +452,8 @@ module.exports =
 	
 	FENStringToPNGBuffer : FENStringToPNGBuffer,
 	
-	KingMovesInGame : KingMovesInGame,
-	KingLegalsInGame: KingLegalsInGame,
+	PieceMovesInGame: PieceMovesInGame,
+	PieceLegalsInGame: PieceLegalsInGame,
 	
 	AllMovesInGame : AllMovesInGame,
 	AllLegalsInGame : AllLegalsInGame,
