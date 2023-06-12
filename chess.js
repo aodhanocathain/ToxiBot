@@ -442,8 +442,11 @@ function MakeMoveInGame(move, game)
 	}
 	game.turn = (game.turn == WHITE ? BLACK : WHITE);
 	game.enPassantable = "-";
-	game.halfMove++;
-	game.fullMove = 1 + Math.floor(game.halfMove/2);
+	if(game.halfMove==1)	//another full move has passed
+	{
+		game.fullMove++;
+	}
+	game.halfMove = (game.halfMove+1)%2;
 }
 
 module.exports = 
