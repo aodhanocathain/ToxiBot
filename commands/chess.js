@@ -135,7 +135,7 @@ module.exports = {
 			//remove the user's properties concering the game
 			delete user.game;
 			delete user.playedMoves;
-			user?.gameDisplay?.deleteReply();	//also remove the message showing the game
+			user.gameDisplay.deleteReply();	//also remove the message showing the game
 			delete user.gameDisplay;
 			return;
 		}
