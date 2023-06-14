@@ -215,6 +215,11 @@ function FENStringToPNGBuffer(FENString)
 	});
 }
 
+function GameToPNGBuffer(game)
+{
+	return FENStringToPNGBuffer(GameToFENString(game));
+}
+
 const PieceDestinationsFromSquare = {
 	[KING] : ({rank, file})=>{
 		//the king can move to any adjacent square
@@ -457,6 +462,7 @@ module.exports =
 	GameToFENString : GameToFENString,
 	
 	FENStringToPNGBuffer : FENStringToPNGBuffer,
+	GameToPNGBuffer: GameToPNGBuffer,
 	
 	PieceMovesInGame: PieceMovesInGame,
 	PieceLegalsInGame: PieceLegalsInGame,

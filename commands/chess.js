@@ -2,121 +2,166 @@ const Discord = require("discord.js");
 const FileSystem = require("fs");
 const Chess = require("../chess.js");
 
-const actionOption = (option) => {
-	return option
-	.setName("action")
-	.setDescription("take action")
-	.setRequired(true)
-	.addChoices(
-	{name: "gamecreate", value:"gamecreate"},
-	{name: "gameend", value:"gameend"},
-	);
-}
-
 const commandName = "chess";
 
-function interactionReplyFromMove(interaction, move)
+const users = {};
+
+function gamecreateSubcommand(subcommand){
+	return subcommand
+	.setName("gamecreate")
+	.setDescription("create your game")
+}
+
+function gamedeleteSubcommand(subcommand)
 {
-	//apply the move in the user's game and return the necessary update to the original reply
-	
-	const game = Chess.FENStringToGame(interaction.client.FENs[`${interaction.user.id}`]);
-	if(move)
-	{
-		Chess.MakeMoveInGame(move, game);
-		interaction.client.FENs[`${interaction.user.id}`] = Chess.GameToFENString(game);
-	}
-	//image of the board
-	const buffer = Chess.FENStringToPNGBuffer(interaction.client.FENs[`${interaction.user.id}`]);
-	const moveList = Chess.AllLegalsInGame(game);
-	const moveSelectMenu = new Discord.StringSelectMenuBuilder().setCustomId("move").setPlaceholder("Choose a move")
-	.addOptions(
-		...moveList.map((move)=>{
-			return new Discord.StringSelectMenuOptionBuilder().setLabel(move).setValue(move)
-		})
-	)
-	
-	const moveHistory = interaction.client.histories[`${interaction.user.id}`].reduce((accumulator, move, index)=>{
+	return subcommand
+	.setName("gamedelete")
+	.setDescription("delete your game")
+}
+
+function movemakeSubcommand(subcommand){
+	return subcommand
+	.setName("movemake")
+	.setDescription("make a move in your game")
+	.addStringOption(moveOption)
+}
+
+function moveOption(option){
+	return option
+	.setName("move")
+	.setDescription("the move you want to make")
+	.setRequired(true)
+}
+
+function moveundoSubcommand(subcommand)
+{
+	return subcommand
+	.setName("moveundo")
+	.setDescription("undo a move in your game")
+}
+
+function moveHistoryString(moveHistory)
+{
+	return moveHistory.reduce((accumulator, move, index)=>{
 		//give the full move counter at the start of each full move
 		if(index%2==0)
 		{
 			const fullMoveCounter = (index+2)/2;
-			accumulator = accumulator.concat(`\n${fullMoveCounter}.`);
+			accumulator = accumulator.concat(`\t${fullMoveCounter}.`);
 		}
-		return accumulator.concat(`\t${move}`);
+		return accumulator.concat(` ${move}`);
 	},"");
-	const FENString = interaction.client.FENs[`${interaction.user.id}`];
+}
+
+function buildGameMessageFromMove(interaction, move)
+{
+	const user = users[`${interaction.user.id}`];
+	//apply the move in the user's game and return the necessary update to the original reply
 	
-	return buffer.then((b)=>{
+	//make the move in the game
+	if(move)
+	{
+		Chess.MakeMoveInGame(move, user.game);
+	}
+	
+	const boardPictureBuffer = Chess.GameToPNGBuffer(user.game);
+	const playedMovesString = moveHistoryString(user.playedMoves);
+	const FENString = Chess.GameToFENString(user.game);
+	const availableMovesString = Chess.AllLegalsInGame(user.game).sort().join("\t");
+	
+	return boardPictureBuffer.then((boardPicture)=>{
 		return {
-			content: `**Moves**:${moveHistory}\n**FEN String**: ${FENString}`,
-			files: [b],
-			components: [new Discord.ActionRowBuilder().addComponents(moveSelectMenu)]
+			content: `**Played Moves**:${playedMovesString}\n`
+			.concat(`**FEN String**:${FENString}\n`)
+			.concat(`**Available Moves**:${availableMovesString}\n`),
+			files: [boardPicture],
 		}
 	});
 }
 
+function userHasGame(user)
+{
+	return "game" in (user??{});
+}
+
 module.exports = {
 	name: commandName,
-	configure: (client) => {
-		client.FENs = {};
-		client.interactions = {};
-		client.histories = {};
-	},
+	configure: (client) => {},
 	discordCommand : new Discord.SlashCommandBuilder().setName(commandName).setDescription("Utilize chess functionality")
-	.addStringOption(actionOption),
+	.addSubcommand(gamecreateSubcommand)
+	.addSubcommand(gamedeleteSubcommand)
+	.addSubcommand(movemakeSubcommand)
+	.addSubcommand(moveundoSubcommand),
+	
 	execute: (interaction) => {
-		const action = interaction.options.getString("action");
-		if(action == "gamecreate")
+		const userId = interaction.user.id;
+		const user = users[userId];
+		
+		const subcommand = interaction.options.getSubcommand();
+		if(subcommand == "gamecreate")
 		{
-			if(interaction.client.FENs[`${interaction.user.id}`])
+			if(userHasGame(user))
 			{
-				return interaction.reply("You already have an active game");
+				return interaction.reply("You already have a game");
 			}
-			interaction.client.FENs[`${interaction.user.id}`] = Chess.DEFAULT_FEN_STRING;
-			interaction.client.interactions[`${interaction.user.id}`] = interaction;
-			interaction.client.histories[`${interaction.user.id}`] = [];
 			
-			return Promise.all([interactionReplyFromMove(interaction, null)])
-			.then(([message])=>{
-				//reply with an interactive message that collects responses and updates the board
-				return interaction.reply(message)
-				.then((response)=>{
-					const collector = response.createMessageComponentCollector();
-					collector.on("collect", (selection)=>{
-						//only respond to the active game, not to previously ended games
-						if(selection.message.interaction.id == (interaction.client.interactions[`${interaction.user.id}`]??{id:null}).id)
-						{
-							//only allow the user who created the game to interact with it
-							if(selection.user.id==interaction.user.id)
-							{
-								const [move] = selection.values;
-								interaction.client.histories[`${interaction.user.id}`].push(move);
-								Promise.all([interactionReplyFromMove(interaction, move)])
-								.then(([message])=>{
-									selection.update(message);
-								});
-							}
-						}
-					});
-				});
+			//initialize the user
+			users[userId] = {
+				"game": Chess.FENStringToGame(Chess.DEFAULT_FEN_STRING),
+				"playedMoves":[],
+				"gameDisplay":interaction
+			};
+			
+			return buildGameMessageFromMove(interaction, null)
+			.then((message)=>{
+				return interaction.reply(message);
 			});
 		}
-		else if(action == "gameend")
+		else if(subcommand == "gamedelete")
 		{
-			if(interaction.client.FENs[`${interaction.user.id}`])
+			if(!userHasGame(user))
 			{
-				delete interaction.client.interactions[`${interaction.user.id}`];
-				delete interaction.client.FENs[`${interaction.user.id}`];
-				delete interaction.client.histories[`${interaction.user.id}`];
-				return;
+				return interaction.reply("You have no game to delete");
 			}
-			else
+			
+			//remove the user's properties concering the game
+			delete user.game;
+			delete user.playedMoves;
+			user?.gameDisplay?.deleteReply();	//also remove the message showing the game
+			delete user.gameDisplay;
+			return;
+		}
+		else if(subcommand == "movemake")
+		{
+			if(!userHasGame(user))
 			{
-				return interaction.reply("You have no active game to end");
+				return interaction.reply("You have no game in which to make a move");
 			}
+			
+			const moveChoice = interaction.options.getString("move");
+			const moveChoices = Chess.AllLegalsInGame(user.game);
+			
+			if(!(moveChoices.includes(moveChoice)))
+			{
+				return interaction.reply("The move supplied is invalid");
+			}
+					
+			user.playedMoves.push(moveChoice);
+			return buildGameMessageFromMove(interaction, moveChoice)
+			.then((message)=>{
+				interaction.deferReply();
+				interaction.deleteReply();
+				return user.gameDisplay.editReply(message);
+			});
+		}
+		else if(subcommand == "moveundo")
+		{
+			return interaction.reply("not yet implemented");
 		}
 	},
 	exiter: (client)=>{
-		
+		Object.values(users).forEach(({gameDisplay})=>{
+			gameDisplay?.deleteReply();
+		})
 	}
 };
