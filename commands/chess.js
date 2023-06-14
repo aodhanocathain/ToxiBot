@@ -19,6 +19,13 @@ function gamedeleteSubcommand(subcommand)
 	.setDescription("delete your game")
 }
 
+function gamebumpSubcommand(subcommand)
+{
+	return subcommand
+	.setName("gamebump")
+	.setDescription("show your game again in a new message")
+}
+
 function movemakeSubcommand(subcommand){
 	return subcommand
 	.setName("movemake")
@@ -90,6 +97,7 @@ module.exports = {
 	discordCommand : new Discord.SlashCommandBuilder().setName(commandName).setDescription("Utilize chess functionality")
 	.addSubcommand(gamecreateSubcommand)
 	.addSubcommand(gamedeleteSubcommand)
+	.addSubcommand(gamebumpSubcommand)
 	.addSubcommand(movemakeSubcommand)
 	.addSubcommand(moveundoSubcommand),
 	
@@ -130,6 +138,19 @@ module.exports = {
 			user?.gameDisplay?.deleteReply();	//also remove the message showing the game
 			delete user.gameDisplay;
 			return;
+		}
+		else if(subcommand == "gamebump")
+		{
+			if(!userHasGame(user))
+			{
+				return interaction.reply("You have no game to post again");
+			}
+			
+			user.gameDisplay.deleteReply();
+			user.gameDisplay = interaction;
+			return buildGameMessageFromMove(interaction, null).then((message)=>{
+				return interaction.reply(message);
+			});	
 		}
 		else if(subcommand == "movemake")
 		{
