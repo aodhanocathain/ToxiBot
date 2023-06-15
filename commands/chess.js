@@ -10,6 +10,15 @@ function gamecreateSubcommand(subcommand){
 	return subcommand
 	.setName("gamecreate")
 	.setDescription("create your game")
+	.addStringOption(fenStringOption)
+}
+
+function fenStringOption(option)
+{
+	return option
+	.setName("fen")
+	.setDescription("a FEN string describing the starting position")
+	.setRequired(false)
 }
 
 function gamedeleteSubcommand(subcommand)
@@ -54,7 +63,7 @@ function moveHistoryString(moveHistory)
 		if(index%2==0)
 		{
 			const fullMoveCounter = (index+2)/2;
-			accumulator = accumulator.concat(`\t${fullMoveCounter}.`);
+			accumulator = accumulator.concat(`${fullMoveCounter>1?"\t":""}${fullMoveCounter}.`);
 		}
 		return accumulator.concat(` ${move}`);
 	},"");
@@ -78,9 +87,9 @@ function buildGameMessageFromMove(interaction, move)
 	
 	return boardPictureBuffer.then((boardPicture)=>{
 		return {
-			content: `**Played Moves**:${playedMovesString}\n`
-			.concat(`**FEN String**:${FENString}\n`)
-			.concat(`**Available Moves**:${availableMovesString}\n`),
+			content: `**Played Moves**:\t${playedMovesString}\n`
+			.concat(`**FEN String**:\t${FENString}\n`)
+			.concat(`**Available Moves**:\t${availableMovesString}\n`),
 			files: [boardPicture],
 		}
 	});
@@ -113,9 +122,11 @@ module.exports = {
 				return interaction.reply("You already have a game");
 			}
 			
+			const fenString = interaction.options.getString("fen");
+			
 			//initialize the user
 			users[userId] = {
-				"game": Chess.FENStringToGame(Chess.DEFAULT_FEN_STRING),
+				"game": Chess.FENStringToGame(fenString ?? Chess.DEFAULT_FEN_STRING),
 				"playedMoves":[],
 				"gameDisplay":interaction
 			};
@@ -182,7 +193,7 @@ module.exports = {
 	},
 	exiter: (client)=>{
 		Object.values(users).forEach(({gameDisplay})=>{
-			gameDisplay?.deleteReply();
+			//gameDisplay?.deleteReply();
 		})
 	}
 };

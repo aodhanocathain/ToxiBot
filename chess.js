@@ -16,9 +16,10 @@ const WHITE = "w";
 const BLACK = "b";
 
 const KING = "K";
+const BISHOP = "B";
 const KNIGHT = "N";
 
-const pieceLetters = [KING,KNIGHT];
+const pieceLetters = [KING,BISHOP,KNIGHT];
 
 //FEN strings denote white pieces in uppercase and black pieces in lowercase
 const teamSetters = {
@@ -31,7 +32,9 @@ const chessPieceImages = {
 	[teamSetters[WHITE](KING)] : Canvas.loadImage(`./images/chess/white/king.png`),
 	[teamSetters[BLACK](KING)] : Canvas.loadImage(`./images/chess/black/king.png`),
 	[teamSetters[WHITE](KNIGHT)] : Canvas.loadImage(`./images/chess/white/knight.png`),
-	[teamSetters[BLACK](KNIGHT)] : Canvas.loadImage(`./images/chess/black/knight.png`)
+	[teamSetters[BLACK](KNIGHT)] : Canvas.loadImage(`./images/chess/black/knight.png`),
+	[teamSetters[WHITE](BISHOP)] : Canvas.loadImage(`./images/chess/white/bishop.png`),
+	[teamSetters[BLACK](BISHOP)] : Canvas.loadImage(`./images/chess/black/bishop.png`),
 };
 
 //helpful functions
@@ -74,11 +77,15 @@ function isPiece(piece)
 	return piece in chessPieceImages;
 }
 
+function pieceTeam(piece)
+{
+	if(!pieceLetters.includes(piece)){return undefined;}
+	return Object.keys(teamSetters).find((team)=>{return teamSetters[team](piece)==piece;})
+}
+
 function moveComponents(move)
 {
-	const whitePiecesString = pieceLetters.map(teamSetters[WHITE]);
-	const blackPiecesString = pieceLetters.map(teamSetters[BLACK]);
-	const piecesString = whitePiecesString.concat(blackPiecesString).join("");
+	const piecesString = pieceLetters.join("");
 	
 	const piece = `[${piecesString}]`;
 	const originFile = `[${START_FILE}-${asciiOffset(START_FILE, NUM_FILES)}]`;
@@ -91,7 +98,7 @@ function moveComponents(move)
 	const reg = new RegExp(`(${piece})(${originFile}?)(${originRank}?)(x?)(${destinationFile}${destinationRank})`);
 	const components = move.match(reg);
 	return {
-		piece: components[1],
+		pieceConstant: components[1],
 		originFile: components[2],
 		originRank: components[3],
 		capture: components[4],
@@ -240,6 +247,33 @@ const PieceDestinationsFromSquare = {
 			}
 		};
 	},
+	[BISHOP] : ({rank, file})=>{
+		//the bishop can move diagonally until it hits a piece or the edge of the board
+		return {
+			inGame: (game)=>{				
+				const maxDirectionLength = Math.max(NUM_RANKS, NUM_FILES);
+				return [-1,1].map((rankDirection)=>{
+					return [-1,1].map((fileDirection)=>{
+						//assume the bishop can see all the way out
+						const maxRange = Array(maxDirectionLength).fill(null).map((item, index)=>{
+							return Square(rank + (rankDirection * (index+1)), file + (fileDirection * (index+1)));
+						})
+						.filter(validSquare);
+						//the bishop has to stop at the first piece it can see
+						const blockingPiece = maxRange.find(({rank,file})=>{
+							return game.board[rank][file] != null;
+						});
+						//if the piece is on the enemy team then it is included in the range as a capture
+						const capture = pieceTeam(blockingPiece) != game.turn;
+						let endIndex = maxRange.indexOf(blockingPiece);
+						if(endIndex<0){endIndex = maxRange.length;}
+						return maxRange.slice(0, endIndex+(capture? 1 : 0));
+					})
+				})
+				.flat(2)
+			}
+		};
+	},
 	[KNIGHT] : ({rank, file})=>{
 		//the knight moves in an L shape (2 squares in a straight direction, then 1 square in a perpendicular direction)
 		return {
@@ -320,9 +354,9 @@ function PieceMovesInGame(pieceConstant, game)
 		return PieceDestinationsFromSquare[pieceConstant](square).inGame(game)
 		.filter(({rank,file})=>{
 			const capturedPiece = game.board[rank][file];
-			return capturedPiece ?	//if the move would capture a piece of the same colour, it is forbidden
-			capturedPiece != teamSetters[game.turn](capturedPiece) :
-			true;
+			if(!capturedPiece){return true;}
+			//if the move would capture a piece of the same colour, it is forbidden
+			return pieceTeam(movingPiece) != pieceTeam(capturedPiece);
 		})
 		.map((destinationSquare)=>{
 			return {"before":square,"after":destinationSquare};
@@ -383,8 +417,8 @@ function MakeMoveInGame(move, game)
 {
 	const movingTeamSetter = teamSetters[game.turn];
 	const components = moveComponents(move);
-	const movingPiece = movingTeamSetter(components.piece);
-	if(components.piece == KING)
+	const movingPiece = movingTeamSetter(components.pieceConstant);
+	if(components.pieceConstant == KING)
 	{
 		const [square] = pieceLocationsInGame(movingPiece, game);
 		const oldFile = square.file;
@@ -404,7 +438,7 @@ function MakeMoveInGame(move, game)
 			return movingTeamSetter(wing) != wing;
 		});
 	}
-	else if(components.piece == KNIGHT)
+	else if(components.pieceConstant == BISHOP || components.pieceConstant == KNIGHT)
 	{
 		const destinationName = components.destination;
 		const newFile = asciiDistance(destinationName.charAt(0), START_FILE);
@@ -412,7 +446,7 @@ function MakeMoveInGame(move, game)
 		const destinationSquare = Square(newRank, newFile);
 		
 		/*
-		with multiple knights potentially able to move to the same square,
+		with multiple of this piece potentially able to move to the same square,
 		check if the move has specified the square where the moving piece originates
 		*/
 		const fileFilter = components.originFile? 
@@ -425,12 +459,12 @@ function MakeMoveInGame(move, game)
 		.filter(rankFilter)
 		.filter(fileFilter);
 		
-		//if only the destination was given in the move string, then all the knights are still accounted for
-		//this means only 1 knight is actually able to reach the move destination
+		//if only the destination was given in the move string, then all pieces of this type are still accounted for
+		//this means only 1 of them is actually able to reach the move destination
 		
-		//find the 1 knight whose possible destinations includes the move destination
+		//find the one whose possible destinations includes the move destination
 		const [origin] = locations.filter((square)=>{
-			const availableDestinations = PieceDestinationsFromSquare[KNIGHT](square).inGame(game);
+			const availableDestinations = PieceDestinationsFromSquare[components.pieceConstant](square).inGame(game);
 			const canReachDestination = availableDestinations.findIndex((dest)=>{
 				return sameSquare(dest, destinationSquare);
 			}) >= 0;
@@ -444,6 +478,7 @@ function MakeMoveInGame(move, game)
 		game.board[oldRank][oldFile] = null;
 		//place in new square
 		game.board[newRank][newFile] = movingPiece;
+		
 	}
 	game.turn = (game.turn == WHITE ? BLACK : WHITE);
 	game.enPassantable = "-";
@@ -456,7 +491,7 @@ function MakeMoveInGame(move, game)
 
 module.exports = 
 {
-	DEFAULT_FEN_STRING : "1n2k1n1/8/8/8/8/8/8/1N2K1N1 w KQkq - 0 1",
+	DEFAULT_FEN_STRING : "1nb1kbn1/8/8/8/8/8/8/1NB1KBN1 w KQkq - 0 1",
 	
 	FENStringToGame : FENStringToGame,
 	GameToFENString : GameToFENString,
@@ -470,5 +505,7 @@ module.exports =
 	AllMovesInGame : AllMovesInGame,
 	AllLegalsInGame : AllLegalsInGame,
 	
-	MakeMoveInGame : MakeMoveInGame
+	MakeMoveInGame : MakeMoveInGame,
+	
+	PieceDestinationsFromSquare: PieceDestinationsFromSquare
 };
