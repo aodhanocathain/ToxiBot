@@ -344,7 +344,7 @@ function distinguishTransitions(fullTransitions)
 	not required to unambiguously describe a move, by retaining what differs between
 	the "before" components of transitions that have the same "after" components (destination).
 	*/
-	
+
 	return fullTransitions.map((pieceTransition)=>{
 		//find the transitions of other pieces that have the same destination
 		const otherPieceTransitions = fullTransitions.filter((t)=>{
@@ -377,12 +377,13 @@ function distinguishTransitions(fullTransitions)
 			distinguishedTransition.before.file=pieceTransition.before.file;
 			distinguishedTransition.before.rank=pieceTransition.before.rank;
 		}
+		
 		return distinguishedTransition;
 	});
 }
 
 function PieceMovesInGame(pieceConstant, game)
-{
+{	
 	const movingPiece = teamSetters[game.turn](pieceConstant);
 	const locations = pieceLocationsInGame(movingPiece, game);
 	const fullTransitions = locations.map((square)=>{
@@ -403,8 +404,8 @@ function PieceMovesInGame(pieceConstant, game)
 	
 	return distinguishedTransitions.map((t)=>{
 		//convert the transition to a move string
-		const startFile = t.before.file? asciiOffset(START_FILE, t.before.file) : "";
-		const startRank = t.before.rank? asciiOffset(START_RANK, t.before.rank) : "";
+		const startFile = "file" in t.before? asciiOffset(START_FILE, t.before.file) : "";
+		const startRank = "rank" in t.before? asciiOffset(START_RANK, t.before.rank) : "";
 		const capture = game.board[t.after.rank][t.after.file] ? "x" : "";
 		const endFile = asciiOffset(START_FILE, t.after.file);
 		const endRank = asciiOffset(START_RANK, t.after.rank);
