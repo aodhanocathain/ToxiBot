@@ -265,9 +265,9 @@ const PieceDestinationsFromSquare = {
 						});
 						//if the piece is on the enemy team then it is included in the range as a capture
 						const capture = pieceTeam(blockingPiece) != game.turn;
-						let endIndex = maxRange.indexOf(blockingPiece);
+						let endIndex = maxRange.indexOf(blockingPiece) + (capture? 1 : 0);
 						if(endIndex<0){endIndex = maxRange.length;}
-						return maxRange.slice(0, endIndex+(capture? 1 : 0));
+						return maxRange.slice(0, endIndex);
 					})
 				})
 				.flat(2)
