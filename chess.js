@@ -16,10 +16,11 @@ const WHITE = "w";
 const BLACK = "b";
 
 const KING = "K";
+const ROOK = "R";
 const BISHOP = "B";
 const KNIGHT = "N";
 
-const pieceLetters = [KING,BISHOP,KNIGHT];
+const pieceLetters = [KING,ROOK,BISHOP,KNIGHT];
 
 //FEN strings denote white pieces in uppercase and black pieces in lowercase
 const teamSetters = {
@@ -31,10 +32,12 @@ const teamSetters = {
 const chessPieceImages = {
 	[teamSetters[WHITE](KING)] : Canvas.loadImage(`./images/chess/white/king.png`),
 	[teamSetters[BLACK](KING)] : Canvas.loadImage(`./images/chess/black/king.png`),
-	[teamSetters[WHITE](KNIGHT)] : Canvas.loadImage(`./images/chess/white/knight.png`),
-	[teamSetters[BLACK](KNIGHT)] : Canvas.loadImage(`./images/chess/black/knight.png`),
+	[teamSetters[WHITE](ROOK)] : Canvas.loadImage(`./images/chess/white/rook.png`),
+	[teamSetters[BLACK](ROOK)] : Canvas.loadImage(`./images/chess/black/rook.png`),
 	[teamSetters[WHITE](BISHOP)] : Canvas.loadImage(`./images/chess/white/bishop.png`),
 	[teamSetters[BLACK](BISHOP)] : Canvas.loadImage(`./images/chess/black/bishop.png`),
+	[teamSetters[WHITE](KNIGHT)] : Canvas.loadImage(`./images/chess/white/knight.png`),
+	[teamSetters[BLACK](KNIGHT)] : Canvas.loadImage(`./images/chess/black/knight.png`),
 };
 
 //helpful functions
@@ -227,6 +230,63 @@ function GameToPNGBuffer(game)
 	return FENStringToPNGBuffer(GameToFENString(game));
 }
 
+function RookDestinationsFromSquare({rank, file}){
+	//the rook can move in a straight line until it hits a piece or the edge of the board
+	return {
+		inGame: (game)=>{				
+			const maxDirectionLength = Math.max(NUM_RANKS-1, NUM_FILES-1);
+			return [[0,1],[1,0]].map(([rankToggle,fileToggle])=>{
+				return [-1,1].map((direction)=>{
+					//assume the rook can see all the way out
+					const maxRange = Array(maxDirectionLength).fill(null).map((item, index)=>{
+						const offset = (direction * (index+1));
+						return Square(rank + (rankToggle*offset), file + (fileToggle*offset));
+					})
+					.filter(validSquare);
+					//the rook has to stop at the first piece it can see
+					const blockingPiece = maxRange.find(({rank,file})=>{
+						return game.board[rank][file] != null;
+					});
+					//if the piece is on the enemy team then it is included in the range as a capture
+					const capture = blockingPiece? pieceTeam(blockingPiece) != game.turn : false;
+					let endIndex = maxRange.indexOf(blockingPiece) + (capture? 1 : 0);
+					if(endIndex<0){endIndex = maxRange.length;}
+					return maxRange.slice(0, endIndex);
+				})
+			})
+			.flat(2);
+		}
+	};
+}
+
+function BishopDestinationsFromSquare({rank, file}){
+	//the bishop can move diagonally until it hits a piece or the edge of the board
+	return {
+		inGame: (game)=>{				
+			const maxDirectionLength = Math.max(NUM_RANKS-1, NUM_FILES-1);
+			return [-1,1].map((rankDirection)=>{
+				return [-1,1].map((fileDirection)=>{
+					//assume the bishop can see all the way out
+					const maxRange = Array(maxDirectionLength).fill(null).map((item, index)=>{
+						return Square(rank + (rankDirection * (index+1)), file + (fileDirection * (index+1)));
+					})
+					.filter(validSquare);
+					//the bishop has to stop at the first piece it can see
+					const blockingPiece = maxRange.find(({rank,file})=>{
+						return game.board[rank][file] != null;
+					});
+					//if the piece is on the enemy team then it is included in the range as a capture
+					const capture = pieceTeam(blockingPiece) != game.turn;
+					let endIndex = maxRange.indexOf(blockingPiece) + (capture? 1 : 0);
+					if(endIndex<0){endIndex = maxRange.length;}
+					return maxRange.slice(0, endIndex);
+				})
+			})
+			.flat(2)
+		}
+	};
+}
+
 const PieceDestinationsFromSquare = {
 	[KING] : ({rank, file})=>{
 		//the king can move to any adjacent square
@@ -247,33 +307,8 @@ const PieceDestinationsFromSquare = {
 			}
 		};
 	},
-	[BISHOP] : ({rank, file})=>{
-		//the bishop can move diagonally until it hits a piece or the edge of the board
-		return {
-			inGame: (game)=>{				
-				const maxDirectionLength = Math.max(NUM_RANKS, NUM_FILES);
-				return [-1,1].map((rankDirection)=>{
-					return [-1,1].map((fileDirection)=>{
-						//assume the bishop can see all the way out
-						const maxRange = Array(maxDirectionLength).fill(null).map((item, index)=>{
-							return Square(rank + (rankDirection * (index+1)), file + (fileDirection * (index+1)));
-						})
-						.filter(validSquare);
-						//the bishop has to stop at the first piece it can see
-						const blockingPiece = maxRange.find(({rank,file})=>{
-							return game.board[rank][file] != null;
-						});
-						//if the piece is on the enemy team then it is included in the range as a capture
-						const capture = pieceTeam(blockingPiece) != game.turn;
-						let endIndex = maxRange.indexOf(blockingPiece) + (capture? 1 : 0);
-						if(endIndex<0){endIndex = maxRange.length;}
-						return maxRange.slice(0, endIndex);
-					})
-				})
-				.flat(2)
-			}
-		};
-	},
+	[ROOK] : RookDestinationsFromSquare,
+	[BISHOP] : BishopDestinationsFromSquare,
 	[KNIGHT] : ({rank, file})=>{
 		//the knight moves in an L shape (2 squares in a straight direction, then 1 square in a perpendicular direction)
 		return {
@@ -438,7 +473,7 @@ function MakeMoveInGame(move, game)
 			return movingTeamSetter(wing) != wing;
 		});
 	}
-	else if(components.pieceConstant == BISHOP || components.pieceConstant == KNIGHT)
+	else if(components.pieceConstant == ROOK || components.pieceConstant == BISHOP || components.pieceConstant == KNIGHT)
 	{
 		const destinationName = components.destination;
 		const newFile = asciiDistance(destinationName.charAt(0), START_FILE);
@@ -491,7 +526,7 @@ function MakeMoveInGame(move, game)
 
 module.exports = 
 {
-	DEFAULT_FEN_STRING : "1nb1kbn1/8/8/8/8/8/8/1NB1KBN1 w KQkq - 0 1",
+	DEFAULT_FEN_STRING : "rnb1kbnr/8/8/8/8/8/8/RNB1KBNR w KQkq - 0 1",
 	
 	FENStringToGame : FENStringToGame,
 	GameToFENString : GameToFENString,
