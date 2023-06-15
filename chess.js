@@ -16,11 +16,12 @@ const WHITE = "w";
 const BLACK = "b";
 
 const KING = "K";
+const QUEEN = "Q";
 const ROOK = "R";
 const BISHOP = "B";
 const KNIGHT = "N";
 
-const pieceLetters = [KING,ROOK,BISHOP,KNIGHT];
+const pieceLetters = [KING,QUEEN,ROOK,BISHOP,KNIGHT];
 
 //FEN strings denote white pieces in uppercase and black pieces in lowercase
 const teamSetters = {
@@ -32,6 +33,8 @@ const teamSetters = {
 const chessPieceImages = {
 	[teamSetters[WHITE](KING)] : Canvas.loadImage(`./images/chess/white/king.png`),
 	[teamSetters[BLACK](KING)] : Canvas.loadImage(`./images/chess/black/king.png`),
+	[teamSetters[WHITE](QUEEN)] : Canvas.loadImage(`./images/chess/white/queen.png`),
+	[teamSetters[BLACK](QUEEN)] : Canvas.loadImage(`./images/chess/black/queen.png`),
 	[teamSetters[WHITE](ROOK)] : Canvas.loadImage(`./images/chess/white/rook.png`),
 	[teamSetters[BLACK](ROOK)] : Canvas.loadImage(`./images/chess/black/rook.png`),
 	[teamSetters[WHITE](BISHOP)] : Canvas.loadImage(`./images/chess/white/bishop.png`),
@@ -230,59 +233,61 @@ function GameToPNGBuffer(game)
 	return FENStringToPNGBuffer(GameToFENString(game));
 }
 
-function RookDestinationsFromSquare({rank, file}){
+function directionalDestinationsFromSquare({rank,file})
+{
+	return {
+		inGame: (game)=>{
+			return {
+				withDirections: (directions)=>{	//something like [-1,1] for [forwards, backwards]
+					return {
+						withToggles: (toggles)=>{	//something like [[1,0],[0,-1]] for [[progress, ignore],[ignore, regress]]
+							const maxDirectionLength = Math.max(NUM_RANKS-1, NUM_FILES-1);
+							return toggles.map(([rankToggle,fileToggle])=>{
+								return directions.map((direction)=>{
+									//assume the piece can see all the way out
+									const maxRange = Array(maxDirectionLength).fill(null).map((item, index)=>{
+										const offset = (direction * (index+1));
+										return Square(rank + (rankToggle*offset), file + (fileToggle*offset));
+									})
+									.filter(validSquare);
+									//the piece has to stop at the first piece it can see
+									const blockingPiece = maxRange.find(({rank,file})=>{
+										return game.board[rank][file] != null;
+									});
+									//if the piece is on the enemy team then it is included in the range as a capture
+									const capture = blockingPiece? pieceTeam(blockingPiece) != game.turn : false;
+									let endIndex = maxRange.indexOf(blockingPiece) + (capture? 1 : 0);
+									if(endIndex<0){endIndex = maxRange.length;}
+									return maxRange.slice(0, endIndex);
+								})
+							})
+							.flat(2);
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+function RookDestinationsFromSquare(square){
 	//the rook can move in a straight line until it hits a piece or the edge of the board
 	return {
 		inGame: (game)=>{				
-			const maxDirectionLength = Math.max(NUM_RANKS-1, NUM_FILES-1);
-			return [[0,1],[1,0]].map(([rankToggle,fileToggle])=>{
-				return [-1,1].map((direction)=>{
-					//assume the rook can see all the way out
-					const maxRange = Array(maxDirectionLength).fill(null).map((item, index)=>{
-						const offset = (direction * (index+1));
-						return Square(rank + (rankToggle*offset), file + (fileToggle*offset));
-					})
-					.filter(validSquare);
-					//the rook has to stop at the first piece it can see
-					const blockingPiece = maxRange.find(({rank,file})=>{
-						return game.board[rank][file] != null;
-					});
-					//if the piece is on the enemy team then it is included in the range as a capture
-					const capture = blockingPiece? pieceTeam(blockingPiece) != game.turn : false;
-					let endIndex = maxRange.indexOf(blockingPiece) + (capture? 1 : 0);
-					if(endIndex<0){endIndex = maxRange.length;}
-					return maxRange.slice(0, endIndex);
-				})
-			})
-			.flat(2);
+			return directionalDestinationsFromSquare(square).inGame(game)
+			.withDirections([-1,1])	//[backwards, forwards]
+			.withToggles([[0,1],[1,0]]);	//[[dont change rank, progress the file],[progress the rank, dont change file]]
 		}
 	};
 }
 
-function BishopDestinationsFromSquare({rank, file}){
+function BishopDestinationsFromSquare(square){
 	//the bishop can move diagonally until it hits a piece or the edge of the board
 	return {
-		inGame: (game)=>{				
-			const maxDirectionLength = Math.max(NUM_RANKS-1, NUM_FILES-1);
-			return [-1,1].map((rankDirection)=>{
-				return [-1,1].map((fileDirection)=>{
-					//assume the bishop can see all the way out
-					const maxRange = Array(maxDirectionLength).fill(null).map((item, index)=>{
-						return Square(rank + (rankDirection * (index+1)), file + (fileDirection * (index+1)));
-					})
-					.filter(validSquare);
-					//the bishop has to stop at the first piece it can see
-					const blockingPiece = maxRange.find(({rank,file})=>{
-						return game.board[rank][file] != null;
-					});
-					//if the piece is on the enemy team then it is included in the range as a capture
-					const capture = pieceTeam(blockingPiece) != game.turn;
-					let endIndex = maxRange.indexOf(blockingPiece) + (capture? 1 : 0);
-					if(endIndex<0){endIndex = maxRange.length;}
-					return maxRange.slice(0, endIndex);
-				})
-			})
-			.flat(2)
+		inGame: (game)=>{		
+			return directionalDestinationsFromSquare(square).inGame(game)
+			.withDirections([-1,1])	//[backwards, forwards]
+			.withToggles([[1,-1],[1,1]]);	//[[progress the rank, regress the file],[progress the rank, progress the file]]
 		}
 	};
 }
@@ -304,6 +309,14 @@ const PieceDestinationsFromSquare = {
 					Square(rank+1,file+1),
 				]
 				.filter(validSquare);
+			}
+		};
+	},
+	[QUEEN] : (square)=>{
+		return {
+			inGame: (game)=>{
+				return RookDestinationsFromSquare(square).inGame(game)
+				.concat(BishopDestinationsFromSquare(square).inGame(game));
 			}
 		};
 	},
@@ -474,7 +487,13 @@ function MakeMoveInGame(move, game)
 			return movingTeamSetter(wing) != wing;
 		});
 	}
-	else if(components.pieceConstant == ROOK || components.pieceConstant == BISHOP || components.pieceConstant == KNIGHT)
+	else if
+	(
+		components.pieceConstant == QUEEN ||
+		components.pieceConstant == ROOK ||
+		components.pieceConstant == BISHOP ||
+		components.pieceConstant == KNIGHT
+	)
 	{
 		const destinationName = components.destination;
 		const newFile = asciiDistance(destinationName.charAt(0), START_FILE);
@@ -527,7 +546,7 @@ function MakeMoveInGame(move, game)
 
 module.exports = 
 {
-	DEFAULT_FEN_STRING : "rnb1kbnr/8/8/8/8/8/8/RNB1KBNR w KQkq - 0 1",
+	DEFAULT_FEN_STRING : "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1",
 	
 	FENStringToGame : FENStringToGame,
 	GameToFENString : GameToFENString,
