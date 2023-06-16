@@ -83,7 +83,7 @@ function buildGameMessageFromMove(interaction, move)
 	const boardPictureBuffer = Chess.GameToPNGBuffer(user.game);
 	const playedMovesString = moveHistoryString(user.playedMoves);
 	const FENString = Chess.GameToFENString(user.game);
-	const availableMovesString = Chess.AllLegalsInGame(user.game).sort().join("\t");
+	const availableMovesString = Chess.AllLegalsInGame(user.game).join("\t");
 	
 	return boardPictureBuffer.then((boardPicture)=>{
 		return {

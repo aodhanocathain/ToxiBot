@@ -52,7 +52,7 @@ function asciiOffset(character, offset)
 
 function asciiDistance(character, baseCharacter)
 {
-	return character.charCodeAt(0) - baseCharacter.charCodeAt(0);
+	return Math.abs(character.charCodeAt(0) - baseCharacter.charCodeAt(0));
 }
 
 function squareName({rank, file})
@@ -85,8 +85,20 @@ function isPiece(piece)
 
 function pieceTeam(piece)
 {
-	if(!pieceLetters.includes(piece)){return undefined;}
-	return Object.keys(teamSetters).find((team)=>{return teamSetters[team](piece)==piece;})
+	if(!piece){return undefined;}
+	if(teamSetters[WHITE](piece)==piece)
+	{
+		return WHITE;
+	}
+	else
+	{
+		return BLACK;
+	}
+}
+
+function changeGameTurn(game)
+{
+	game.turn = (game.turn==WHITE)? BLACK : WHITE;
 }
 
 function moveComponents(move)
@@ -99,16 +111,17 @@ function moveComponents(move)
 	const capture = "x";
 	const destinationFile = originFile;
 	const destinationRank = originRank;
-	
+	const check = "\\+";
 	//capture parts of a move string
-	const reg = new RegExp(`(${piece})(${originFile}?)(${originRank}?)(x?)(${destinationFile}${destinationRank})`);
+	const reg = new RegExp(`(${piece})(${originFile}?)(${originRank}?)(x?)(${destinationFile}${destinationRank})(${check}?)`);
 	const components = move.match(reg);
 	return {
 		pieceConstant: components[1],
 		originFile: components[2],
 		originRank: components[3],
 		capture: components[4],
-		destination: components[5]
+		destination: components[5],
+		check: components[6]
 	};
 }
 
@@ -126,6 +139,24 @@ function pieceLocationsInGame(piece, game)
 		}
 	}
 	return locations;
+}
+
+function KingCapturableInGame(game)
+{
+	//can the moving team move to the square occupied by the opposition's king?
+	const enemyKing = teamSetters[game.turn==WHITE? BLACK : WHITE](KING);
+	const [kingLocation] = pieceLocationsInGame(enemyKing, game);
+	return AllTransitionsInGame(game).some(({before, after})=>{
+		return sameSquare(after, kingLocation);
+	});
+}
+
+function KingCheckedInGame(game)
+{
+	//define check as when the moving team's king could be "captured" were it the other team's turn again
+	const copy = GameCopy(game);
+	changeGameTurn(copy);
+	return KingCapturableInGame(copy);
 }
 
 //CHESS FUNCTIONS
@@ -238,7 +269,7 @@ function directionalDestinationsFromSquare({rank,file})
 	return {
 		inGame: (game)=>{
 			return {
-				withDirections: (directions)=>{	//something like [-1,1] for [forwards, backwards]
+				withDirections: (directions)=>{	//something like [-1,1] for [backwards, forwards]
 					return {
 						withToggles: (toggles)=>{	//something like [[1,0],[0,-1]] for [[progress, ignore],[ignore, regress]]
 							const maxDirectionLength = Math.max(NUM_RANKS-1, NUM_FILES-1);
@@ -251,12 +282,13 @@ function directionalDestinationsFromSquare({rank,file})
 									})
 									.filter(validSquare);
 									//the piece has to stop at the first piece it can see
-									const blockingPiece = maxRange.find(({rank,file})=>{
+									const blockedSquare = maxRange.find(({rank,file})=>{
 										return game.board[rank][file] != null;
 									});
+									const blockingPiece = blockedSquare? game.board[blockedSquare.rank][blockedSquare.file] : null;
 									//if the piece is on the enemy team then it is included in the range as a capture
 									const capture = blockingPiece? pieceTeam(blockingPiece) != game.turn : false;
-									let endIndex = maxRange.indexOf(blockingPiece) + (capture? 1 : 0);
+									let endIndex = maxRange.indexOf(blockedSquare) + (capture? 1 : 0);
 									if(endIndex<0){endIndex = maxRange.length;}
 									return maxRange.slice(0, endIndex);
 								})
@@ -395,8 +427,8 @@ function distinguishTransitions(fullTransitions)
 	});
 }
 
-function PieceMovesInGame(pieceConstant, game)
-{	
+function PieceTransitionsInGame(pieceConstant, game)
+{
 	const movingPiece = teamSetters[game.turn](pieceConstant);
 	const locations = pieceLocationsInGame(movingPiece, game);
 	const fullTransitions = locations.map((square)=>{
@@ -411,8 +443,13 @@ function PieceMovesInGame(pieceConstant, game)
 			return {"before":square,"after":destinationSquare};
 		})
 	})
-	.flat(1)
+	.flat(1);
+	return fullTransitions;
+}
 
+function PieceMovesInGame(pieceConstant, game)
+{	
+	const fullTransitions = PieceTransitionsInGame(pieceConstant, game);
 	const distinguishedTransitions = distinguishTransitions(fullTransitions);
 	
 	return distinguishedTransitions.map((t)=>{
@@ -422,30 +459,37 @@ function PieceMovesInGame(pieceConstant, game)
 		const capture = game.board[t.after.rank][t.after.file] ? "x" : "";
 		const endFile = asciiOffset(START_FILE, t.after.file);
 		const endRank = asciiOffset(START_RANK, t.after.rank);
-		return `${pieceConstant}${startFile}${startRank}${capture}${endFile}${endRank}`;
+		
+		let move = `${pieceConstant}${startFile}${startRank}${capture}${endFile}${endRank}`;
+		//the above is sufficient for MakeMoveInGame but would be better if it showed checks
+		
+		//make the move in a copy of the game
+		const progressedGame = GameCopy(game);
+		MakeMoveInGame(move, progressedGame);
+		//see if this move leaves the other king in check
+		const check = KingCheckedInGame(progressedGame) ? "+" : "";
+		
+		move = `${move}${check}`;
+		return move;
 	});
 }
 
 function PieceLegalsInGame(pieceConstant, game)
 {
-	//legality here is defined as a move not leaving the king vulnerable to capture
-	
-	//the king that could potentially be captured
-	const movingTeamKing = teamSetters[game.turn](KING);
-	
-	//determine legality by making a move and seeing if it leaves the king vulnerable
 	return PieceMovesInGame(pieceConstant, game).filter((move)=>{
 		//make the move in a copy of the game
 		const progressedGame = GameCopy(game);
 		MakeMoveInGame(move, progressedGame);
-		//find where the king is
-		const [kingLocation] = pieceLocationsInGame(movingTeamKing, progressedGame);
-		const kingSquareName = squareName(kingLocation);
-		//see if a reply by the other team can occupy the king's square
-		const potentialReplies = AllMovesInGame(progressedGame);
-		const replyDestinations = potentialReplies.map(moveComponents).map(({destination})=>{return destination});
-		return replyDestinations.includes(kingSquareName)==false;
+		//legality: the move does not leave its team's own king vulnerable to capture
+		return !KingCapturableInGame(game);
 	});
+}
+
+function AllTransitionsInGame(game)
+{
+	return pieceLetters.reduce((accumulator, letter)=>{
+		return accumulator.concat(PieceTransitionsInGame(letter,game));
+	}, []);
 }
 
 function AllMovesInGame(game)
@@ -535,7 +579,7 @@ function MakeMoveInGame(move, game)
 		game.board[newRank][newFile] = movingPiece;
 		
 	}
-	game.turn = (game.turn == WHITE ? BLACK : WHITE);
+	changeGameTurn(game);
 	game.enPassantable = "-";
 	if(game.halfMove==1)	//another full move has passed
 	{
