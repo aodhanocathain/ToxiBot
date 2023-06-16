@@ -481,7 +481,7 @@ function PieceLegalsInGame(pieceConstant, game)
 		const progressedGame = GameCopy(game);
 		MakeMoveInGame(move, progressedGame);
 		//legality: the move does not leave its team's own king vulnerable to capture
-		return !KingCapturableInGame(game);
+		return !KingCapturableInGame(progressedGame);
 	});
 }
 
