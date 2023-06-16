@@ -179,12 +179,25 @@ module.exports = {
 			}
 					
 			user.playedMoves.push(moveChoice);
-			return buildGameMessageFromMove(interaction, moveChoice)
+			let response = buildGameMessageFromMove(interaction, moveChoice)
 			.then((message)=>{
-				interaction.deferReply();
-				interaction.deleteReply();
 				return user.gameDisplay.editReply(message);
 			});
+			if(Chess.CheckmateInGame(user.game))
+			{
+				const winningTeam = (user.game.turn == Chess.WHITE)? Chess.BLACK : Chess.WHITE;
+				return interaction.reply(`The game has reached checkmate, the result is a win for ${winningTeam==Chess.WHITE? "white" : "black"}`);
+			}
+			else if(Chess.StalemateInGame(user.game))
+			{
+				return interaction.reply("The game has reached stalemate, the result is a draw");
+			}
+			else
+			{
+				interaction.deferReply();
+				interaction.deleteReply();
+				return response;
+			}
 		}
 		else if(subcommand == "moveundo")
 		{

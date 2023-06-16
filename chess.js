@@ -159,6 +159,16 @@ function KingCheckedInGame(game)
 	return KingCapturableInGame(copy);
 }
 
+function CheckmateInGame(game)
+{
+	return (AllLegalsInGame(game).length == 0) && KingCheckedInGame(game);
+}
+
+function StalemateInGame(game)
+{
+	return (AllLegalsInGame(game).length == 0) && !(KingCheckedInGame(game));
+}
+
 //CHESS FUNCTIONS
 
 function FENStringToGame(FENString)
@@ -590,7 +600,10 @@ function MakeMoveInGame(move, game)
 
 module.exports = 
 {
-	DEFAULT_FEN_STRING : "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1",
+	WHITE: WHITE,
+	BLACK: BLACK,
+	//DEFAULT_FEN_STRING : "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1",
+	DEFAULT_FEN_STRING : "k7/8/K7/Q7/8/8/8/8 w Qq - 0 1",
 	
 	FENStringToGame : FENStringToGame,
 	GameToFENString : GameToFENString,
@@ -606,5 +619,6 @@ module.exports =
 	
 	MakeMoveInGame : MakeMoveInGame,
 	
-	PieceDestinationsFromSquare: PieceDestinationsFromSquare
+	CheckmateInGame : CheckmateInGame,
+	StalemateInGame : StalemateInGame,
 };
