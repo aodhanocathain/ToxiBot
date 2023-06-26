@@ -122,6 +122,106 @@ class Game
 		return [boardString, this.turn.toString(), this.castleRights.join(""), this.enPassantable, this.halfMove, this.fullMove].join(" ");
 	}
 
+	evaluate(depth = 1)
+	{
+		if(depth>1)
+		{
+			const continuations = this.getLegals();
+			
+			//need to score checkmates and stalemates in future
+			//maybe track temporal proximity of mates with a {"mate in halfmoves": 0}
+			//that increments each turn back in time
+			
+			//start with the first continuation as the best
+			let bestContinuation = continuations[0];
+			this.makeMove(bestContinuation);
+			let bestEvaluationScore = this.evaluate(depth-1).score;
+			this.undoMove();
+			
+			const scoreBetterThanScore = (this.turn==WHITE_TEAM)?
+			function(newEval, oldEval){return newEval > oldEval;} :
+			function(newEval, oldEval){return newEval < oldEval;}
+			
+			//check for better continuations
+			for(let i=1; i<continuations.length; i++)
+			{
+				const newContinuation = continuations[i];
+				this.makeMove(newContinuation);
+				const newEvaluationScore = this.evaluate(depth-1).score;
+				this.undoMove();
+				
+				if(scoreBetterThanScore(newEvaluationScore,bestEvaluationScore))
+				{
+					bestContinuation = newContinuation;
+					bestEvaluationScore = newEvaluationScore;
+				}
+			}
+			return {
+				score: bestEvaluationScore,
+				bestMove: bestContinuation
+			};
+		}
+		else
+		{
+			
+			const continuations = this.getLegals();
+			
+			//need to score checkmates and stalemates in future
+			//maybe track temporal proximity of mates with a {"mate in halfmoves": 0}
+			//that increments each turn back in time
+			
+			//start with the first continuation as the best
+			let bestContinuation = continuations[0];
+			this.makeMove(bestContinuation);
+			let bestEvaluationScore = this.immediatePositionScore();
+			this.undoMove();
+			
+			const scoreBetterThanScore = (this.turn==WHITE_TEAM)?
+			function(newEval, oldEval){return newEval > oldEval;} :
+			function(newEval, oldEval){return newEval < oldEval;}
+			
+			//check for better continuations
+			for(let i=1; i<continuations.length; i++)
+			{
+				const newContinuation = continuations[i];
+				this.makeMove(newContinuation);
+				const newEvaluationScore = this.immediatePositionScore();
+				this.undoMove();
+				
+				if(scoreBetterThanScore(newEvaluationScore,bestEvaluationScore))
+				{
+					bestContinuation = newContinuation;
+					bestEvaluationScore = newEvaluationScore;
+				}
+			}
+			return {
+				score: bestEvaluationScore,
+				bestMove: bestContinuation
+			};
+		}
+	}
+	
+	immediatePositionScore()
+	{
+		let score=0;
+		this.board.forEach((rankPieces)=>{
+			rankPieces.forEach((piece)=>{
+				if(piece)
+				{
+					if(piece.team==WHITE_TEAM)
+					{
+						score += piece.constructor.points;
+					}
+					else
+					{
+						score -= piece.constructor.points;
+					}
+				}
+			})
+		})
+		return score;
+	}
+
 	toPNGBuffer()
 	{
 		const LIGHT_COLOUR = "#e0d0b0";

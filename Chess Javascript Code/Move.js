@@ -73,8 +73,6 @@ class Move
 			(otherPiece?.constructor == this.movingPiece.constructor);
 		})
 		
-		console.log(`otherOrigins of ${this.mainTransition.after.toString()} are ${otherOrigins}`);
-		
 		const sameOriginFiles = otherOrigins.filter((square)=>{return square.file==this.mainTransition.before.file}) ?? [];
 		const sameOriginRanks = otherOrigins.filter((square)=>{return square.rank==this.mainTransition.before.rank}) ?? [];
 		

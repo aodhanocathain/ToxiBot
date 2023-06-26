@@ -130,6 +130,8 @@ const pieceClassesArray = [
 	{
 		static typeChar = "K";
 		
+		static points = 0;
+		
 		constructor(team)
 		{
 			super(team);
@@ -145,6 +147,8 @@ const pieceClassesArray = [
 	class Knight extends Piece
 	{
 		static typeChar = "N";
+		
+		static points = 3;
 		
 		constructor(team)
 		{
@@ -162,6 +166,8 @@ const pieceClassesArray = [
 	{
 		static typeChar = "B";
 		
+		static points = 3;
+		
 		constructor(team)
 		{
 			super(team);
@@ -178,6 +184,8 @@ const pieceClassesArray = [
 	{
 		static typeChar = "R";
 		
+		static points = 5;
+		
 		constructor(team)
 		{
 			super(team);
@@ -193,6 +201,8 @@ const pieceClassesArray = [
 	class Queen extends Piece
 	{
 		static typeChar = "Q";
+		
+		static points = 9;
 		
 		constructor(team)
 		{
