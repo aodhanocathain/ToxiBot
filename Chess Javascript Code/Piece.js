@@ -1,116 +1,103 @@
-const {NUM_RANKS, NUM_FILES} = require("./Constants.js");
-const {WHITE_TEAM, BLACK_TEAM, Team} = require("./Team.js");
-const {Offset} = require("./Offset.js");
-const {Direction} = require("./Direction.js");
-
-const Canvas = require("canvas");
+const {Direction, UP, DOWN, LEFT, RIGHT, UP_AND_LEFT, UP_AND_RIGHT, DOWN_AND_LEFT, DOWN_AND_RIGHT} = require("./Direction.js");
 
 //for patterns that depend only on set offsets from a starting square
-function specificOffsettedSquares(square, offsets)
+function squaresInPatternFromSquare(pattern,square)
 {
-	return offsets.map((offset)=>{return square.offset(offset);})
-	.filter((square)=>{return square.valid;});
+	const squares = [];
+	for(const direction of pattern)
+	{
+		//step to the next square
+		const offsetSquare = square.offset(direction);
+		//if it is in the board, include it
+		if(offsetSquare){squares.push(offsetSquare);}
+	}
+	return squares;
 }
 
-//the king's pattern depends only on these offsets from its current square
-const kingOffsets = [
-	new Offset(-1,-1),
-	new Offset(-1,0),
-	new Offset(-1,1),
-	new Offset(0,1),
-	new Offset(0,-1),
-	new Offset(1,-1),
-	new Offset(1,0),
-	new Offset(1,1)
-];
-
-//the knight's pattern depends only on these offsets from its current square
-const knightOffsets = [
-	new Offset(-2,-1),
-	new Offset(-2,1),
-	new Offset(-1,-2),
-	new Offset(-1,2),
-	new Offset(1,-2),
-	new Offset(1,2),
-	new Offset(2,-1),
-	new Offset(2,1)
-];
-
-const maxDirectionLength = Math.max(NUM_RANKS-1, NUM_FILES-1);
 //for patterns that extend as far as possible in directions from a starting square
-function directionOffsettedSquares(square, game, directions)
+function squaresInDirectionsFromSquare(directions, square)
 {
-	return directions.map((direction)=>{
-	const maxRange = Array(maxDirectionLength).fill(null).map((item, index)=>{
-		const rankOffset = (direction.rankCoefficient * (index+1));
-		const fileOffset = (direction.fileCoefficient * (index+1));
-		const offset = new Offset(rankOffset, fileOffset);
-		return square.offset(offset);
-	})
-	.filter((square)=>{return square.valid;});
-	
-	//the piece has to stop at the first piece it can see
-	let blockedSquareIndex = maxRange.findIndex((square)=>{
-		return game.board[square.rank][square.file] instanceof Piece;
-	});
-	if(blockedSquareIndex<0){return maxRange;}
-	
-	//the point of this function is to find squares that would be targetted
-	//by a specific pattern, not to check whether captures are possible on those squares
-	//therefore the blocked square is included in the range as a target, assuming possible capture
-	return maxRange.slice(0, blockedSquareIndex+1);
-	})
-	.flat(1);
+	const squares = [];
+	for(const direction of directions)
+	{
+		let offsetSquare = square;
+		do
+		{
+			//step to the next square
+			offsetSquare = offsetSquare.offset(direction);
+			//if still in the board, include it
+			if(offsetSquare){squares.push(offsetSquare)}
+			//if off the board, can go no further
+			else{break;}
+		}
+		while(!(offsetSquare.piece instanceof Piece))	//if piece is found, can go no further
+	}
+	return squares;
 }
-
-const bishopDirections = [
-	new Direction(1,1),	//up and right
-	new Direction(1,-1),	//up and left
-	new Direction(-1,1),	//down and right
-	new Direction(-1,-1)	//down and left
-];
-
-const rookDirections = [
-	new Direction(1,0),	//up
-	new Direction(-1,0),	//down
-	new Direction(0,1),	//right
-	new Direction(0,-1)	//left
-];
 
 class Piece
 {
-	team;
-	image;
-	moved;
-	
 	static typeChar;
 	
-	constructor(team)
+	static points;
+	
+	static typeCharOfTeamedChar(teamedChar)
 	{
-		this.team = team;
+		return teamedChar.toUpperCase();
 	}
 	
-	is(piece)
+	static findReachableSquaresFromSquare(square)
 	{
-		return (this.constructor == piece.constructor) && (this.team == piece.team);
+		throw "subclasses of Piece must implement findReachableSquaresFromSquare";
 	}
 	
-	static typeOfTeamedChar(teamedChar)
+	moved;
+	square;
+	
+	team;	
+	id;
+	
+	reachableSquares;
+	
+	constructor()
 	{
-		return teamedChar.toUpperCase();	//maps teamed chars to teamless chars (which only show the type)
+		this.moved = false;
 	}
 	
-	static fromTeamedChar(teamedChar)
+	activate()
 	{
-		const typeChar = Piece.typeOfTeamedChar(teamedChar);
-		const team = Team.ofTeamedChar(teamedChar);
-		const pieceClass = pieceClassesObject[typeChar];
-		return new pieceClass(team);
+		this.team.activatePiece(this);
 	}
 	
-	static getDestinations(square, game)
+	deactivate()
 	{
-		throw "Piece.getDestinations must be implemented";
+		this.team.deactivatePiece(this);
+	}
+	
+	//call only for squares without pieces
+	putInEmptySquare(square)
+	{
+		square.piece = this;
+		this.square = square;
+	}
+	
+	//could be called for squares that already have pieces
+	moveToSquare(toSquare)
+	{
+		//tell the current square to forget
+		this.square.piece = null;
+		
+		//clear the toSquare for this piece
+		toSquare.piece?.deactivate();
+		
+		this.putInEmptySquare(toSquare);
+		
+		this.moved = true;
+	}
+	
+	updateReachableSquares()
+	{
+		this.reachableSquares = this.constructor.findReachableSquaresFromSquare(this.square);
 	}
 	
 	toString()
@@ -119,116 +106,123 @@ class Piece
 	}
 }
 
-function pieceImageDirectory(team)
+class PatternPiece extends Piece
 {
-	return `./images/chess/${team==WHITE_TEAM? "white":"black"}`;
+	static pattern;
+	
+	static findReachableSquaresFromSquare(square)
+	{
+		return squaresInPatternFromSquare(this.pattern,square);
+	}
+}
+
+class DirectionPiece extends Piece
+{
+	static directions;
+	
+	static findReachableSquaresFromSquare(square)
+	{
+		return squaresInDirectionsFromSquare(this.directions,square);
+	}
 }
 
 const pieceClassesArray = [
 
-	class King extends Piece
+	class King extends PatternPiece
 	{
 		static typeChar = "K";
 		
 		static points = 0;
 		
-		constructor(team)
-		{
-			super(team);
-			this.image = Canvas.loadImage(`${pieceImageDirectory(team)}/king.png`);
-		}
-		
-		static getDestinations(square, game)
-		{
-			return specificOffsettedSquares(square, kingOffsets);
-		}
+		static pattern = [
+			DOWN_AND_LEFT,
+			LEFT,
+			UP_AND_LEFT,
+			DOWN,
+			UP,
+			DOWN_AND_RIGHT,
+			RIGHT,
+			UP_AND_RIGHT
+		];
 	},
 
-	class Knight extends Piece
+	class Knight extends PatternPiece
 	{
 		static typeChar = "N";
 		
 		static points = 3;
 		
-		constructor(team)
-		{
-			super(team);
-			this.image = Canvas.loadImage(`${pieceImageDirectory(team)}/knight.png`);
-		}
-		
-		static getDestinations(square, game)
-		{
-			return specificOffsettedSquares(square, knightOffsets);
-		}
+		static pattern = [
+			new Direction(-2,-1),
+			new Direction(-2,1),
+			new Direction(-1,-2),
+			new Direction(-1,2),
+			new Direction(1,-2),
+			new Direction(1,2),
+			new Direction(2,-1),
+			new Direction(2,1)
+		];
 	},
 
-	class Bishop extends Piece
+	class Bishop extends DirectionPiece
 	{
 		static typeChar = "B";
 		
 		static points = 3;
 		
-		constructor(team)
-		{
-			super(team);
-			this.image = Canvas.loadImage(`${pieceImageDirectory(team)}/bishop.png`);
-		}
-		
-		static getDestinations(square, game)
-		{
-			return directionOffsettedSquares(square, game, bishopDirections);
-		}
+		static directions = [
+			UP_AND_RIGHT,
+			UP_AND_LEFT,
+			DOWN_AND_RIGHT,
+			DOWN_AND_LEFT
+		];
 	},
 
-	class Rook extends Piece
+	class Rook extends DirectionPiece
 	{
 		static typeChar = "R";
 		
 		static points = 5;
 		
-		constructor(team)
-		{
-			super(team);
-			this.image = Canvas.loadImage(`${pieceImageDirectory(team)}/rook.png`);
-		}
-		
-		static getDestinations(square, game)
-		{
-			return directionOffsettedSquares(square, game, rookDirections);
-		}
+		static directions = [
+			LEFT,
+			DOWN,
+			UP,
+			RIGHT
+		];
 	},
 
-	class Queen extends Piece
+	class Queen extends DirectionPiece
 	{
 		static typeChar = "Q";
 		
 		static points = 9;
 		
-		constructor(team)
-		{
-			super(team);
-			this.image = Canvas.loadImage(`${pieceImageDirectory(team)}/queen.png`);
-		}
-		
-		static getDestinations(square, game)
-		{
-			//the queen can move like a rook and like a bishop
-			return directionOffsettedSquares(square, game, rookDirections)
-			.concat(directionOffsettedSquares(square, game, bishopDirections));
-		}
+		static directions = [
+			DOWN_AND_LEFT,
+			LEFT,
+			UP_AND_LEFT,
+			DOWN,
+			UP,
+			DOWN_AND_RIGHT,
+			RIGHT,
+			UP_AND_RIGHT,
+		];
 	}
 ];
 
 //match piece type characters to classes
-const pieceClassesObject = pieceClassesArray.reduce((accumulator, pieceClass)=>{
+const pieceTypeCharClasses = pieceClassesArray.reduce((accumulator, pieceClass)=>{
 	accumulator[pieceClass.typeChar] = pieceClass;
 	return accumulator;
 }, {});
 
 module.exports = {
 	Piece:Piece,
+	PatternPiece:PatternPiece,
+	DirectionPiece:DirectionPiece,
 	
 	PieceClassesArray: pieceClassesArray,
 	
-	PieceClassesObject: pieceClassesObject,
+	PieceTypeCharClasses: pieceTypeCharClasses,
 }

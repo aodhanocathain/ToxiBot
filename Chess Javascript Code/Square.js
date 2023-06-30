@@ -1,4 +1,4 @@
-const {NUM_FILES, NUM_RANKS, MIN_FILE, MIN_RANK} = require("./Constants.js");
+const {MIN_FILE, MIN_RANK, NUM_FILES, NUM_RANKS} = require("./Constants.js");
 const {asciiOffset} = require("./Helpers.js");
 
 class Square
@@ -6,38 +6,41 @@ class Square
 	rank;
 	file;
 	
-	rankString;
-	fileString;
+	game;
+	piece;
 	
-	valid;
-	
-	constructor(rank, file)
+	constructor(rank, file, game, piece)
 	{
 		this.rank = rank;
 		this.file = file;
+		this.game = game;
 		
-		this.valid = (0 <= this.rank) && (this.rank < NUM_RANKS) && (0 <= this.file) && (this.file < NUM_FILES);
-		
-		if(this.valid)
+		this.piece = piece ?? null;
+	}
+	
+	offset(direction)
+	{
+		const newRank = this.rank+direction.rankIncrement;
+		const newFile = this.file+direction.fileIncrement;
+		if(0<=newFile && 0<=newRank && newFile<NUM_FILES && newRank<NUM_RANKS)
 		{
-			this.rankString = asciiOffset(MIN_RANK, this.rank);
-			this.fileString = asciiOffset(MIN_FILE, this.file);
+			return this.game.squares[newRank][newFile];
 		}
 	}
 	
-	offset(offset)
+	rankString()
 	{
-		return new Square(this.rank+offset.rank, this.file+offset.file);
+		return asciiOffset(MIN_RANK, this.rank);
 	}
 	
-	sameAs(square)
+	fileString()
 	{
-		return (this.rank==square.rank) && (this.file==square.file);
+		return asciiOffset(MIN_FILE, this.file);
 	}
 	
 	toString()
 	{
-		return `${this.fileString}${this.rankString}`;
+		return `${this.fileString()}${this.rankString()}`;
 	}
 }
 
