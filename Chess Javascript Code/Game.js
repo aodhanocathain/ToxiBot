@@ -7,8 +7,6 @@ const [King] = PieceClassesArray;
 const {Square} = require("./Square.js");
 const {NUM_RANKS, NUM_FILES} = require("./Constants.js");
 
-const {Transition} = require("./Transition.js");
-
 const {PlainMove} = require("./Move.js");
 
 const Canvas = require("canvas");
@@ -90,15 +88,16 @@ class Game
 		
 		this.movingTeam = this.teams[FENparts[1]];
 		
-		this.castleRights = FENparts[2].split("");
-		this.enPassantable = FENparts[3];
+		//this.castleRights = FENparts[2].split("");
+		//this.enPassantable = FENparts[3];
+		
 		this.halfMove = parseInt(FENparts[4]);
 		this.fullMove = parseInt(FENparts[5]);
 		
 		this.playedMoves = [];
 		
-		white.updateReachableSquares();
-		black.updateReachableSquares();
+		white.updateAllReachableSquares();
+		black.updateAllReachableSquares();
 		
 		this.movesCache = [];
 		this.legalsCache = [];
@@ -146,7 +145,7 @@ class Game
 		if(depth>0)
 		{
 			const continuations = this.getLegals();
-				
+			const scorePreferredToScore = this.movingTeam.constructor.scorePreferredToScore;
 			//need to score checkmates and stalemates in future
 			//maybe track temporal proximity of mates with a {"mate in halfmoves": 0}
 			//that increments each turn back in time
@@ -160,28 +159,30 @@ class Game
 			//check for better continuations
 			for(let i=1; i<continuations.length; i++)
 			{
+				/*
 				if(depth == MAX_DEPTH)
 				{
 					console.log(`${i}/${continuations.length}`);
 				}
+				*/
 				const newContinuation = continuations[i];
 				this.makeMoveWithConditionalLegalsUpdate(newContinuation, true);
 				const newEval = this.evaluate(depth-1);
 				this.undoMoveWithConditionalLegalsUpdate(true);
 				
-				if(this.movingTeam.constructor.scorePreferredToScore(newEval.score,bestEval.score))
+				if(scorePreferredToScore(newEval.score,bestEval.score))
 				{
 					bestContinuation = newContinuation;
 					bestEval = newEval;
 				}
 			}
 			
-			const line = bestEval.line ?? [];
-			line.unshift(bestContinuation);
+			const reverseLine = bestEval.reverseLine ?? [];
+			reverseLine.push(bestContinuation);
 			return {
 				score: bestEval.score,
 				bestMove: bestContinuation,
-				line: line
+				reverseLine: reverseLine
 			};
 		}
 		else
@@ -196,20 +197,9 @@ class Game
 	{
 		if(move instanceof PlainMove)
 		{
-			const mainTransition = move.mainTransition;
-			const movingPiece = mainTransition.before.piece;
+			const movingPiece = move.before.piece;
 			
-			movingPiece.moveToSquare(mainTransition.after);
-			if(movingPiece instanceof King)
-			{				
-				//forfeit castle rights
-				this.castleRights = this.castleRights.filter((wing)=>{
-					//retain the castle rights of the opposition, i.e. moving team loses castle rights
-					return Team.charOfTeamedChar(wing) != this.movingTeamChar;
-				})
-			}
-			
-			this.enPassantable = "-";
+			movingPiece.moveToSquare(move.after);
 		}
 		
 		this.playedMoves.push(move);
@@ -230,21 +220,13 @@ class Game
 		if(move instanceof PlainMove)
 		{
 			const mainTransition = move.mainTransition;
-			const movingPiece = mainTransition.after.piece;
+			const movingPiece = move.after.piece;
 			
-			movingPiece.moveToSquare(mainTransition.before);
+			movingPiece.moveToSquare(move.before);
 			movingPiece.moved = (move.firstMove == false);
 			
 			move.targetPiece?.activate();
-			mainTransition.after.piece = move.targetPiece;
-			
-			if(move.movingPiece instanceof King)
-			{				
-				//restore preexisting castle rights
-				this.castleRights = move.castleRights;
-			}
-			
-			this.enPassantable = move.enPassantable;
+			move.after.piece = move.targetPiece;
 		}
 		
 		this.regressMoveCounters();
@@ -257,47 +239,45 @@ class Game
 		}
 	}
 	
-	conditionAfterTempMove(move, conditionFunction)
-	{
-		//make a move, check some condition, then undo the move
-		//this pattern arises a lot
-		this.makeMoveWithConditionalLegalsUpdate(move, false);
-		const condition = conditionFunction(this, move);
-		this.undoMoveWithConditionalLegalsUpdate(false);
-		return condition;
-	}
-	
 	calculateMoves()
 	{
 		const moves = [];
-		this.teams[WhiteTeam.char].updateReachableSquares();
-		this.teams[BlackTeam.char].updateReachableSquares();
-		this.movingTeam.alivePieces.forEach((piece)=>{
+		this.teams[WhiteTeam.char].updateDirectionReachableSquares();
+		this.teams[BlackTeam.char].updateDirectionReachableSquares();
+		this.movingTeam.alivePatternPieces.forEach((piece)=>{
 			//get destination squares of current piece
 			const currentSquare = piece.square;
 			const reachableSquares = piece.reachableSquares;
-			const transitions = reachableSquares.map((reachableSquare)=>{
-				return new Transition(currentSquare, reachableSquare);
-			})
-			//turn each transition into a move and add to list
-			transitions.forEach((transition)=>{
-				const targetPiece = transition.after.piece;
+			reachableSquares.forEach((reachableSquare)=>{
 				//only allow moves that do not capture pieces from the same team
-				if(targetPiece?.team!=piece.team)
+				if(currentSquare.piece.team != reachableSquare.piece?.team)
 				{
-					moves.push(new PlainMove(transition));
+					moves.push(new PlainMove(currentSquare, reachableSquare));
 				}
-			});
+			})
+		});
+		this.movingTeam.aliveDirectionPieces.forEach((piece)=>{
+			//get destination squares of current piece
+			const currentSquare = piece.square;
+			const reachableSquares = piece.reachableSquares;
+			reachableSquares.forEach((reachableSquare)=>{
+				//only allow moves that do not capture pieces from the same team
+				if(currentSquare.piece.team != reachableSquare.piece?.team)
+				{
+					moves.push(new PlainMove(currentSquare, reachableSquare));
+				}
+			})
 		});
 		return moves;
 	}
 	
 	calculateLegals()
 	{
-		return this.calculateMoves().filter((move)=>{
-			return this.conditionAfterTempMove(move, function(game,move){
-				return !(game.kingCapturable());
-			})
+		return this.getMoves().filter((move)=>{
+			this.makeMoveWithConditionalLegalsUpdate(move, false);
+			const condition = !(this.kingCapturable());
+			this.undoMoveWithConditionalLegalsUpdate(false);
+			return condition;
 		});
 	}
 	
@@ -335,12 +315,17 @@ class Game
 	
 	kingChecked()
 	{
-		return this.movingTeam.opposition.alivePieces.some((piece)=>{
+		return this.movingTeam.opposition.alivePatternPieces.some((piece)=>{
 			const reachableSquares = piece.reachableSquares;
 			return reachableSquares.some((square)=>{
 				return square.piece == this.movingTeam.king;
 			});
-		})
+		}) || this.movingTeam.opposition.aliveDirectionPieces.some((piece)=>{
+			const reachableSquares = piece.reachableSquares;
+			return reachableSquares.some((square)=>{
+				return square.piece == this.movingTeam.king;
+			});
+		});
 	}
 	
 	regressMoveCounters()

@@ -9,19 +9,19 @@ class Square
 	game;
 	piece;
 	
-	constructor(rank, file, game, piece)
+	constructor(rank, file, game)
 	{
 		this.rank = rank;
 		this.file = file;
 		this.game = game;
 		
-		this.piece = piece ?? null;
+		this.piece = null;
 	}
 	
-	offset(direction)
+	offset(rankOffset, fileOffset)
 	{
-		const newRank = this.rank+direction.rankIncrement;
-		const newFile = this.file+direction.fileIncrement;
+		const newRank = this.rank+rankOffset;
+		const newFile = this.file+fileOffset;
 		if(0<=newFile && 0<=newRank && newFile<NUM_FILES && newRank<NUM_RANKS)
 		{
 			return this.game.squares[newRank][newFile];

@@ -3,25 +3,20 @@ const {MIN_RANK, MIN_FILE} = require("./Constants.js");
 
 class Move
 {
-	mainTransition;
+	before;
+	after;
 	
 	firstMove;
 	targetPiece;
 	
-	castleRights;
-	enPassantable;
-	
-	constructor(mainTransition)
+	constructor(before, after)
 	{
-		this.mainTransition = mainTransition;
+		this.before = before;
+		this.after = after;
 		
 		//most of this is required for undoing the move
-		this.firstMove = (this.mainTransition.before.moved == false);
-		this.targetPiece = this.mainTransition.after.piece;
-		
-		const game = this.mainTransition.before.game;
-		this.castleRights = game.castleRights.slice();	//.slice() to copy the castle rights
-		this.enPassantable = game.enPassantable;
+		this.firstMove = (this.before.moved == false);
+		this.targetPiece = this.after.piece;
 	}
 	
 	toString()
@@ -34,49 +29,47 @@ class Move
 		//search for any pieces of this move's piece type, that could also move to the same square
 		//see what squares the piece could have come from at the destination
 		//this is the same as the new destinations the piece has available from the move destination
-		const movingPiece = this.mainTransition.before.piece;
-		const game = this.mainTransition.before.game;
+		const movingPiece = this.before.piece;
+		const game = this.before.game;
 		
-		let otherOrigins = movingPiece.constructor.findReachableSquaresFromSquare(this.mainTransition.after)
+		let otherOrigins = movingPiece.constructor.findReachableSquaresFromSquare(this.after)
 		.filter((square)=>{
 			//ignore the square the moving piece came from
-			return (square != this.mainTransition.before) &&
+			return (square != this.before) &&
 			//piece teams must match
 			(square.piece?.team == movingPiece.team) &&
 			//piece types must match
 			(square.piece?.constructor == movingPiece.constructor);
 		})
 		
-		const sameOriginFiles = otherOrigins.filter((square)=>{return square.file==this.mainTransition.before.file});
-		const sameOriginRanks = otherOrigins.filter((square)=>{return square.rank==this.mainTransition.before.rank});
+		const sameOriginFiles = otherOrigins.filter((square)=>{return square.file==this.before.file});
+		const sameOriginRanks = otherOrigins.filter((square)=>{return square.rank==this.before.rank});
 		
 		const beforeDetails = 
 		(otherOrigins.length==0)?	//piece is the only possible candidate for the move
 		"":
 		(sameOriginFiles.length==0)?	//can uniquely identify piece by its file
-		this.mainTransition.before.fileString() :
+		this.before.fileString() :
 		(sameOriginRanks.length==0)?	//can uniquely identify piece by its rank
-		this.mainTransition.before.rankString() :
+		this.before.rankString() :
 		//have to fully specify the square the piece starts on
-		this.mainTransition.before.toString();
+		this.before.toString();
 		
 		const capture = this.targetPiece? "x" : "";
 		
-		const checkStatus = (()=>{
-			return game.conditionAfterTempMove(this, function(game, move){
-				return game.isCheckmate()? "#" : game.kingChecked()? "+" : "";
-			});
-		})();
+		game.makeMoveWithConditionalLegalsUpdate(this, false);
+		const checkStatus = game.isCheckmate()? "#" : game.kingChecked()? "+" : "";
+		game.undoMoveWithConditionalLegalsUpdate(false);
 		
-		return `${movingPiece.constructor.typeChar}${beforeDetails}${capture}${this.mainTransition.after.toString()}${checkStatus}`;
+		return `${movingPiece.constructor.typeChar}${beforeDetails}${capture}${this.after.toString()}${checkStatus}`;
 	}
 }
 
 class PlainMove extends Move
 {
-	constructor(mainTransition)
+	constructor(before, after)
 	{
-		super(mainTransition);
+		super(before, after);
 	}
 }
 

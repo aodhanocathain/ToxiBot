@@ -1,16 +1,15 @@
-const {Direction, UP, DOWN, LEFT, RIGHT, UP_AND_LEFT, UP_AND_RIGHT, DOWN_AND_LEFT, DOWN_AND_RIGHT} = require("./Direction.js");
-
 //for patterns that depend only on set offsets from a starting square
 function squaresInPatternFromSquare(pattern,square)
 {
 	const squares = [];
-	for(const direction of pattern)
+	for(let i=0; i<pattern.length; i+=2)
 	{
 		//step to the next square
-		const offsetSquare = square.offset(direction);
+		const offsetSquare = square.offset(pattern[i], pattern[i+1]);
 		//if it is in the board, include it
 		if(offsetSquare){squares.push(offsetSquare);}
 	}
+	
 	return squares;
 }
 
@@ -18,19 +17,22 @@ function squaresInPatternFromSquare(pattern,square)
 function squaresInDirectionsFromSquare(directions, square)
 {
 	const squares = [];
-	for(const direction of directions)
+	for(let i=0; i<directions.length; i+=2)
 	{
+		const rankOffset = directions[i];
+		const fileOffset = directions[i+1];
 		let offsetSquare = square;
 		do
 		{
 			//step to the next square
-			offsetSquare = offsetSquare.offset(direction);
-			//if still in the board, include it
-			if(offsetSquare){squares.push(offsetSquare)}
-			//if off the board, can go no further
-			else{break;}
+			offsetSquare = offsetSquare.offset(rankOffset,fileOffset);
+			squares.push(offsetSquare)
 		}
-		while(!(offsetSquare.piece instanceof Piece))	//if piece is found, can go no further
+		while(offsetSquare && !offsetSquare.piece)	//if piece is found, can go no further
+		if(!offsetSquare)
+		{
+			squares.pop();
+		}
 	}
 	return squares;
 }
@@ -135,14 +137,14 @@ const pieceClassesArray = [
 		static points = 0;
 		
 		static pattern = [
-			DOWN_AND_LEFT,
-			LEFT,
-			UP_AND_LEFT,
-			DOWN,
-			UP,
-			DOWN_AND_RIGHT,
-			RIGHT,
-			UP_AND_RIGHT
+			-1,-1,
+			0,-1,
+			1,-1,
+			-1,0,
+			1,0,
+			-1,1,
+			0,1,
+			1,1
 		];
 	},
 
@@ -153,14 +155,14 @@ const pieceClassesArray = [
 		static points = 3;
 		
 		static pattern = [
-			new Direction(-2,-1),
-			new Direction(-2,1),
-			new Direction(-1,-2),
-			new Direction(-1,2),
-			new Direction(1,-2),
-			new Direction(1,2),
-			new Direction(2,-1),
-			new Direction(2,1)
+			-2,-1,
+			-2,1,
+			-1,-2,
+			-1,2,
+			1,-2,
+			1,2,
+			2,-1,
+			2,1
 		];
 	},
 
@@ -171,10 +173,10 @@ const pieceClassesArray = [
 		static points = 3;
 		
 		static directions = [
-			UP_AND_RIGHT,
-			UP_AND_LEFT,
-			DOWN_AND_RIGHT,
-			DOWN_AND_LEFT
+			-1,-1,
+			1,-1,
+			-1,1,
+			1,1
 		];
 	},
 
@@ -185,10 +187,10 @@ const pieceClassesArray = [
 		static points = 5;
 		
 		static directions = [
-			LEFT,
-			DOWN,
-			UP,
-			RIGHT
+			0,-1,
+			-1,0,
+			1,0,
+			0,1
 		];
 	},
 
@@ -199,14 +201,14 @@ const pieceClassesArray = [
 		static points = 9;
 		
 		static directions = [
-			DOWN_AND_LEFT,
-			LEFT,
-			UP_AND_LEFT,
-			DOWN,
-			UP,
-			DOWN_AND_RIGHT,
-			RIGHT,
-			UP_AND_RIGHT,
+			-1,-1,
+			0,-1,
+			1,-1,
+			-1,0,
+			1,0,
+			-1,1,
+			0,1,
+			1,1
 		];
 	}
 ];

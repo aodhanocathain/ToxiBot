@@ -23,10 +23,13 @@ class Team
 	
 	opposition;
 	
-	alivePieces;
-	deadPieces;
+	alivePatternPieces;
+	deadPatternPieces;
+	nextPatternPieceId;	
 	
-	nextPieceId;
+	aliveDirectionPieces;
+	deadDirectionPieces;
+	nextDirectionPieceId;
 	
 	points;
 	
@@ -34,12 +37,16 @@ class Team
 	
 	constructor()
 	{		
-		this.alivePieces = [];
-		this.deadPieces = [];
+		this.alivePatternPieces = [];
+		this.aliveDirectionPieces = [];
+		
+		this.deadPatternPieces = [];
+		this.deadDirectionPieces = [];
+		
+		this.nextPatternPieceId=0;
+		this.nextDirectionPieceId=0;
 		
 		this.points = 0;
-		
-		this.nextPieceId=0;
 	}
 	
 	addPiece(piece)
@@ -50,8 +57,16 @@ class Team
 	
 	registerPiece(piece)
 	{
-		piece.id = this.nextPieceId;
-		this.nextPieceId++;
+		if(piece instanceof PatternPiece)
+		{
+			piece.id = this.nextPatternPieceId;
+			this.nextPatternPieceId++;
+		}
+		else
+		{
+			piece.id = this.nextDirectionPieceId;
+			this.nextDirectionPieceId++;
+		}
 		
 		piece.team = this;
 		
@@ -63,21 +78,47 @@ class Team
 	
 	activatePiece(piece)
 	{
-		this.alivePieces[piece.id] = piece;
-		delete this.deadPieces[piece.id];
+		if(piece instanceof PatternPiece)
+		{
+			this.alivePatternPieces[piece.id] = piece;
+			delete this.deadPatternPieces[piece.id];
+		}
+		else
+		{
+			this.aliveDirectionPieces[piece.id] = piece;
+			delete this.deadDirectionPieces[piece.id];
+		}
 		this.points += piece.constructor.points;
 	}
 	
 	deactivatePiece(piece)
 	{
-		this.deadPieces[piece.id] = piece;
-		delete this.alivePieces[piece.id];
+		if(piece instanceof PatternPiece)
+		{
+			this.deadPatternPieces[piece.id] = piece;
+			delete this.alivePatternPieces[piece.id];
+		}
+		else
+		{
+			this.deadDirectionPieces[piece.id] = piece;
+			delete this.aliveDirectionPieces[piece.id];
+		}
 		this.points -= piece.constructor.points;
 	}
 	
-	updateReachableSquares()
+	updateAllReachableSquares()
 	{
-		this.alivePieces.forEach((piece)=>{
+		this.alivePatternPieces.forEach((piece)=>{
+			piece.updateReachableSquares();
+		});
+		this.aliveDirectionPieces.forEach((piece)=>{
+			piece.updateReachableSquares();
+		});
+	}
+	
+	updateDirectionReachableSquares()
+	{
+		this.aliveDirectionPieces.forEach((piece)=>{
 			piece.updateReachableSquares();
 		});
 	}
