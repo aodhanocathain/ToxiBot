@@ -154,17 +154,17 @@ class Game
 				
 				//start with the first continuation as the best
 				let bestContinuation = continuations[0];
-				this.makeMoveEvalConsequences(bestContinuation);
+				this.makeMoveForEvalConsequences(bestContinuation);
 				let bestEval = this.evaluate(depth-1);
-				this.undoMoveEvalConsequences(bestContinuation);
+				this.undoMoveForEvalConsequences(bestContinuation);
 				
 				//check for better continuations
 				for(let i=1; i<continuations.length; i++)
 				{
 					const newContinuation = continuations[i];
-					this.makeMoveEvalConsequences(newContinuation);
+					this.makeMoveForEvalConsequences(newContinuation);
 					const newEval = this.evaluate(depth-1);
-					this.undoMoveEvalConsequences(newContinuation);
+					this.undoMoveForEvalConsequences(newContinuation);
 					
 					if(scorePreferredToScore(newEval.score,bestEval.score))
 					{
