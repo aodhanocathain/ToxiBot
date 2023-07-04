@@ -1,40 +1,64 @@
+const {Square} = require("./Square.js");
+const {BitVector64} = require("./BitVector64.js");
+
 //for patterns that depend only on set offsets from a starting square
-function squaresInPatternFromSquare(pattern,square)
+function squaresAndBitsInPatternFromSquareInGame(pattern,square, game)
 {
-	const squares = [];
+	const squaresArray = [];
+	const squaresBits = new BitVector64();
+	
+	const rank = Square.rank(square);
+	const file = Square.file(square);
+	
 	for(let i=0; i<pattern.length; i+=2)
 	{
-		//step to the next square
-		const offsetSquare = square.offset(pattern[i], pattern[i+1]);
+		const newRank = rank + pattern[i];
+		const newFile = file + pattern[i+1];
 		//if it is in the board, include it
-		if(offsetSquare){squares.push(offsetSquare);}
+		if(((newRank|newFile)>>3)==0)
+		{
+			const newSquare = Square.make(newRank,newFile);
+			squaresArray.push(newSquare);
+			squaresBits.set(newSquare);
+		}
 	}
 	
-	return squares;
+	return [squaresArray, squaresBits];
 }
 
 //for patterns that extend as far as possible in directions from a starting square
-function squaresInDirectionsFromSquare(directions, square)
+function squaresAndBitsInDirectionsFromSquareInGame(directions,square,game)
 {
-	const squares = [];
+	const squaresArray = [];
+	const squaresBits = new BitVector64();
+	
+	const squaresOccupiedBitVector = game.squaresOccupiedBitVector;
+	
+	const rank = Square.rank(square);
+	const file = Square.file(square);
+	
 	for(let i=0; i<directions.length; i+=2)
 	{
 		const rankOffset = directions[i];
 		const fileOffset = directions[i+1];
-		let offsetSquare = square;
-		do
+		
+		let newRank = rank+rankOffset;
+		let newFile = file+fileOffset;
+		let blocked = false;
+		
+		while((((newRank|newFile)>>3)==0) && !blocked)
 		{
-			//step to the next square
-			offsetSquare = offsetSquare.offset(rankOffset,fileOffset);
-			squares.push(offsetSquare)
-		}
-		while(offsetSquare && !offsetSquare.piece)	//if piece is found, can go no further
-		if(!offsetSquare)
-		{
-			squares.pop();
+			const newSquare = Square.make(newRank,newFile);
+			
+			squaresArray.push(newSquare);
+			squaresBits.set(newSquare);
+			
+			blocked = squaresOccupiedBitVector.read(newSquare);
+			newRank += rankOffset;
+			newFile += fileOffset;
 		}
 	}
-	return squares;
+	return [squaresArray,squaresBits];
 }
 
 class Piece
@@ -48,18 +72,18 @@ class Piece
 		return teamedChar.toUpperCase();
 	}
 	
-	static findReachableSquaresFromSquare(square)
+	static findReachableSquaresAndBitsFromSquareInGame(square, game)
 	{
-		throw "subclasses of Piece must implement findReachableSquaresFromSquare";
+		throw "subclasses of Piece must implement findReachableSquaresAndBitsFromSquare";
 	}
 	
 	moved;
-	square;
 	
 	team;	
 	id;
 	
 	reachableSquares;
+	reachableBits;
 	
 	constructor()
 	{
@@ -76,30 +100,11 @@ class Piece
 		this.team.deactivatePiece(this);
 	}
 	
-	//call only for squares without pieces
-	putInEmptySquare(square)
+	updateReachableSquaresAndBitsFromSquareInGame(square, game)
 	{
-		square.piece = this;
-		this.square = square;
-	}
-	
-	//could be called for squares that already have pieces
-	moveToSquare(toSquare)
-	{
-		//tell the current square to forget
-		this.square.piece = null;
-		
-		//clear the toSquare for this piece
-		toSquare.piece?.deactivate();
-		
-		this.putInEmptySquare(toSquare);
-		
-		this.moved = true;
-	}
-	
-	updateReachableSquares()
-	{
-		this.reachableSquares = this.constructor.findReachableSquaresFromSquare(this.square);
+		const reachables = this.constructor.findReachableSquaresAndBitsFromSquareInGame(square, game);
+		this.reachableSquares = reachables[0];
+		this.reachableBits = reachables[1];
 	}
 	
 	toString()
@@ -112,9 +117,9 @@ class PatternPiece extends Piece
 {
 	static pattern;
 	
-	static findReachableSquaresFromSquare(square)
+	static findReachableSquaresAndBitsFromSquareInGame(square, game)
 	{
-		return squaresInPatternFromSquare(this.pattern,square);
+		return squaresAndBitsInPatternFromSquareInGame(this.pattern,square, game);
 	}
 }
 
@@ -122,9 +127,9 @@ class DirectionPiece extends Piece
 {
 	static directions;
 	
-	static findReachableSquaresFromSquare(square)
+	static findReachableSquaresAndBitsFromSquareInGame(square, game)
 	{
-		return squaresInDirectionsFromSquare(this.directions,square);
+		return squaresAndBitsInDirectionsFromSquareInGame(this.directions,square, game);
 	}
 }
 

@@ -1,22 +1,32 @@
 const {Piece, DirectionPiece} = require("./Piece.js");
 const {MIN_RANK, MIN_FILE} = require("./Constants.js");
+const {Square} = require("./Square.js");
 
 class Move
 {
 	before;
 	after;
 	
-	firstMove;
-	targetPiece;
+	movingPiece;
 	
-	constructor(before, after)
+	//required to undo the move
+	targetPiece;
+	firstMove;
+	enPassantable;
+	castleRights;
+	
+	constructor(game, before, after)
 	{
+		this.game = game;
+		
 		this.before = before;
 		this.after = after;
 		
-		//most of this is required for undoing the move
-		this.firstMove = (this.before.moved == false);
-		this.targetPiece = this.after.piece;
+		this.movingPiece = game.pieces[before];
+		this.targetPiece = game.pieces[after];
+		this.firstMove = (this.movingPiece.moved == false);
+		this.enPassantable = game.enPassantable;
+		this.castleRights = game.castleRights;
 	}
 	
 	toString()
@@ -26,50 +36,49 @@ class Move
 		information about the square the piece moves from, to uniquely identify the moving piece.
 		*/
 		
-		//search for any pieces of this move's piece type, that could also move to the same square
-		//see what squares the piece could have come from at the destination
-		//this is the same as the new destinations the piece has available from the move destination
-		const movingPiece = this.before.piece;
-		const game = this.before.game;
+		//Search for any pieces of this move's piece type, that could also move to the same square
+		//See what squares the piece could have come from at the destination
+		//(this is the same as the new destinations the piece has available from the move destination)
 		
-		let otherOrigins = movingPiece.constructor.findReachableSquaresFromSquare(this.after)
+		let otherOrigins = this.movingPiece.constructor.findReachableSquaresAndBitsFromSquareInGame(this.after,this.game)[0]
 		.filter((square)=>{
+			const otherPiece = this.game.pieces[square];
 			//ignore the square the moving piece came from
 			return (square != this.before) &&
 			//piece teams must match
-			(square.piece?.team == movingPiece.team) &&
+			(otherPiece?.team == this.movingPiece.team) &&
 			//piece types must match
-			(square.piece?.constructor == movingPiece.constructor);
+			(otherPiece?.constructor == this.movingPiece.constructor);
 		})
 		
-		const sameOriginFiles = otherOrigins.filter((square)=>{return square.file==this.before.file});
-		const sameOriginRanks = otherOrigins.filter((square)=>{return square.rank==this.before.rank});
+		const sameOriginFiles = otherOrigins.filter((square)=>{return file==Square.file(square);});
+		const sameOriginRanks = otherOrigins.filter((square)=>{return rank==Square.rank(square);});
 		
 		const beforeDetails = 
 		(otherOrigins.length==0)?	//piece is the only possible candidate for the move
 		"":
 		(sameOriginFiles.length==0)?	//can uniquely identify piece by its file
-		this.before.fileString() :
+		Square.fileString(this.before) :
 		(sameOriginRanks.length==0)?	//can uniquely identify piece by its rank
-		this.before.rankString() :
+		Square.rankString(this.before) :
 		//have to fully specify the square the piece starts on
-		this.before.toString();
+		Square.fullString(this.before);
 		
 		const capture = this.targetPiece? "x" : "";
 		
-		game.makeMoveWithConditionalLegalsUpdate(this, false);
-		const checkStatus = game.isCheckmate()? "#" : game.kingChecked()? "+" : "";
-		game.undoMoveWithConditionalLegalsUpdate(false);
+		this.game.makeMoveWithConditionalLegalsUpdate(this, true);
+		const checkStatus = this.game.isCheckmate()? "#" : this.game.kingChecked()? "+" : "";
+		this.game.undoMoveWithConditionalLegalsUpdate(true);
 		
-		return `${movingPiece.constructor.typeChar}${beforeDetails}${capture}${this.after.toString()}${checkStatus}`;
+		return `${this.movingPiece.constructor.typeChar}${beforeDetails}${capture}${Square.fullString(this.after)}${checkStatus}`;
 	}
 }
 
 class PlainMove extends Move
 {
-	constructor(before, after)
+	constructor(game, before, after)
 	{
-		super(before, after);
+		super(game, before, after);
 	}
 }
 

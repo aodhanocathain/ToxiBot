@@ -22,13 +22,17 @@ class Team
 	}
 	
 	opposition;
+	allPieces;
+	directionPieces;
 	
 	alivePatternPieces;
 	deadPatternPieces;
-	nextPatternPieceId;	
+	patternPieceSquares;
+	nextPatternPieceId;
 	
 	aliveDirectionPieces;
 	deadDirectionPieces;
+	directionPieceSquares;
 	nextDirectionPieceId;
 	
 	points;
@@ -40,6 +44,9 @@ class Team
 		this.alivePatternPieces = [];
 		this.aliveDirectionPieces = [];
 		
+		this.patternPieceSquares = [];
+		this.directionPieceSquares = [];
+		
 		this.deadPatternPieces = [];
 		this.deadDirectionPieces = [];
 		
@@ -49,23 +56,27 @@ class Team
 		this.points = 0;
 	}
 	
-	addPiece(piece)
+	addPieceAtSquare(piece, square)
 	{
-		this.registerPiece(piece);
+		this.registerPieceAtSquare(piece, square);
 		this.activatePiece(piece);
 	}
 	
-	registerPiece(piece)
+	registerPieceAtSquare(piece, square)
 	{
 		if(piece instanceof PatternPiece)
 		{
 			piece.id = this.nextPatternPieceId;
 			this.nextPatternPieceId++;
+			
+			this.patternPieceSquares[piece.id] = square;
 		}
 		else
 		{
 			piece.id = this.nextDirectionPieceId;
 			this.nextDirectionPieceId++;
+			
+			this.directionPieceSquares[piece.id] = square;
 		}
 		
 		piece.team = this;
@@ -106,20 +117,20 @@ class Team
 		this.points -= piece.constructor.points;
 	}
 	
-	updateAllReachableSquares()
+	updateAllReachableSquaresAndBitsInGame(game)
 	{
 		this.alivePatternPieces.forEach((piece)=>{
-			piece.updateReachableSquares();
+			piece.updateReachableSquaresAndBitsFromSquareInGame(this.patternPieceSquares[piece.id],game);
 		});
 		this.aliveDirectionPieces.forEach((piece)=>{
-			piece.updateReachableSquares();
+			piece.updateReachableSquaresAndBitsFromSquareInGame(this.directionPieceSquares[piece.id],game);
 		});
 	}
 	
-	updateDirectionReachableSquares()
+	updateDirectionReachableSquaresAndBitsInGame(game)
 	{
 		this.aliveDirectionPieces.forEach((piece)=>{
-			piece.updateReachableSquares();
+			piece.updateReachableSquaresAndBitsFromSquareInGame(this.directionPieceSquares[piece.id],game);
 		});
 	}
 	

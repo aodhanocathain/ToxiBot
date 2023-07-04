@@ -4,54 +4,59 @@ const [WhiteTeam, BlackTeam] = TeamClassesArray;
 const {Piece, PatternPiece, DirectionPiece, PieceTypeCharClasses, PieceClassesArray} = require("./Piece.js");
 const [King] = PieceClassesArray;
 
-const {Square} = require("./Square.js");
 const {NUM_RANKS, NUM_FILES} = require("./Constants.js");
 
 const {PlainMove} = require("./Move.js");
+
+const {BitVector64} = require("./BitVector64.js");
+
+const {Square} = require("./Square.js");
+
+const {Manager} = require("./Manager.js");
 
 const Canvas = require("canvas");
 
 const DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
 
-const MAX_DEPTH = 3;
-
 class Game
 {
-	squares;
+	//locations in the game containing pieces
+	pieces;	
+	squaresOccupiedBitVector;
+
+	reachableSquaresBits;
+	moves;
+	legals;
 	
 	teams;
 	movingTeam;
 	
+	playedMoves;
 	castleRights;
 	enPassantable;
 	halfMove;
 	fullMove;
-
-	playedMoves;
-	
-	moves;
-	movesCache;
-	legals;
-	legalsCache;
 	
 	constructor(FENString = DEFAULT_FEN_STRING)
 	{
-		//initialize the teams
+		this.squaresOccupiedBitVector = new BitVector64();
+		
+		this.reachableSquaresBits = new Manager();
+		this.moves = new Manager();
+		this.legals = new Manager();
+		
 		const white = new WhiteTeam();
 		const black = new BlackTeam();
 		white.opposition = black;
 		black.opposition = white;
-		
 		this.teams = {
 			[white.constructor.char]:white,
 			[black.constructor.char]:black
 		};
 		
 		//initialize an empty board
-		this.squares = Array(NUM_RANKS).fill(null).map((item,rank)=>{
-			return Array(NUM_FILES).fill(null).map((item,file)=>{
-				return new Square(rank,file,this);
-			});
+		this.pieces = Array(NUM_RANKS).fill(null).map(()=>{
+			return Array(NUM_FILES).fill(null);
 		});
 		
 		const FENparts = FENString.split(" ");
@@ -69,13 +74,16 @@ class Game
 					const pieceClass = PieceTypeCharClasses[typeChar];
 					const piece = new pieceClass();
 					
+					const newSquare = Square.make(rank,file);
+					
+					//current square is occupied
+					this.pieces[newSquare] = piece;
+					this.squaresOccupiedBitVector.set(newSquare);
+					
 					//assign the piece to a team according to the character case
 					const teamChar = Team.charOfTeamedChar(character);
 					const team = this.teams[teamChar];
-					team.addPiece(piece, team);
-					
-					//position the piece in the game
-					piece.putInEmptySquare(this.squares[rank][file]);
+					team.addPieceAtSquare(piece, newSquare);
 					
 					file += 1;
 				}
@@ -88,32 +96,21 @@ class Game
 		
 		this.movingTeam = this.teams[FENparts[1]];
 		
-		//this.castleRights = FENparts[2].split("");
-		//this.enPassantable = FENparts[3];
+		this.castleRights = FENparts[2].split("");
+		this.enPassantable = FENparts[3];
 		
 		this.halfMove = parseInt(FENparts[4]);
 		this.fullMove = parseInt(FENparts[5]);
 		
 		this.playedMoves = [];
 		
-		white.updateAllReachableSquares();
-		black.updateAllReachableSquares();
+		white.updateAllReachableSquaresAndBitsInGame(this);
+		black.updateAllReachableSquaresAndBitsInGame(this);
 		
-		this.movesCache = [];
-		this.legalsCache = [];
-		
-		this.updateMoves();
-		this.updateLegals();
-	}
-	
-	getMoves()
-	{
-		return this.moves;
-	}
-	
-	getLegals()
-	{
-		return this.legals;
+		const calculations = this.calculateMovesAndBits();
+		this.reachableSquaresBits.update(calculations[1]);
+		this.moves.update(calculations[0]);
+		this.legals.update(this.calculateLegals());
 	}
 	
 	changeTurns()
@@ -131,65 +128,109 @@ class Game
 	isCheckmate()
 	{
 		//by definition
-		return (this.getLegals().length == 0) && this.kingChecked();
+		return (this.legals.get().length == 0) && this.kingChecked();
 	}
 
 	isStalemate()
 	{
 		//by definition
-		return (this.getLegals().length == 0) && !(this.kingChecked());
+		return (this.legals.get().length == 0) && !(this.kingChecked());
 	}
 
 	evaluate(depth = 1)
 	{
-		if(depth>0)
+		if(depth==0)
 		{
-			const continuations = this.getLegals();
-			const scorePreferredToScore = this.movingTeam.constructor.scorePreferredToScore;
-			//need to score checkmates and stalemates in future
-			//maybe track temporal proximity of mates with a {"mate in halfmoves": 0}
-			//that increments each turn back in time
-			
-			//start with the first continuation as the best
-			let bestContinuation = continuations[0];
-			this.makeMoveWithConditionalLegalsUpdate(bestContinuation, true);
-			let bestEval = this.evaluate(depth-1);
-			this.undoMoveWithConditionalLegalsUpdate(true);
-			
-			//check for better continuations
-			for(let i=1; i<continuations.length; i++)
-			{
-				/*
-				if(depth == MAX_DEPTH)
-				{
-					console.log(`${i}/${continuations.length}`);
-				}
-				*/
-				const newContinuation = continuations[i];
-				this.makeMoveWithConditionalLegalsUpdate(newContinuation, true);
-				const newEval = this.evaluate(depth-1);
-				this.undoMoveWithConditionalLegalsUpdate(true);
-				
-				if(scorePreferredToScore(newEval.score,bestEval.score))
-				{
-					bestContinuation = newContinuation;
-					bestEval = newEval;
-				}
-			}
-			
-			const reverseLine = bestEval.reverseLine ?? [];
-			reverseLine.push(bestContinuation);
 			return {
-				score: bestEval.score,
-				bestMove: bestContinuation,
-				reverseLine: reverseLine
-			};
+				score: this.immediatePositionScore(),
+			}
 		}
 		else
 		{
-			return {
-				score: this.immediatePositionScore()
-			};
+			if(depth==1)
+			{
+				const continuations = this.legals.get();
+				const scorePreferredToScore = this.movingTeam.constructor.scorePreferredToScore;
+				
+				//start with the first continuation as the best
+				let bestContinuation = continuations[0];
+				this.makeMoveEvalConsequences(bestContinuation);
+				let bestEval = this.evaluate(depth-1);
+				this.undoMoveEvalConsequences(bestContinuation);
+				
+				//check for better continuations
+				for(let i=1; i<continuations.length; i++)
+				{
+					const newContinuation = continuations[i];
+					this.makeMoveEvalConsequences(newContinuation);
+					const newEval = this.evaluate(depth-1);
+					this.undoMoveEvalConsequences(newContinuation);
+					
+					if(scorePreferredToScore(newEval.score,bestEval.score))
+					{
+						bestContinuation = newContinuation;
+						bestEval = newEval;
+					}
+				}
+				
+				const reverseLine = bestEval.reverseLine ?? [];
+				reverseLine.push(bestContinuation);
+				return {
+					score: bestEval.score,
+					bestMove: bestContinuation,
+					reverseLine: reverseLine
+				};
+			}
+			else
+			{
+				const continuations = this.legals.get();
+				const scorePreferredToScore = this.movingTeam.constructor.scorePreferredToScore;
+				
+				//start with the first continuation as the best
+				let bestContinuation = continuations[0];
+				this.makeMoveWithConditionalLegalsUpdate(bestContinuation, true);
+				let bestEval = this.evaluate(depth-1);
+				this.undoMoveWithConditionalLegalsUpdate(true);
+				
+				//check for better continuations
+				for(let i=1; i<continuations.length; i++)
+				{
+					const newContinuation = continuations[i];
+					this.makeMoveWithConditionalLegalsUpdate(newContinuation, true);
+					const newEval = this.evaluate(depth-1);
+					this.undoMoveWithConditionalLegalsUpdate(true);
+					
+					if(scorePreferredToScore(newEval.score,bestEval.score))
+					{
+						bestContinuation = newContinuation;
+						bestEval = newEval;
+					}
+				}
+				
+				const reverseLine = bestEval.reverseLine ?? [];
+				reverseLine.push(bestContinuation);
+				return {
+					score: bestEval.score,
+					bestMove: bestContinuation,
+					reverseLine: reverseLine
+				};
+			}
+		}
+	}
+	
+	makeMoveForEvalConsequences(move)
+	{
+		if(move instanceof PlainMove)
+		{
+			move.targetPiece?.deactivate();
+		}
+	}
+	
+	undoMoveForEvalConsequences(move)
+	{
+		if(move instanceof PlainMove)
+		{
+			move.targetPiece?.activate();
 		}
 	}
 	
@@ -197,9 +238,27 @@ class Game
 	{
 		if(move instanceof PlainMove)
 		{
-			const movingPiece = move.before.piece;
+			move.targetPiece?.deactivate()
 			
-			movingPiece.moveToSquare(move.after);
+			this.pieces[move.after] = move.movingPiece;
+			this.squaresOccupiedBitVector.set(move.after);
+			
+			this.pieces[move.before] = null;
+			this.squaresOccupiedBitVector.clear(move.before);
+			
+			move.movingPiece.team[`${move.movingPiece instanceof PatternPiece?"pattern":"direction"}PieceSquares`][move.movingPiece.id] =
+			move.after;
+			
+			move.movingPiece.moved = true;
+			
+			if(move.movingPiece instanceof King)
+			{
+				//opponent retains castling rights, moving team forfeits castle rights
+				this.castleRights = this.castleRights.filter((wing)=>{
+					return Team.charOfTeamedChar(wing) != move.movingPiece.team.constructor.char;
+				});
+			}
+			this.enPassantable = "-";
 		}
 		
 		this.playedMoves.push(move);
@@ -207,10 +266,12 @@ class Game
 		this.progressMoveCounters();
 		this.changeTurns();
 		
-		this.updateMoves();
+		const calculations = this.calculateMovesAndBits();
+		this.moves.update(calculations[0]);
+		this.reachableSquaresBits.update(calculations[1]);
 		if(condition)
 		{
-			this.updateLegals();
+			this.legals.update(this.calculateLegals());
 		}
 	}
 	
@@ -219,61 +280,78 @@ class Game
 		const move = this.playedMoves.pop();
 		if(move instanceof PlainMove)
 		{
-			const mainTransition = move.mainTransition;
-			const movingPiece = move.after.piece;
+			move.targetPiece?.activate()
 			
-			movingPiece.moveToSquare(move.before);
-			movingPiece.moved = (move.firstMove == false);
+			this.pieces[move.before] = move.movingPiece;
+			this.squaresOccupiedBitVector.set(move.before);
 			
-			move.targetPiece?.activate();
-			move.after.piece = move.targetPiece;
+			if(!move.targetPiece)
+			{
+				this.pieces[move.after] = null;
+				this.squaresOccupiedBitVector.clear(move.after);
+			}
+			else
+			{
+				this.pieces[move.after] = move.targetPiece;
+			}
+			
+			move.movingPiece.team[`${move.movingPiece instanceof PatternPiece?"pattern":"direction"}PieceSquares`][move.movingPiece.id] =
+			move.before;			
+			
+			move.movingPiece.moved = (move.firstMove == false);
+			this.castleRights = move.castleRights;
+			this.enPassantable = move.enPassantable;
 		}
 		
 		this.regressMoveCounters();
 		this.changeTurns();
 		
-		this.revertMoves();
+		this.moves.revert();
+		this.reachableSquaresBits.revert();
 		if(condition)
 		{
-			this.revertLegals();
+			this.legals.revert();
 		}
 	}
 	
-	calculateMoves()
+	calculateMovesAndBits()
 	{
 		const moves = [];
-		this.teams[WhiteTeam.char].updateDirectionReachableSquares();
-		this.teams[BlackTeam.char].updateDirectionReachableSquares();
+		const bits = new BitVector64();
+		
+		this.movingTeam.updateDirectionReachableSquaresAndBitsInGame(this);
 		this.movingTeam.alivePatternPieces.forEach((piece)=>{
 			//get destination squares of current piece
-			const currentSquare = piece.square;
+			bits.or(piece.reachableBits);
+			const currentSquare = this.movingTeam.patternPieceSquares[piece.id];
 			const reachableSquares = piece.reachableSquares;
 			reachableSquares.forEach((reachableSquare)=>{
 				//only allow moves that do not capture pieces from the same team
-				if(currentSquare.piece.team != reachableSquare.piece?.team)
+				if(this.pieces[reachableSquare]?.team != piece.team)
 				{
-					moves.push(new PlainMove(currentSquare, reachableSquare));
+					moves.push(new PlainMove(this, currentSquare, reachableSquare));
 				}
 			})
 		});
 		this.movingTeam.aliveDirectionPieces.forEach((piece)=>{
 			//get destination squares of current piece
-			const currentSquare = piece.square;
+			bits.or(piece.reachableBits);
+			const currentSquare = this.movingTeam.directionPieceSquares[piece.id];
 			const reachableSquares = piece.reachableSquares;
 			reachableSquares.forEach((reachableSquare)=>{
 				//only allow moves that do not capture pieces from the same team
-				if(currentSquare.piece.team != reachableSquare.piece?.team)
+				if(this.pieces[reachableSquare]?.team != piece.team)
 				{
-					moves.push(new PlainMove(currentSquare, reachableSquare));
+					moves.push(new PlainMove(this, currentSquare, reachableSquare));
 				}
 			})
 		});
-		return moves;
+		return [moves, bits];
 	}
 	
 	calculateLegals()
 	{
-		return this.getMoves().filter((move)=>{
+		return this.moves.get().filter((move)=>{
 			this.makeMoveWithConditionalLegalsUpdate(move, false);
 			const condition = !(this.kingCapturable());
 			this.undoMoveWithConditionalLegalsUpdate(false);
@@ -281,76 +359,63 @@ class Game
 		});
 	}
 	
-	updateLegals()
-	{
-		this.legalsCache.push(this.legals);
-		this.legals = this.calculateLegals();
-	}
-	
-	updateMoves()
-	{
-		this.movesCache.push(this.moves);
-		this.moves = this.calculateMoves();
-	}
-	
-	revertLegals()
-	{
-		this.legals = this.legalsCache.pop();
-	}
-	
-	revertMoves()
-	{
-		this.moves = this.movesCache.pop();
-	}
-	
 	kingCapturable()
-	{		
-		return this.getMoves().some((move)=>{
-			if(move instanceof PlainMove)
-			{
-				return move.targetPiece == this.movingTeam.opposition.king;
-			}
+	{	
+		const opposition = this.movingTeam.opposition;
+		const oppositionKingSquare = opposition.patternPieceSquares[opposition.king.id];
+		return this.movingTeam.alivePatternPieces.some((piece)=>{
+			return piece.reachableBits.read(oppositionKingSquare);
+		}) || this.movingTeam.aliveDirectionPieces.some((piece)=>{
+			return piece.reachableBits.read(oppositionKingSquare);
 		});
 	}
 	
 	kingChecked()
 	{
+		const movingTeamKingSquare = this.movingTeam.patternPieceSquares[this.movingTeam.king.id];
+		this.movingTeam.opposition.updateAllReachableSquaresAndBitsInGame(this);
+		
 		return this.movingTeam.opposition.alivePatternPieces.some((piece)=>{
-			const reachableSquares = piece.reachableSquares;
-			return reachableSquares.some((square)=>{
-				return square.piece == this.movingTeam.king;
-			});
-		}) || this.movingTeam.opposition.aliveDirectionPieces.some((piece)=>{
-			const reachableSquares = piece.reachableSquares;
-			return reachableSquares.some((square)=>{
-				return square.piece == this.movingTeam.king;
-			});
+			return piece.reachableBits.read(movingTeamKingSquare);
+		}) ||
+		this.movingTeam.opposition.aliveDirectionPieces.some((piece)=>{
+			return piece.reachableBits.read(movingTeamKingSquare);
 		});
 	}
 	
 	regressMoveCounters()
 	{
+		/*
 		if(this.halfMove==0)
 		{
 			this.fullMove--;
 		}
-		this.halfMove = (this.halfMove+1)%2;
+		*/
+		this.fullMove -= 1-this.halfMove;
+		
+		//this.halfMove = (this.halfMove+1)%2;
+		this.halfMove = (this.halfMove + 1) & 1;
 	}
 	
 	progressMoveCounters()
 	{
+		/*
 		if(this.halfMove==1)
 		{
 			//this corresponds to when black has just moved, meaning a full move has passed
-			this.fullMove++;
+			this.fullMove ++;
 		}
-		this.halfMove = (this.halfMove+1)%2;
+		*/
+		this.fullMove += this.halfMove;
+		
+		//this.halfMove = (this.halfMove+1)%2;
+		this.halfMove = (this.halfMove + 1) & 1;
 	}
 	
 	toString()
 	{
 		//game stores ranks in ascending order, must reverse a copy for descending order in FEN string
-		const squaresCopy = this.squares.slice();
+		const squaresCopy = this.pieces.slice();
 		const boardString = squaresCopy.reverse().map((rankSquares)=>{
 			let emptySquares = 0;
 			let rankString = rankSquares.reduce((accumulator, square)=>{
@@ -382,7 +447,5 @@ class Game
 }
 
 module.exports = {
-	Game:Game,
-	
-	MAX_DEPTH:MAX_DEPTH
+	Game:Game
 }
