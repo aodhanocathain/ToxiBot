@@ -51,8 +51,8 @@ class Move
 			(otherPiece?.constructor == this.movingPiece.constructor);
 		})
 		
-		const sameOriginFiles = otherOrigins.filter((square)=>{return file==Square.file(square);});
-		const sameOriginRanks = otherOrigins.filter((square)=>{return rank==Square.rank(square);});
+		const sameOriginFiles = otherOrigins.filter((square)=>{return Square.file(this.before)==Square.file(square);});
+		const sameOriginRanks = otherOrigins.filter((square)=>{return Square.rank(this.before)==Square.rank(square);});
 		
 		const beforeDetails = 
 		(otherOrigins.length==0)?	//piece is the only possible candidate for the move

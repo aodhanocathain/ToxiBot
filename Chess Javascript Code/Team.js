@@ -85,6 +85,13 @@ class Team
 		});
 	}
 	
+	revertReachableSquaresAndBits()
+	{
+		this.alivePieces.forEach((piece)=>{
+			piece.revertReachableSquaresAndBits();
+		});
+	}
+	
 	updatePieceSquare(piece, square)
 	{
 		this.pieceSquares[piece.id] = square;
@@ -108,8 +115,7 @@ const teamClassesArray = [
 		
 		static evalPreferredToEval(newEval, oldEval)
 		{
-			if(newEval.illegal){return false;}
-			return newEval.score > oldEval.score;
+			return oldEval.illegal || (newEval.score > oldEval.score);
 		}
 		
 		constructor()
@@ -129,8 +135,7 @@ const teamClassesArray = [
 		
 		static evalPreferredToEval(newEval, oldEval)
 		{
-			if(newEval.illegal){return false;}
-			return newEval.score < oldEval.score;
+			return oldEval.illegal || (newEval.score < oldEval.score);
 		}
 		
 		constructor()

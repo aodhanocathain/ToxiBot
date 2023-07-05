@@ -131,8 +131,8 @@ class Game
 		if(this.kingCapturable())
 		{
 			return {
-				illegal: true
-			};
+				illegal:true
+			}
 		}
 		if(depth==0)
 		{
@@ -158,7 +158,6 @@ class Game
 				this.makeMove(newContinuation);
 				const newEval = this.evaluate(depth-1);
 				this.undoMove();
-				
 				if(evalPreferredToEval(newEval,bestEval))
 				{
 					bestContinuation = newContinuation;
@@ -167,7 +166,8 @@ class Game
 			}
 			
 			const reverseLine = bestEval.reverseLine ?? [];
-			reverseLine.push(bestContinuation.toString());
+			//reverseLine.push(bestContinuation.toString());
+			reverseLine.push(bestContinuation);
 			return {
 				score: bestEval.score,
 				bestMove: bestContinuation,
@@ -189,7 +189,6 @@ class Game
 			this.squaresOccupiedBitVector.clear(move.before);
 			
 			move.movingPiece.team.updatePieceSquare(move.movingPiece,move.after);
-			
 			move.movingPiece.moved = true;
 			
 			if(move.movingPiece instanceof King)
@@ -216,24 +215,20 @@ class Game
 		const move = this.playedMoves.pop();
 		if(move instanceof PlainMove)
 		{
-			move.targetPiece?.activate()
+			move.targetPiece?.activate();
 			
 			this.pieces[move.before] = move.movingPiece;
 			this.squaresOccupiedBitVector.set(move.before);
 			
-			if(!move.targetPiece)
+			this.pieces[move.after] = move.targetPiece;
+			if(!(move.targetPiece))
 			{
-				this.pieces[move.after] = null;
 				this.squaresOccupiedBitVector.clear(move.after);
-			}
-			else
-			{
-				this.pieces[move.after] = move.targetPiece;
 			}
 			
 			move.movingPiece.team.updatePieceSquare(move.movingPiece,move.before);
-			
 			move.movingPiece.moved = (move.firstMove == false);
+			
 			this.castleRights = move.castleRights;
 			this.enPassantable = move.enPassantable;
 		}
@@ -241,8 +236,8 @@ class Game
 		this.regressMoveCounters();
 		this.changeTurns();
 		
-		this.white.updateReachableSquaresAndBitsInGame(this);
-		this.black.updateReachableSquaresAndBitsInGame(this);
+		this.white.revertReachableSquaresAndBits();
+		this.black.revertReachableSquaresAndBits();
 	}
 	
 	calculateMovesAndBits()
@@ -253,9 +248,9 @@ class Game
 		this.movingTeam.updateReachableSquaresAndBitsInGame(this);
 		this.movingTeam.alivePieces.forEach((piece)=>{
 			//get destination squares of current piece
-			bits.or(piece.reachableBits);
+			bits.or(piece.reachableBits.get());
 			const currentSquare = this.movingTeam.pieceSquares[piece.id];
-			const reachableSquares = piece.reachableSquares;
+			const reachableSquares = piece.reachableSquares.get();
 			reachableSquares.forEach((reachableSquare)=>{
 				//only allow moves that do not capture pieces from the same team
 				if(this.pieces[reachableSquare]?.team != piece.team)
@@ -282,7 +277,7 @@ class Game
 		const opposition = this.movingTeam.opposition;
 		const oppositionKingSquare = opposition.pieceSquares[opposition.king.id];
 		return this.movingTeam.alivePieces.some((piece)=>{
-			return piece.reachableBits.read(oppositionKingSquare);
+			return piece.reachableBits.get().read(oppositionKingSquare);
 		});
 	}
 	
@@ -292,7 +287,7 @@ class Game
 		this.movingTeam.opposition.updateReachableSquaresAndBitsInGame(this);
 		
 		return this.movingTeam.opposition.alivePieces.some((piece)=>{
-			return piece.reachableBits.read(movingTeamKingSquare);
+			return piece.reachableBits.get().read(movingTeamKingSquare);
 		});
 	}
 	

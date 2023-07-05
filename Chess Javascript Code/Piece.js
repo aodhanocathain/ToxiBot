@@ -1,3 +1,4 @@
+const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
 const {BitVector64} = require("./BitVector64.js");
 
@@ -88,6 +89,9 @@ class Piece
 	constructor()
 	{
 		this.moved = false;
+		
+		this.reachableSquares = new Manager();
+		this.reachableBits = new Manager();
 	}
 	
 	activate()
@@ -103,8 +107,14 @@ class Piece
 	updateReachableSquaresAndBitsFromSquareInGame(square, game)
 	{
 		const reachables = this.constructor.findReachableSquaresAndBitsFromSquareInGame(square, game);
-		this.reachableSquares = reachables[0];
-		this.reachableBits = reachables[1];
+		this.reachableSquares.update(reachables[0]);
+		this.reachableBits.update(reachables[1]);
+	}
+	
+	revertReachableSquaresAndBits()
+	{
+		this.reachableSquares.revert();
+		this.reachableBits.revert();
 	}
 	
 	toString()
