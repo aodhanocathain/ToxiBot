@@ -5,7 +5,7 @@ class Square	//assumes 8 ranks and 8 files
 {
 	static make(rank,file)
 	{
-		return (rank<<3)|file;
+		return (rank << 3) | file;
 	}
 	
 	static rank(square)

@@ -26,7 +26,6 @@ class Game
 
 	reachableSquaresBits;
 	moves;
-	legals;
 	
 	teams;
 	movingTeam;
@@ -43,7 +42,6 @@ class Game
 		
 		this.reachableSquaresBits = new Manager();
 		this.moves = new Manager();
-		this.legals = new Manager();
 		
 		const white = new WhiteTeam();
 		const black = new BlackTeam();
@@ -104,13 +102,12 @@ class Game
 		
 		this.playedMoves = [];
 		
-		white.updateAllReachableSquaresAndBitsInGame(this);
-		black.updateAllReachableSquaresAndBitsInGame(this);
+		white.updateReachableSquaresAndBitsInGame(this);
+		black.updateReachableSquaresAndBitsInGame(this);
 		
 		const calculations = this.calculateMovesAndBits();
 		this.reachableSquaresBits.update(calculations[1]);
 		this.moves.update(calculations[0]);
-		this.legals.update(this.calculateLegals());
 	}
 	
 	changeTurns()
@@ -128,13 +125,13 @@ class Game
 	isCheckmate()
 	{
 		//by definition
-		return (this.legals.get().length == 0) && this.kingChecked();
+		return (this.calculateLegals().length == 0) && this.kingChecked();
 	}
 
 	isStalemate()
 	{
 		//by definition
-		return (this.legals.get().length == 0) && !(this.kingChecked());
+		return (this.calculateLegals().length == 0) && !(this.kingChecked());
 	}
 
 	evaluate(depth = 1)
@@ -147,74 +144,37 @@ class Game
 		}
 		else
 		{
-			if(depth==1)
+			const continuations = this.calculateLegals();
+			const scorePreferredToScore = this.movingTeam.constructor.scorePreferredToScore;
+			
+			//start with the first continuation as the best
+			let bestContinuation = continuations[0];
+			this.makeMove(bestContinuation);
+			let bestEval = this.evaluate(depth-1);
+			this.undoMove();
+			
+			//check for better continuations
+			for(let i=1; i<continuations.length; i++)
 			{
-				const continuations = this.legals.get();
-				const scorePreferredToScore = this.movingTeam.constructor.scorePreferredToScore;
+				const newContinuation = continuations[i];
+				this.makeMove(newContinuation);
+				const newEval = this.evaluate(depth-1);
+				this.undoMove();
 				
-				//start with the first continuation as the best
-				let bestContinuation = continuations[0];
-				this.makeMoveForEvalConsequences(bestContinuation);
-				let bestEval = this.evaluate(depth-1);
-				this.undoMoveForEvalConsequences(bestContinuation);
-				
-				//check for better continuations
-				for(let i=1; i<continuations.length; i++)
+				if(scorePreferredToScore(newEval.score,bestEval.score))
 				{
-					const newContinuation = continuations[i];
-					this.makeMoveForEvalConsequences(newContinuation);
-					const newEval = this.evaluate(depth-1);
-					this.undoMoveForEvalConsequences(newContinuation);
-					
-					if(scorePreferredToScore(newEval.score,bestEval.score))
-					{
-						bestContinuation = newContinuation;
-						bestEval = newEval;
-					}
+					bestContinuation = newContinuation;
+					bestEval = newEval;
 				}
-				
-				const reverseLine = bestEval.reverseLine ?? [];
-				reverseLine.push(bestContinuation);
-				return {
-					score: bestEval.score,
-					bestMove: bestContinuation,
-					reverseLine: reverseLine
-				};
 			}
-			else
-			{
-				const continuations = this.legals.get();
-				const scorePreferredToScore = this.movingTeam.constructor.scorePreferredToScore;
-				
-				//start with the first continuation as the best
-				let bestContinuation = continuations[0];
-				this.makeMoveWithConditionalLegalsUpdate(bestContinuation, true);
-				let bestEval = this.evaluate(depth-1);
-				this.undoMoveWithConditionalLegalsUpdate(true);
-				
-				//check for better continuations
-				for(let i=1; i<continuations.length; i++)
-				{
-					const newContinuation = continuations[i];
-					this.makeMoveWithConditionalLegalsUpdate(newContinuation, true);
-					const newEval = this.evaluate(depth-1);
-					this.undoMoveWithConditionalLegalsUpdate(true);
-					
-					if(scorePreferredToScore(newEval.score,bestEval.score))
-					{
-						bestContinuation = newContinuation;
-						bestEval = newEval;
-					}
-				}
-				
-				const reverseLine = bestEval.reverseLine ?? [];
-				reverseLine.push(bestContinuation);
-				return {
-					score: bestEval.score,
-					bestMove: bestContinuation,
-					reverseLine: reverseLine
-				};
-			}
+			
+			const reverseLine = bestEval.reverseLine ?? [];
+			reverseLine.push(bestContinuation.toString());
+			return {
+				score: bestEval.score,
+				bestMove: bestContinuation,
+				reverseLine: reverseLine
+			};
 		}
 	}
 	
@@ -234,7 +194,7 @@ class Game
 		}
 	}
 	
-	makeMoveWithConditionalLegalsUpdate(move, condition)
+	makeMove(move)
 	{
 		if(move instanceof PlainMove)
 		{
@@ -246,8 +206,7 @@ class Game
 			this.pieces[move.before] = null;
 			this.squaresOccupiedBitVector.clear(move.before);
 			
-			move.movingPiece.team[`${move.movingPiece instanceof PatternPiece?"pattern":"direction"}PieceSquares`][move.movingPiece.id] =
-			move.after;
+			move.movingPiece.team.updatePieceSquare(move.movingPiece,move.after);
 			
 			move.movingPiece.moved = true;
 			
@@ -269,13 +228,9 @@ class Game
 		const calculations = this.calculateMovesAndBits();
 		this.moves.update(calculations[0]);
 		this.reachableSquaresBits.update(calculations[1]);
-		if(condition)
-		{
-			this.legals.update(this.calculateLegals());
-		}
 	}
 	
-	undoMoveWithConditionalLegalsUpdate(condition)
+	undoMove()
 	{
 		const move = this.playedMoves.pop();
 		if(move instanceof PlainMove)
@@ -295,8 +250,7 @@ class Game
 				this.pieces[move.after] = move.targetPiece;
 			}
 			
-			move.movingPiece.team[`${move.movingPiece instanceof PatternPiece?"pattern":"direction"}PieceSquares`][move.movingPiece.id] =
-			move.before;			
+			move.movingPiece.team.updatePieceSquare(move.movingPiece,move.before);
 			
 			move.movingPiece.moved = (move.firstMove == false);
 			this.castleRights = move.castleRights;
@@ -308,10 +262,6 @@ class Game
 		
 		this.moves.revert();
 		this.reachableSquaresBits.revert();
-		if(condition)
-		{
-			this.legals.revert();
-		}
 	}
 	
 	calculateMovesAndBits()
@@ -319,24 +269,11 @@ class Game
 		const moves = [];
 		const bits = new BitVector64();
 		
-		this.movingTeam.updateDirectionReachableSquaresAndBitsInGame(this);
-		this.movingTeam.alivePatternPieces.forEach((piece)=>{
+		this.movingTeam.updateReachableSquaresAndBitsInGame(this);
+		this.movingTeam.alivePieces.forEach((piece)=>{
 			//get destination squares of current piece
 			bits.or(piece.reachableBits);
-			const currentSquare = this.movingTeam.patternPieceSquares[piece.id];
-			const reachableSquares = piece.reachableSquares;
-			reachableSquares.forEach((reachableSquare)=>{
-				//only allow moves that do not capture pieces from the same team
-				if(this.pieces[reachableSquare]?.team != piece.team)
-				{
-					moves.push(new PlainMove(this, currentSquare, reachableSquare));
-				}
-			})
-		});
-		this.movingTeam.aliveDirectionPieces.forEach((piece)=>{
-			//get destination squares of current piece
-			bits.or(piece.reachableBits);
-			const currentSquare = this.movingTeam.directionPieceSquares[piece.id];
+			const currentSquare = this.movingTeam.pieceSquares[piece.id];
 			const reachableSquares = piece.reachableSquares;
 			reachableSquares.forEach((reachableSquare)=>{
 				//only allow moves that do not capture pieces from the same team
@@ -352,9 +289,9 @@ class Game
 	calculateLegals()
 	{
 		return this.moves.get().filter((move)=>{
-			this.makeMoveWithConditionalLegalsUpdate(move, false);
+			this.makeMove(move);
 			const condition = !(this.kingCapturable());
-			this.undoMoveWithConditionalLegalsUpdate(false);
+			this.undoMove();
 			return condition;
 		});
 	}
@@ -362,23 +299,18 @@ class Game
 	kingCapturable()
 	{	
 		const opposition = this.movingTeam.opposition;
-		const oppositionKingSquare = opposition.patternPieceSquares[opposition.king.id];
-		return this.movingTeam.alivePatternPieces.some((piece)=>{
-			return piece.reachableBits.read(oppositionKingSquare);
-		}) || this.movingTeam.aliveDirectionPieces.some((piece)=>{
+		const oppositionKingSquare = opposition.pieceSquares[opposition.king.id];
+		return this.movingTeam.alivePieces.some((piece)=>{
 			return piece.reachableBits.read(oppositionKingSquare);
 		});
 	}
 	
 	kingChecked()
 	{
-		const movingTeamKingSquare = this.movingTeam.patternPieceSquares[this.movingTeam.king.id];
-		this.movingTeam.opposition.updateAllReachableSquaresAndBitsInGame(this);
+		const movingTeamKingSquare = this.movingTeam.pieceSquares[this.movingTeam.king.id];
+		this.movingTeam.opposition.updateReachableSquaresAndBitsInGame(this);
 		
-		return this.movingTeam.opposition.alivePatternPieces.some((piece)=>{
-			return piece.reachableBits.read(movingTeamKingSquare);
-		}) ||
-		this.movingTeam.opposition.aliveDirectionPieces.some((piece)=>{
+		return this.movingTeam.opposition.alivePieces.some((piece)=>{
 			return piece.reachableBits.read(movingTeamKingSquare);
 		});
 	}

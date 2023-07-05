@@ -22,18 +22,12 @@ class Team
 	}
 	
 	opposition;
-	allPieces;
-	directionPieces;
 	
-	alivePatternPieces;
-	deadPatternPieces;
-	patternPieceSquares;
-	nextPatternPieceId;
+	alivePieces;
+	deadPieces;	
+	nextId;
 	
-	aliveDirectionPieces;
-	deadDirectionPieces;
-	directionPieceSquares;
-	nextDirectionPieceId;
+	pieceSquares;
 	
 	points;
 	
@@ -41,17 +35,11 @@ class Team
 	
 	constructor()
 	{		
-		this.alivePatternPieces = [];
-		this.aliveDirectionPieces = [];
+		this.alivePieces = [];
+		this.deadPieces = [];
+		this.nextId = 0;
 		
-		this.patternPieceSquares = [];
-		this.directionPieceSquares = [];
-		
-		this.deadPatternPieces = [];
-		this.deadDirectionPieces = [];
-		
-		this.nextPatternPieceId=0;
-		this.nextDirectionPieceId=0;
+		this.pieceSquares = [];
 		
 		this.points = 0;
 	}
@@ -64,20 +52,9 @@ class Team
 	
 	registerPieceAtSquare(piece, square)
 	{
-		if(piece instanceof PatternPiece)
-		{
-			piece.id = this.nextPatternPieceId;
-			this.nextPatternPieceId++;
-			
-			this.patternPieceSquares[piece.id] = square;
-		}
-		else
-		{
-			piece.id = this.nextDirectionPieceId;
-			this.nextDirectionPieceId++;
-			
-			this.directionPieceSquares[piece.id] = square;
-		}
+		piece.id = this.nextId;
+		this.nextId++;
+		this.pieceSquares[piece.id] = square;
 		
 		piece.team = this;
 		
@@ -89,49 +66,28 @@ class Team
 	
 	activatePiece(piece)
 	{
-		if(piece instanceof PatternPiece)
-		{
-			this.alivePatternPieces[piece.id] = piece;
-			delete this.deadPatternPieces[piece.id];
-		}
-		else
-		{
-			this.aliveDirectionPieces[piece.id] = piece;
-			delete this.deadDirectionPieces[piece.id];
-		}
+		this.alivePieces[piece.id] = piece;
+		delete this.deadPieces[piece.id];
 		this.points += piece.constructor.points;
 	}
 	
 	deactivatePiece(piece)
 	{
-		if(piece instanceof PatternPiece)
-		{
-			this.deadPatternPieces[piece.id] = piece;
-			delete this.alivePatternPieces[piece.id];
-		}
-		else
-		{
-			this.deadDirectionPieces[piece.id] = piece;
-			delete this.aliveDirectionPieces[piece.id];
-		}
+		this.deadPieces[piece.id] = piece;
+		delete this.alivePieces[piece.id];
 		this.points -= piece.constructor.points;
 	}
 	
-	updateAllReachableSquaresAndBitsInGame(game)
+	updateReachableSquaresAndBitsInGame(game)
 	{
-		this.alivePatternPieces.forEach((piece)=>{
-			piece.updateReachableSquaresAndBitsFromSquareInGame(this.patternPieceSquares[piece.id],game);
-		});
-		this.aliveDirectionPieces.forEach((piece)=>{
-			piece.updateReachableSquaresAndBitsFromSquareInGame(this.directionPieceSquares[piece.id],game);
+		this.alivePieces.forEach((piece)=>{
+			piece.updateReachableSquaresAndBitsFromSquareInGame(this.pieceSquares[piece.id],game);
 		});
 	}
 	
-	updateDirectionReachableSquaresAndBitsInGame(game)
+	updatePieceSquare(piece, square)
 	{
-		this.aliveDirectionPieces.forEach((piece)=>{
-			piece.updateReachableSquaresAndBitsFromSquareInGame(this.directionPieceSquares[piece.id],game);
-		});
+		this.pieceSquares[piece.id] = square;
 	}
 	
 	toString()

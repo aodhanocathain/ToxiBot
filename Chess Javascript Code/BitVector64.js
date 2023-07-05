@@ -4,11 +4,6 @@ class BitVector64
 	
 	words;	//integers
 	
-	static indexify(rank,file)
-	{
-		return (rank<<3)|file;
-	}
-	
 	constructor()
 	{
 		this.words = [0,0];
