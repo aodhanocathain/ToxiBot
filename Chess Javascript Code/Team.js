@@ -11,9 +11,9 @@ class Team
 		return teamClassesArray.find((team)=>{return team.charConverter(teamedChar)==teamedChar}).char;
 	}
 	
-	static scorePreferredToScore(newScore, oldScore)
+	static evalPreferredToEval(newEval, oldEval)
 	{
-		throw "subclasses of Team must implement scorePreferredToScore";
+		throw "subclasses of Team must implement evalPreferredToEval";
 	}
 	
 	static toString()
@@ -106,9 +106,10 @@ const teamClassesArray = [
 			return char.toUpperCase();
 		}
 		
-		static scorePreferredToScore(newScore, oldScore)
+		static evalPreferredToEval(newEval, oldEval)
 		{
-			return newScore > oldScore;
+			if(newEval.illegal){return false;}
+			return newEval.score > oldEval.score;
 		}
 		
 		constructor()
@@ -126,9 +127,10 @@ const teamClassesArray = [
 			return char.toLowerCase();
 		}
 		
-		static scorePreferredToScore(newScore, oldScore)
+		static evalPreferredToEval(newEval, oldEval)
 		{
-			return newScore < oldScore;
+			if(newEval.illegal){return false;}
+			return newEval.score < oldEval.score;
 		}
 		
 		constructor()

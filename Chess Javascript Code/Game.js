@@ -23,11 +23,10 @@ class Game
 	//locations in the game containing pieces
 	pieces;	
 	squaresOccupiedBitVector;
-
-	reachableSquaresBits;
-	moves;
 	
 	teams;
+	white;
+	black;
 	movingTeam;
 	
 	playedMoves;
@@ -40,16 +39,13 @@ class Game
 	{
 		this.squaresOccupiedBitVector = new BitVector64();
 		
-		this.reachableSquaresBits = new Manager();
-		this.moves = new Manager();
-		
-		const white = new WhiteTeam();
-		const black = new BlackTeam();
-		white.opposition = black;
-		black.opposition = white;
+		this.white = new WhiteTeam();
+		this.black = new BlackTeam();
+		this.white.opposition = this.black;
+		this.black.opposition = this.white;
 		this.teams = {
-			[white.constructor.char]:white,
-			[black.constructor.char]:black
+			[this.white.constructor.char]:this.white,
+			[this.black.constructor.char]:this.black
 		};
 		
 		//initialize an empty board
@@ -102,12 +98,8 @@ class Game
 		
 		this.playedMoves = [];
 		
-		white.updateReachableSquaresAndBitsInGame(this);
-		black.updateReachableSquaresAndBitsInGame(this);
-		
-		const calculations = this.calculateMovesAndBits();
-		this.reachableSquaresBits.update(calculations[1]);
-		this.moves.update(calculations[0]);
+		this.white.updateReachableSquaresAndBitsInGame(this);
+		this.black.updateReachableSquaresAndBitsInGame(this);
 	}
 	
 	changeTurns()
@@ -136,6 +128,12 @@ class Game
 
 	evaluate(depth = 1)
 	{
+		if(this.kingCapturable())
+		{
+			return {
+				illegal: true
+			};
+		}
 		if(depth==0)
 		{
 			return {
@@ -144,8 +142,8 @@ class Game
 		}
 		else
 		{
-			const continuations = this.calculateLegals();
-			const scorePreferredToScore = this.movingTeam.constructor.scorePreferredToScore;
+			const continuations = this.calculateMovesAndBits()[0];
+			const evalPreferredToEval = this.movingTeam.constructor.evalPreferredToEval;
 			
 			//start with the first continuation as the best
 			let bestContinuation = continuations[0];
@@ -161,7 +159,7 @@ class Game
 				const newEval = this.evaluate(depth-1);
 				this.undoMove();
 				
-				if(scorePreferredToScore(newEval.score,bestEval.score))
+				if(evalPreferredToEval(newEval,bestEval))
 				{
 					bestContinuation = newContinuation;
 					bestEval = newEval;
@@ -175,22 +173,6 @@ class Game
 				bestMove: bestContinuation,
 				reverseLine: reverseLine
 			};
-		}
-	}
-	
-	makeMoveForEvalConsequences(move)
-	{
-		if(move instanceof PlainMove)
-		{
-			move.targetPiece?.deactivate();
-		}
-	}
-	
-	undoMoveForEvalConsequences(move)
-	{
-		if(move instanceof PlainMove)
-		{
-			move.targetPiece?.activate();
 		}
 	}
 	
@@ -225,9 +207,8 @@ class Game
 		this.progressMoveCounters();
 		this.changeTurns();
 		
-		const calculations = this.calculateMovesAndBits();
-		this.moves.update(calculations[0]);
-		this.reachableSquaresBits.update(calculations[1]);
+		this.white.updateReachableSquaresAndBitsInGame(this);
+		this.black.updateReachableSquaresAndBitsInGame(this);
 	}
 	
 	undoMove()
@@ -260,8 +241,8 @@ class Game
 		this.regressMoveCounters();
 		this.changeTurns();
 		
-		this.moves.revert();
-		this.reachableSquaresBits.revert();
+		this.white.updateReachableSquaresAndBitsInGame(this);
+		this.black.updateReachableSquaresAndBitsInGame(this);
 	}
 	
 	calculateMovesAndBits()
@@ -288,7 +269,7 @@ class Game
 	
 	calculateLegals()
 	{
-		return this.moves.get().filter((move)=>{
+		return this.calculateMovesAndBits()[0].filter((move)=>{
 			this.makeMove(move);
 			const condition = !(this.kingCapturable());
 			this.undoMove();
