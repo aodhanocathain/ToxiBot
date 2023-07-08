@@ -30,7 +30,7 @@ function squaresAndBitsInPatternFromSquareInGame(pattern,square, game)
 //for patterns that extend as far as possible in directions from a starting square
 function squaresAndBitsInDirectionsFromSquareInGame(directions,square,game)
 {
-	const squaresArray = [];
+	const rays = [];
 	const squaresBits = new BitVector64();
 	
 	const squaresOccupiedBitVector = game.squaresOccupiedBitVector;
@@ -40,6 +40,8 @@ function squaresAndBitsInDirectionsFromSquareInGame(directions,square,game)
 	
 	for(let i=0; i<directions.length; i+=2)
 	{
+		const squaresArray = [];
+		
 		const rankOffset = directions[i];
 		const fileOffset = directions[i+1];
 		
@@ -58,8 +60,9 @@ function squaresAndBitsInDirectionsFromSquareInGame(directions,square,game)
 			newRank += rankOffset;
 			newFile += fileOffset;
 		}
+		rays.push(squaresArray);
 	}
-	return [squaresArray,squaresBits];
+	return [rays,squaresBits];
 }
 
 class Piece
@@ -140,6 +143,22 @@ class DirectionPiece extends Piece
 	static findReachableSquaresAndBitsFromSquareInGame(square, game)
 	{
 		return squaresAndBitsInDirectionsFromSquareInGame(this.directions,square, game);
+	}
+
+	rays;
+	
+	constructor()
+	{
+		super();
+		this.rays = this.constructor.directions.map((direction)=>{return [];});
+	}
+	
+	updateReachableSquaresAndBitsFromSquareInGame(square, game)
+	{
+		const reachables = this.constructor.findReachableSquaresAndBitsFromSquareInGame(square, game);
+		reachables[0].forEach((ray, index)=>{this.rays[index] = ray;})
+		this.reachableSquares.update(this.rays.flat(1));
+		this.reachableBits.update(reachables[1]);
 	}
 }
 
