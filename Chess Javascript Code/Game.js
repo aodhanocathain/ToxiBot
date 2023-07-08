@@ -24,7 +24,6 @@ class Game
 	pieces;	
 	squaresOccupiedBitVector;
 	
-	teams;
 	white;
 	black;
 	movingTeam;
@@ -39,14 +38,10 @@ class Game
 	{
 		this.squaresOccupiedBitVector = new BitVector64();
 		
-		this.white = new WhiteTeam();
-		this.black = new BlackTeam();
+		this.white = new WhiteTeam(this);
+		this.black = new BlackTeam(this);
 		this.white.opposition = this.black;
 		this.black.opposition = this.white;
-		this.teams = {
-			[this.white.constructor.char]:this.white,
-			[this.black.constructor.char]:this.black
-		};
 		
 		//initialize an empty board
 		this.pieces = Array(NUM_RANKS).fill(null).map(()=>{
@@ -76,7 +71,7 @@ class Game
 					
 					//assign the piece to a team according to the character case
 					const teamChar = Team.charOfTeamedChar(character);
-					const team = this.teams[teamChar];
+					const team = (teamChar == WhiteTeam.char)? this.white : this.black;
 					team.addPieceAtSquare(piece, newSquare);
 					
 					file += 1;
@@ -88,7 +83,7 @@ class Game
 			})
 		})
 		
-		this.movingTeam = this.teams[FENparts[1]];
+		this.movingTeam = (FENparts[1] == WhiteTeam.char)? this.white : this.black;
 		
 		this.castleRights = FENparts[2].split("");
 		this.enPassantable = FENparts[3];
@@ -98,8 +93,8 @@ class Game
 		
 		this.playedMoves = [];
 		
-		this.white.updateReachableSquaresAndBitsInGame(this);
-		this.black.updateReachableSquaresAndBitsInGame(this);
+		this.white.updateReachableSquaresAndBits();
+		this.black.updateReachableSquaresAndBits();
 	}
 	
 	changeTurns()
@@ -111,7 +106,7 @@ class Game
 	immediatePositionScore()
 	{
 		//loose heuristic for now
-		return this.teams[WhiteTeam.char].points - this.teams[BlackTeam.char].points;
+		return this.white.points - this.black.points;
 	}
 	
 	isCheckmate()
@@ -206,8 +201,8 @@ class Game
 		this.progressMoveCounters();
 		this.changeTurns();
 		
-		this.white.updateReachableSquaresAndBitsInGame(this);
-		this.black.updateReachableSquaresAndBitsInGame(this);
+		this.white.updateReachableSquaresAndBits();
+		this.black.updateReachableSquaresAndBits();
 	}
 	
 	undoMove()
@@ -245,7 +240,7 @@ class Game
 		const moves = [];
 		const bits = new BitVector64();
 		
-		this.movingTeam.updateReachableSquaresAndBitsInGame(this);
+		this.movingTeam.updateReachableSquaresAndBits();
 		this.movingTeam.alivePieces.forEach((piece)=>{
 			//get destination squares of current piece
 			bits.or(piece.reachableBits.get());
@@ -284,7 +279,7 @@ class Game
 	kingChecked()
 	{
 		const movingTeamKingSquare = this.movingTeam.pieceSquares[this.movingTeam.king.id];
-		this.movingTeam.opposition.updateReachableSquaresAndBitsInGame(this);
+		this.movingTeam.opposition.updateReachableSquaresAndBits();
 		
 		return this.movingTeam.opposition.alivePieces.some((piece)=>{
 			return piece.reachableBits.get().read(movingTeamKingSquare);

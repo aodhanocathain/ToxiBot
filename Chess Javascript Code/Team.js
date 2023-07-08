@@ -21,6 +21,8 @@ class Team
 		return `${this.char}`;
 	}
 	
+	game;
+	
 	opposition;
 	
 	alivePieces;
@@ -33,8 +35,10 @@ class Team
 	
 	king;
 	
-	constructor()
-	{		
+	constructor(game)
+	{
+		this.game = game;
+		
 		this.alivePieces = [];
 		this.deadPieces = [];
 		this.nextId = 0;
@@ -78,10 +82,10 @@ class Team
 		this.points -= piece.constructor.points;
 	}
 	
-	updateReachableSquaresAndBitsInGame(game)
+	updateReachableSquaresAndBits()
 	{
 		this.alivePieces.forEach((piece)=>{
-			piece.updateReachableSquaresAndBitsFromSquareInGame(this.pieceSquares[piece.id],game);
+			piece.updateReachableSquaresAndBitsFromSquareInGame(this.pieceSquares[piece.id],this.game);
 		});
 	}
 	
@@ -117,11 +121,6 @@ const teamClassesArray = [
 		{
 			return oldEval.illegal || (newEval.score > oldEval.score);
 		}
-		
-		constructor()
-		{
-			super();
-		}
 	},
 
 	class BlackTeam extends Team
@@ -136,11 +135,6 @@ const teamClassesArray = [
 		static evalPreferredToEval(newEval, oldEval)
 		{
 			return oldEval.illegal || (newEval.score < oldEval.score);
-		}
-		
-		constructor()
-		{
-			super();
 		}
 	}
 ];
