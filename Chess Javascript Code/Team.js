@@ -29,8 +29,6 @@ class Team
 	deadPieces;	
 	nextId;
 	
-	pieceSquares;
-	
 	points;
 	
 	king;
@@ -43,22 +41,24 @@ class Team
 		this.deadPieces = [];
 		this.nextId = 0;
 		
-		this.pieceSquares = [];
-		
 		this.points = 0;
 	}
 	
-	addPieceAtSquare(piece, square)
+	generateId()
 	{
-		this.registerPieceAtSquare(piece, square);
+		return this.nextId++;
+	}
+	
+	addPiece(piece)
+	{
+		this.registerPiece(piece);
 		this.activatePiece(piece);
 	}
 	
-	registerPieceAtSquare(piece, square)
+	registerPiece(piece)
 	{
 		piece.id = this.nextId;
 		this.nextId++;
-		this.pieceSquares[piece.id] = square;
 		
 		piece.team = this;
 		
@@ -85,7 +85,7 @@ class Team
 	updateReachableSquaresAndBits()
 	{
 		this.alivePieces.forEach((piece)=>{
-			piece.updateReachableSquaresAndBitsFromSquareInGame(this.pieceSquares[piece.id],this.game);
+			piece.updateReachableSquaresAndBits();
 		});
 	}
 	
@@ -94,11 +94,6 @@ class Team
 		this.alivePieces.forEach((piece)=>{
 			piece.revertReachableSquaresAndBits();
 		});
-	}
-	
-	updatePieceSquare(piece, square)
-	{
-		this.pieceSquares[piece.id] = square;
 	}
 	
 	toString()

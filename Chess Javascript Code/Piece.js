@@ -78,19 +78,24 @@ class Piece
 	
 	static findReachableSquaresAndBitsFromSquareInGame(square, game)
 	{
-		throw "subclasses of Piece must implement findReachableSquaresAndBitsFromSquare";
+		throw "subclasses of Piece must implement findReachableSquaresAndBitsFromSquareInGame";
 	}
 	
-	moved;
-	
-	team;	
+	game;
+	team;
+	square;
 	id;
+	moved;
 	
 	reachableSquares;
 	reachableBits;
 	
-	constructor()
+	constructor(game, team, square, id, moved)
 	{
+		this.game = game;
+		this.team = team;
+		this.square = square;
+		this.id = id;
 		this.moved = false;
 		
 		this.reachableSquares = new Manager();
@@ -107,9 +112,9 @@ class Piece
 		this.team.deactivatePiece(this);
 	}
 	
-	updateReachableSquaresAndBitsFromSquareInGame(square, game)
+	updateReachableSquaresAndBits()
 	{
-		const reachables = this.constructor.findReachableSquaresAndBitsFromSquareInGame(square, game);
+		const reachables = this.constructor.findReachableSquaresAndBitsFromSquareInGame(this.square, this.game);
 		this.reachableSquares.update(reachables[0]);
 		this.reachableBits.update(reachables[1]);
 	}
@@ -132,7 +137,7 @@ class PatternPiece extends Piece
 	
 	static findReachableSquaresAndBitsFromSquareInGame(square, game)
 	{
-		return squaresAndBitsInPatternFromSquareInGame(this.pattern,square, game);
+		return squaresAndBitsInPatternFromSquareInGame(this.pattern,square,game);
 	}
 }
 
@@ -142,20 +147,20 @@ class DirectionPiece extends Piece
 	
 	static findReachableSquaresAndBitsFromSquareInGame(square, game)
 	{
-		return squaresAndBitsInDirectionsFromSquareInGame(this.directions,square, game);
+		return squaresAndBitsInDirectionsFromSquareInGame(this.directions,square,game);
 	}
 
 	rays;
 	
-	constructor()
+	constructor(game, team, square, id, moved)
 	{
-		super();
+		super(game, team, square, id, moved);
 		this.rays = this.constructor.directions.map((direction)=>{return [];});
 	}
 	
-	updateReachableSquaresAndBitsFromSquareInGame(square, game)
+	updateReachableSquaresAndBits()
 	{
-		const reachables = this.constructor.findReachableSquaresAndBitsFromSquareInGame(square, game);
+		const reachables = this.constructor.findReachableSquaresAndBitsFromSquareInGame(this.square, this.game);
 		reachables[0].forEach((ray, index)=>{this.rays[index] = ray;})
 		this.reachableSquares.update(this.rays.flat(1));
 		this.reachableBits.update(reachables[1]);

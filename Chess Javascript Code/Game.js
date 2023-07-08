@@ -58,21 +58,20 @@ class Game
 			rankString.split("").forEach((character)=>{
 				if(isNaN(character))	//character denotes a piece
 				{
-					//create a piece using the character
 					const typeChar = Piece.typeCharOfTeamedChar(character);
 					const pieceClass = PieceTypeCharClasses[typeChar];
-					const piece = new pieceClass();
 					
-					const newSquare = Square.make(rank,file);
-					
-					//current square is occupied
-					this.pieces[newSquare] = piece;
-					this.squaresOccupiedBitVector.set(newSquare);
-					
-					//assign the piece to a team according to the character case
 					const teamChar = Team.charOfTeamedChar(character);
 					const team = (teamChar == WhiteTeam.char)? this.white : this.black;
-					team.addPieceAtSquare(piece, newSquare);
+					
+					const square = Square.make(rank,file);
+					const piece = new pieceClass(this,team,square,team.generateId(),false);	
+					
+					//current square is occupied
+					this.pieces[square] = piece;
+					this.squaresOccupiedBitVector.set(square);
+					
+					team.addPiece(piece);
 					
 					file += 1;
 				}
@@ -183,7 +182,7 @@ class Game
 			this.pieces[move.before] = null;
 			this.squaresOccupiedBitVector.clear(move.before);
 			
-			move.movingPiece.team.updatePieceSquare(move.movingPiece,move.after);
+			move.movingPiece.square = move.after;
 			move.movingPiece.moved = true;
 			
 			if(move.movingPiece instanceof King)
@@ -221,7 +220,7 @@ class Game
 				this.squaresOccupiedBitVector.clear(move.after);
 			}
 			
-			move.movingPiece.team.updatePieceSquare(move.movingPiece,move.before);
+			move.movingPiece.square = move.before;
 			move.movingPiece.moved = (move.firstMove == false);
 			
 			this.castleRights = move.castleRights;
@@ -244,7 +243,7 @@ class Game
 		this.movingTeam.alivePieces.forEach((piece)=>{
 			//get destination squares of current piece
 			bits.or(piece.reachableBits.get());
-			const currentSquare = this.movingTeam.pieceSquares[piece.id];
+			const currentSquare = piece.square;
 			const reachableSquares = piece.reachableSquares.get();
 			reachableSquares.forEach((reachableSquare)=>{
 				//only allow moves that do not capture pieces from the same team
@@ -270,7 +269,7 @@ class Game
 	kingCapturable()
 	{	
 		const opposition = this.movingTeam.opposition;
-		const oppositionKingSquare = opposition.pieceSquares[opposition.king.id];
+		const oppositionKingSquare = opposition.king.square;
 		return this.movingTeam.alivePieces.some((piece)=>{
 			return piece.reachableBits.get().read(oppositionKingSquare);
 		});
@@ -278,7 +277,7 @@ class Game
 	
 	kingChecked()
 	{
-		const movingTeamKingSquare = this.movingTeam.pieceSquares[this.movingTeam.king.id];
+		const movingTeamKingSquare = this.movingTeam.king.square;
 		this.movingTeam.opposition.updateReachableSquaresAndBits();
 		
 		return this.movingTeam.opposition.alivePieces.some((piece)=>{
