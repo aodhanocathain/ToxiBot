@@ -136,7 +136,7 @@ class Game
 		}
 		else
 		{
-			const continuations = this.calculateMovesAndBits()[0];
+			const continuations = this.calculateMoves();
 			const evalPreferredToEval = this.movingTeam.constructor.evalPreferredToEval;
 			
 			//start with the first continuation as the best
@@ -234,15 +234,13 @@ class Game
 		this.black.revertReachableSquaresAndBits();
 	}
 	
-	calculateMovesAndBits()
+	calculateMoves()
 	{
 		const moves = [];
-		const bits = new BitVector64();
 		
 		this.movingTeam.updateReachableSquaresAndBits();
 		this.movingTeam.alivePieces.forEach((piece)=>{
 			//get destination squares of current piece
-			bits.or(piece.reachableBits.get());
 			const currentSquare = piece.square;
 			const reachableSquares = piece.reachableSquares.get();
 			reachableSquares.forEach((reachableSquare)=>{
@@ -253,12 +251,12 @@ class Game
 				}
 			})
 		});
-		return [moves, bits];
+		return moves;
 	}
 	
 	calculateLegals()
 	{
-		return this.calculateMovesAndBits()[0].filter((move)=>{
+		return this.calculateMoves().filter((move)=>{
 			this.makeMove(move);
 			const condition = !(this.kingCapturable());
 			this.undoMove();
