@@ -140,13 +140,11 @@ class Game
 			const evalPreferredToEval = this.movingTeam.constructor.evalPreferredToEval;
 			
 			//start with the first continuation as the best
-			let bestContinuation = continuations[0];
-			this.makeMove(bestContinuation);
-			let bestEval = this.evaluate(depth-1);
-			this.undoMove();
+			let bestContinuation;
+			let bestEval;
 			
 			//check for better continuations
-			for(let i=1; i<continuations.length; i++)
+			for(let i=0; i<continuations.length; i++)
 			{
 				const newContinuation = continuations[i];
 				this.makeMove(newContinuation);

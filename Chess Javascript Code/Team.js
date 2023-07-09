@@ -114,7 +114,7 @@ const teamClassesArray = [
 		
 		static evalPreferredToEval(newEval, oldEval)
 		{
-			return oldEval.illegal || (newEval.score > oldEval.score);
+			return newEval?.score > (oldEval?.score ?? -Infinity);
 		}
 	},
 
@@ -129,7 +129,7 @@ const teamClassesArray = [
 		
 		static evalPreferredToEval(newEval, oldEval)
 		{
-			return oldEval.illegal || (newEval.score < oldEval.score);
+			return newEval?.score < (oldEval?.score ?? Infinity);
 		}
 	}
 ];
