@@ -31,6 +31,8 @@ class Team
 	
 	points;
 	
+	numKingSeers;
+	
 	king;
 	
 	constructor(game)
@@ -40,6 +42,8 @@ class Team
 		this.alivePieces = [];
 		this.deadPieces = [];
 		this.nextId = 0;
+		
+		this.numKingSeers = 0;
 		
 		this.points = 0;
 	}
@@ -82,17 +86,18 @@ class Team
 		this.points -= piece.constructor.points;
 	}
 	
-	updateReachableSquaresAndBits()
+	updateReachableSquaresAndBitsAndKingSeers()
 	{
+		const oppositionKingSquare = this.opposition.king.square;
 		this.alivePieces.forEach((piece)=>{
-			piece.updateReachableSquaresAndBits();
+			piece.updateReachableSquaresAndBitsAndKingSeer(oppositionKingSquare);
 		});
 	}
 	
-	revertReachableSquaresAndBits()
+	revertReachableSquaresAndBitsAndKingSeers()
 	{
 		this.alivePieces.forEach((piece)=>{
-			piece.revertReachableSquaresAndBits();
+			piece.revertReachableSquaresAndBitsAndKingSeer();
 		});
 	}
 	
@@ -114,7 +119,7 @@ const teamClassesArray = [
 		
 		static evalPreferredToEval(newEval, oldEval)
 		{
-			return newEval?.score > (oldEval?.score ?? -Infinity);
+			return (newEval?.score) > (oldEval?.score ?? -Infinity);
 		}
 	},
 
@@ -129,7 +134,7 @@ const teamClassesArray = [
 		
 		static evalPreferredToEval(newEval, oldEval)
 		{
-			return newEval?.score < (oldEval?.score ?? Infinity);
+			return (newEval?.score) < (oldEval?.score ?? Infinity);
 		}
 	}
 ];

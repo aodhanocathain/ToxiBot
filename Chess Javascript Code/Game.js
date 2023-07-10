@@ -92,8 +92,8 @@ class Game
 		
 		this.playedMoves = [];
 		
-		this.white.updateReachableSquaresAndBits();
-		this.black.updateReachableSquaresAndBits();
+		this.white.updateReachableSquaresAndBitsAndKingSeers();
+		this.black.updateReachableSquaresAndBitsAndKingSeers();
 	}
 	
 	changeTurns()
@@ -122,6 +122,7 @@ class Game
 
 	evaluate(depth = 1)
 	{
+		//this.movingTeam.updateReachableSquaresAndBits();
 		if(this.kingCapturable())
 		{
 			return {
@@ -139,7 +140,6 @@ class Game
 			const continuations = this.calculateMoves();
 			const evalPreferredToEval = this.movingTeam.constructor.evalPreferredToEval;
 			
-			//start with the first continuation as the best
 			let bestContinuation;
 			let bestEval;
 			
@@ -156,10 +156,18 @@ class Game
 					bestEval = newEval;
 				}
 			}
-			
+			/*
+			if(!bestEval)
+			{
+				const m = this.playedMoves[0];
+				console.log(`${Square.file(m.before)}${Square.rank(m.before)}->${Square.file(m.after)}${Square.rank(m.after)}`);
+			}
+			*/
 			const reverseLine = bestEval.reverseLine ?? [];
 			//reverseLine.push(bestContinuation.toString());
 			reverseLine.push(bestContinuation);
+			
+			this.movingTeam.revertReachableSquaresAndBitsAndKingSeers();
 			return {
 				score: bestEval.score,
 				bestMove: bestContinuation,
@@ -198,12 +206,14 @@ class Game
 		this.progressMoveCounters();
 		this.changeTurns();
 		
-		this.white.updateReachableSquaresAndBits();
-		this.black.updateReachableSquaresAndBits();
+		//this.white.updateReachableSquaresAndBits();
+		//this.black.updateReachableSquaresAndBits();
+		this.movingTeam.updateReachableSquaresAndBitsAndKingSeers();
 	}
 	
 	undoMove()
 	{
+		this.movingTeam.updateReachableSquaresAndBitsAndKingSeers();
 		const move = this.playedMoves.pop();
 		if(move instanceof PlainMove)
 		{
@@ -228,15 +238,15 @@ class Game
 		this.regressMoveCounters();
 		this.changeTurns();
 		
-		this.white.revertReachableSquaresAndBits();
-		this.black.revertReachableSquaresAndBits();
+		//this.white.revertReachableSquaresAndBits();
+		//this.black.revertReachableSquaresAndBits();
 	}
 	
 	calculateMoves()
 	{
 		const moves = [];
 		
-		this.movingTeam.updateReachableSquaresAndBits();
+		//this.movingTeam.updateReachableSquaresAndBits();
 		this.movingTeam.alivePieces.forEach((piece)=>{
 			//get destination squares of current piece
 			const currentSquare = piece.square;
@@ -264,21 +274,18 @@ class Game
 	
 	kingCapturable()
 	{	
-		const opposition = this.movingTeam.opposition;
-		const oppositionKingSquare = opposition.king.square;
-		return this.movingTeam.alivePieces.some((piece)=>{
-			return piece.reachableBits.get().read(oppositionKingSquare);
-		});
+		return this.movingTeam.numKingSeers > 0;
 	}
 	
 	kingChecked()
 	{
 		const movingTeamKingSquare = this.movingTeam.king.square;
-		this.movingTeam.opposition.updateReachableSquaresAndBits();
-		
-		return this.movingTeam.opposition.alivePieces.some((piece)=>{
+		this.movingTeam.opposition.updateReachableSquaresAndBitsAndKingSeers();
+		const status = this.movingTeam.opposition.alivePieces.some((piece)=>{
 			return piece.reachableBits.get().read(movingTeamKingSquare);
 		});
+		this.movingTeam.opposition.revertReachableSquaresAndBitsAndKingSeers();
+		return status;
 	}
 	
 	regressMoveCounters()
