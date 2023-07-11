@@ -1,21 +1,33 @@
-const {asciiOffset} = require("./Helpers.js");
-const {MIN_FILE, MIN_RANK} = require("./Constants.js");
+const {asciiOffset, mask} = require("./Helpers.js");
+const {MIN_FILE, MIN_RANK, NUM_FILES, NUM_RANKS} = require("./Constants.js");
 
-class Square	//assumes 8 ranks and 8 files
+const NUM_FILE_BITS = Math.ceil(Math.log2(NUM_FILES));
+const NUM_RANK_BITS = Math.ceil(Math.log2(NUM_RANKS));
+
+const FILE_BITS_MASK = mask(NUM_FILE_BITS);
+
+//represent a square using a single integer
+//[rank bits][file bits]
+class Square
 {
 	static make(rank,file)
 	{
-		return (rank << 3) | file;
+		return (rank << NUM_FILE_BITS) | file;
+	}
+	
+	static validRankAndFile(rank,file)
+	{
+		return (0 <= rank) && (rank < NUM_RANKS) && (0 <= file) && (file < NUM_FILES);
 	}
 	
 	static rank(square)
 	{
-		return square >> 3;
+		return square >> NUM_FILE_BITS;
 	}
 	
 	static file(square)
 	{
-		return square & 7;
+		return square & FILE_BITS_MASK;
 	}
 	
 	static rankString(square)

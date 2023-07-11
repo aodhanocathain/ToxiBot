@@ -1,12 +1,12 @@
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
-const {BitVector64} = require("./BitVector64.js");
+const {BitVector} = require("./BitVector.js");
 
 //for patterns that depend only on set offsets from a starting square
 function squaresAndBitsInPatternFromSquareInGame(pattern,square, game)
 {
 	const squaresArray = [];
-	const squaresBits = new BitVector64();
+	const squaresBits = new BitVector();
 	
 	const rank = Square.rank(square);
 	const file = Square.file(square);
@@ -31,7 +31,7 @@ function squaresAndBitsInPatternFromSquareInGame(pattern,square, game)
 function squaresAndBitsInDirectionsFromSquareInGame(directions,square,game)
 {
 	const rays = [];
-	const squaresBits = new BitVector64();
+	const squaresBits = new BitVector();
 	
 	const squaresOccupiedBitVector = game.squaresOccupiedBitVector;
 	
@@ -105,7 +105,7 @@ class Piece
 		this.reachableSquares = new Manager();
 		this.reachableSquares.update([]);
 		this.reachableBits = new Manager();
-		this.reachableBits.update(new BitVector64());
+		this.reachableBits.update(new BitVector());
 	}
 	
 	activate()

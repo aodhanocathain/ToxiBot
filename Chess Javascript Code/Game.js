@@ -8,7 +8,7 @@ const {NUM_RANKS, NUM_FILES} = require("./Constants.js");
 
 const {PlainMove} = require("./Move.js");
 
-const {BitVector64} = require("./BitVector64.js");
+const {BitVector} = require("./BitVector.js");
 
 const {Square} = require("./Square.js");
 
@@ -36,7 +36,7 @@ class Game
 	
 	constructor(FENString = DEFAULT_FEN_STRING)
 	{
-		this.squaresOccupiedBitVector = new BitVector64();
+		this.squaresOccupiedBitVector = new BitVector();
 		
 		this.white = new WhiteTeam(this);
 		this.black = new BlackTeam(this);
