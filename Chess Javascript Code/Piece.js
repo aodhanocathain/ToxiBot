@@ -100,8 +100,8 @@ class Piece
 		this.id = id;
 		this.moved = false;
 		
-		this.kingSeer = false;
-		
+		this.kingSeer = new Manager();
+		this.kingSeer.update(0);
 		this.reachableSquares = new Manager();
 		this.reachableSquares.update([]);
 		this.reachableBits = new Manager();
@@ -111,22 +111,11 @@ class Piece
 	activate()
 	{
 		this.team.activatePiece(this);
-		if(this.kingSeer){this.team.numKingSeers++;}
 	}
 	
 	deactivate()
 	{
 		this.team.deactivatePiece(this);
-		if(this.kingSeer){this.team.numKingSeers--;}
-	}
-	
-	correctKingSeer(kingSquare)
-	{
-		if(this.kingSeer == !(this.reachableBits.get().read(kingSquare)))
-		{
-			this.kingSeer = !this.kingSeer;
-			this.team.numKingSeers += (this.kingSeer? 1 : -1);
-		}
 	}
 	
 	updateReachableSquaresAndBitsAndKingSeer(kingSquare)
@@ -134,32 +123,22 @@ class Piece
 		const reachables = this.constructor.findReachableSquaresAndBitsFromSquareInGame(this.square, this.game);
 		this.reachableSquares.update(reachables[0]);
 		this.reachableBits.update(reachables[1]);
-		this.correctKingSeer(kingSquare);
-		/*
-		if(this.kingSeer==false)
-		{
-			if(reachables[0].read(kingSquare))
-			{
-				this.kingSeer = true;
-				this.team.addKingSeer();
-			}
-		}
-		else
-		{
-			if(!(reachables[0].read(kingSquare)))
-			{
-				this.kingSeer = false;
-				this.team.subKingSeer();
-			}
-		}
-		*/
+		
+		const oldKingSeer = this.kingSeer.get();
+		this.kingSeer.update(this.reachableBits.get().read(kingSquare));
+		const currentKingSeer = this.kingSeer.get();
+		this.team.numKingSeers += currentKingSeer - oldKingSeer;
 	}
 	
 	revertReachableSquaresAndBitsAndKingSeer(kingSquare)
 	{
 		this.reachableSquares.revert();
 		this.reachableBits.revert();
-		this.correctKingSeer(kingSquare);
+		
+		const oldKingSeer = this.kingSeer.get();
+		this.kingSeer.revert();
+		const currentKingSeer = this.kingSeer.get();
+		this.team.numKingSeers += currentKingSeer - oldKingSeer;
 	}
 	
 	toString()
@@ -201,7 +180,11 @@ class DirectionPiece extends Piece
 		reachables[0].forEach((ray, index)=>{this.rays[index] = ray;})
 		this.reachableSquares.update(this.rays.flat(1));
 		this.reachableBits.update(reachables[1]);
-		this.correctKingSeer(kingSquare);
+
+		const oldKingSeer = this.kingSeer.get();
+		this.kingSeer.update(this.reachableBits.get().read(kingSquare));
+		const currentKingSeer = this.kingSeer.get();
+		this.team.numKingSeers += currentKingSeer - oldKingSeer;
 	}
 }
 

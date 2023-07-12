@@ -122,7 +122,6 @@ class Game
 
 	evaluate(depth = 1)
 	{
-		//this.movingTeam.updateReachableSquaresAndBits();
 		if(this.kingCapturable())
 		{
 			return {
@@ -156,15 +155,8 @@ class Game
 					bestEval = newEval;
 				}
 			}
-			/*
-			if(!bestEval)
-			{
-				const m = this.playedMoves[0];
-				console.log(`${Square.file(m.before)}${Square.rank(m.before)}->${Square.file(m.after)}${Square.rank(m.after)}`);
-			}
-			*/
+			
 			const reverseLine = bestEval.reverseLine ?? [];
-			//reverseLine.push(bestContinuation.toString());
 			reverseLine.push(bestContinuation);
 			
 			this.movingTeam.revertReachableSquaresAndBitsAndKingSeers();
@@ -206,14 +198,12 @@ class Game
 		this.progressMoveCounters();
 		this.changeTurns();
 		
-		//this.white.updateReachableSquaresAndBits();
-		//this.black.updateReachableSquaresAndBits();
 		this.movingTeam.updateReachableSquaresAndBitsAndKingSeers();
 	}
 	
 	undoMove()
 	{
-		this.movingTeam.updateReachableSquaresAndBitsAndKingSeers();
+		this.movingTeam.revertReachableSquaresAndBitsAndKingSeers();
 		const move = this.playedMoves.pop();
 		if(move instanceof PlainMove)
 		{
@@ -237,17 +227,13 @@ class Game
 		
 		this.regressMoveCounters();
 		this.changeTurns();
-		
-		//this.white.revertReachableSquaresAndBits();
-		//this.black.revertReachableSquaresAndBits();
 	}
 	
 	calculateMoves()
 	{
 		const moves = [];
 		
-		//this.movingTeam.updateReachableSquaresAndBits();
-		this.movingTeam.alivePieces.forEach((piece)=>{
+		this.movingTeam.activePieces.forEach((piece)=>{
 			//get destination squares of current piece
 			const currentSquare = piece.square;
 			const reachableSquares = piece.reachableSquares.get();
@@ -281,7 +267,7 @@ class Game
 	{
 		const movingTeamKingSquare = this.movingTeam.king.square;
 		this.movingTeam.opposition.updateReachableSquaresAndBitsAndKingSeers();
-		const status = this.movingTeam.opposition.alivePieces.some((piece)=>{
+		const status = this.movingTeam.opposition.activePieces.some((piece)=>{
 			return piece.reachableBits.get().read(movingTeamKingSquare);
 		});
 		this.movingTeam.opposition.revertReachableSquaresAndBitsAndKingSeers();

@@ -25,8 +25,8 @@ class Team
 	
 	opposition;
 	
-	alivePieces;
-	deadPieces;	
+	activePieces;
+	inactivePieces;	
 	nextId;
 	
 	points;
@@ -39,8 +39,8 @@ class Team
 	{
 		this.game = game;
 		
-		this.alivePieces = [];
-		this.deadPieces = [];
+		this.activePieces = [];
+		this.inactivePieces = [];
 		this.nextId = 0;
 		
 		this.numKingSeers = 0;
@@ -61,8 +61,7 @@ class Team
 	
 	registerPiece(piece)
 	{
-		piece.id = this.nextId;
-		this.nextId++;
+		piece.id = this.nextId++;
 		
 		piece.team = this;
 		
@@ -74,29 +73,31 @@ class Team
 	
 	activatePiece(piece)
 	{
-		this.alivePieces[piece.id] = piece;
-		delete this.deadPieces[piece.id];
+		this.activePieces[piece.id] = piece;
+		delete this.inactivePieces[piece.id];
 		this.points += piece.constructor.points;
+		this.numKingSeers += piece.kingSeer.get();
 	}
 	
 	deactivatePiece(piece)
 	{
-		this.deadPieces[piece.id] = piece;
-		delete this.alivePieces[piece.id];
+		this.inactivePieces[piece.id] = piece;
+		delete this.activePieces[piece.id];
 		this.points -= piece.constructor.points;
+		this.numKingSeers -= piece.kingSeer.get();
 	}
 	
 	updateReachableSquaresAndBitsAndKingSeers()
 	{
 		const oppositionKingSquare = this.opposition.king.square;
-		this.alivePieces.forEach((piece)=>{
+		this.activePieces.forEach((piece)=>{
 			piece.updateReachableSquaresAndBitsAndKingSeer(oppositionKingSquare);
 		});
 	}
 	
 	revertReachableSquaresAndBitsAndKingSeers()
 	{
-		this.alivePieces.forEach((piece)=>{
+		this.activePieces.forEach((piece)=>{
 			piece.revertReachableSquaresAndBitsAndKingSeer();
 		});
 	}
