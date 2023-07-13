@@ -48,11 +48,6 @@ class Team
 		this.points = 0;
 	}
 	
-	generateId()
-	{
-		return this.nextId++;
-	}
-	
 	addPiece(piece)
 	{
 		this.registerPiece(piece);
@@ -62,7 +57,6 @@ class Team
 	registerPiece(piece)
 	{
 		piece.id = this.nextId++;
-		
 		piece.team = this;
 		
 		if(piece instanceof King)

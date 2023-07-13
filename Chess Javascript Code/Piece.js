@@ -11,10 +11,10 @@ function squaresAndBitsInPatternFromSquareInGame(pattern,square, game)
 	const rank = Square.rank(square);
 	const file = Square.file(square);
 	
-	for(let i=0; i<pattern.length; i+=2)
+	for(let i=0; i<pattern.length; i++)
 	{
-		const newRank = rank + pattern[i];
-		const newFile = file + pattern[i+1];
+		const newRank = rank + pattern[i][0];
+		const newFile = file + pattern[i][1];
 		//if it is in the board, include it
 		if(((newRank|newFile)>>3)==0)
 		{
@@ -38,12 +38,12 @@ function squaresAndBitsInDirectionsFromSquareInGame(directions,square,game)
 	const rank = Square.rank(square);
 	const file = Square.file(square);
 	
-	for(let i=0; i<directions.length; i+=2)
+	for(let i=0; i<directions.length; i++)
 	{
 		const squaresArray = [];
 		
-		const rankOffset = directions[i];
-		const fileOffset = directions[i+1];
+		const rankOffset = directions[i][0];
+		const fileOffset = directions[i][1];
 		
 		let newRank = rank+rankOffset;
 		let newFile = file+fileOffset;
@@ -92,12 +92,11 @@ class Piece
 	reachableSquares;
 	reachableBits;
 	
-	constructor(game, team, square, id, moved)
+	constructor(game, team, square, moved)
 	{
 		this.game = game;
 		this.team = team;
 		this.square = square;
-		this.id = id;
 		this.moved = false;
 		
 		this.kingSeer = new Manager();
@@ -197,14 +196,14 @@ const pieceClassesArray = [
 		static points = 0;
 		
 		static pattern = [
-			-1,-1,
-			0,-1,
-			1,-1,
-			-1,0,
-			1,0,
-			-1,1,
-			0,1,
-			1,1
+			[-1,-1],
+			[0,-1],
+			[1,-1],
+			[-1,0],
+			[1,0],
+			[-1,1],
+			[0,1],
+			[1,1]
 		];
 	},
 
@@ -215,14 +214,14 @@ const pieceClassesArray = [
 		static points = 3;
 		
 		static pattern = [
-			-2,-1,
-			-2,1,
-			-1,-2,
-			-1,2,
-			1,-2,
-			1,2,
-			2,-1,
-			2,1
+			[-2,-1],
+			[-2,1],
+			[-1,-2],
+			[-1,2],
+			[1,-2],
+			[1,2],
+			[2,-1],
+			[2,1]
 		];
 	},
 
@@ -233,10 +232,10 @@ const pieceClassesArray = [
 		static points = 3;
 		
 		static directions = [
-			-1,-1,
-			1,-1,
-			-1,1,
-			1,1
+			[-1,-1],
+			[1,-1],
+			[-1,1],
+			[1,1]
 		];
 	},
 
@@ -247,10 +246,10 @@ const pieceClassesArray = [
 		static points = 5;
 		
 		static directions = [
-			0,-1,
-			-1,0,
-			1,0,
-			0,1
+			[0,-1],
+			[-1,0],
+			[1,0],
+			[0,1]
 		];
 	},
 
@@ -261,14 +260,14 @@ const pieceClassesArray = [
 		static points = 9;
 		
 		static directions = [
-			-1,-1,
-			0,-1,
-			1,-1,
-			-1,0,
-			1,0,
-			-1,1,
-			0,1,
-			1,1
+			[-1,-1],
+			[0,-1],
+			[1,-1],
+			[-1,0],
+			[1,0],
+			[-1,1],
+			[0,1],
+			[1,1]
 		];
 	}
 ];

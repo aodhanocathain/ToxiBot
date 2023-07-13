@@ -17,6 +17,7 @@ const {Manager} = require("./Manager.js");
 const Canvas = require("canvas");
 
 const DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
+//const DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNB1KBNR w KQkq - 0 1";
 
 class Game
 {
@@ -44,9 +45,7 @@ class Game
 		this.black.opposition = this.white;
 		
 		//initialize an empty board
-		this.pieces = Array(NUM_RANKS).fill(null).map(()=>{
-			return Array(NUM_FILES).fill(null);
-		});
+		this.pieces = Array(NUM_RANKS*NUM_FILES).fill(null);
 		
 		const FENparts = FENString.split(" ");
 		//populate the board using the first part of the FEN string
@@ -65,7 +64,7 @@ class Game
 					const team = (teamChar == WhiteTeam.char)? this.white : this.black;
 					
 					const square = Square.make(rank,file);
-					const piece = new pieceClass(this,team,square,team.generateId(),false);	
+					const piece = new pieceClass(this,team,square,false);	
 					
 					//current square is occupied
 					this.pieces[square] = piece;
@@ -159,7 +158,6 @@ class Game
 			const reverseLine = bestEval.reverseLine ?? [];
 			reverseLine.push(bestContinuation);
 			
-			this.movingTeam.revertReachableSquaresAndBitsAndKingSeers();
 			return {
 				score: bestEval.score,
 				bestMove: bestContinuation,
@@ -172,7 +170,7 @@ class Game
 	{
 		if(move instanceof PlainMove)
 		{
-			move.targetPiece?.deactivate()
+			move.targetPiece?.deactivate?.();
 			
 			this.pieces[move.after] = move.movingPiece;
 			this.squaresOccupiedBitVector.set(move.after);
@@ -198,16 +196,35 @@ class Game
 		this.progressMoveCounters();
 		this.changeTurns();
 		
-		this.movingTeam.updateReachableSquaresAndBitsAndKingSeers();
+		move.movingPiece.updateReachableSquaresAndBitsAndKingSeer(move.movingPiece.team.opposition.king.square);
+		const oppositionKingSquare = this.movingTeam.opposition.king.square;
+		this.movingTeam.activePieces.forEach((piece)=>{
+			if(piece instanceof DirectionPiece)
+			{
+				if(piece.reachableBits.get().read(move.before) || piece.reachableBits.get().read(move.after))
+				{
+					piece.updateReachableSquaresAndBitsAndKingSeer(oppositionKingSquare);
+				}
+			}
+		});
 	}
 	
 	undoMove()
 	{
-		this.movingTeam.revertReachableSquaresAndBitsAndKingSeers();
 		const move = this.playedMoves.pop();
+		move.movingPiece.revertReachableSquaresAndBitsAndKingSeer();
+		this.movingTeam.activePieces.forEach((piece)=>{
+			if(piece instanceof DirectionPiece)
+			{
+				if(piece.reachableBits.get().read(move.before) || piece.reachableBits.get().read(move.after))
+				{
+					piece.revertReachableSquaresAndBitsAndKingSeer();
+				}
+			}
+		});
 		if(move instanceof PlainMove)
 		{
-			move.targetPiece?.activate();
+			move.targetPiece?.activate?.();
 			
 			this.pieces[move.before] = move.movingPiece;
 			this.squaresOccupiedBitVector.set(move.before);
@@ -252,8 +269,15 @@ class Game
 	{
 		return this.calculateMoves().filter((move)=>{
 			this.makeMove(move);
+			const numKingSeers = this.movingTeam.numKingSeers;
 			const condition = !(this.kingCapturable());
 			this.undoMove();
+			/*
+			if(this.playedMoves.length==2)
+			{
+				console.log(`${move.toString()} leaves ${numKingSeers} numKingSeers`);
+			}
+			*/
 			return condition;
 		});
 	}
@@ -265,13 +289,7 @@ class Game
 	
 	kingChecked()
 	{
-		const movingTeamKingSquare = this.movingTeam.king.square;
-		this.movingTeam.opposition.updateReachableSquaresAndBitsAndKingSeers();
-		const status = this.movingTeam.opposition.activePieces.some((piece)=>{
-			return piece.reachableBits.get().read(movingTeamKingSquare);
-		});
-		this.movingTeam.opposition.revertReachableSquaresAndBitsAndKingSeers();
-		return status;
+		return this.movingTeam.opposition.numKingSeers > 0;
 	}
 	
 	regressMoveCounters()
