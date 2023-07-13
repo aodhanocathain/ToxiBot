@@ -21,7 +21,6 @@ const DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
 
 class Game
 {
-	//locations in the game containing pieces
 	pieces;	
 	squaresOccupiedBitVector;
 	
@@ -68,7 +67,7 @@ class Game
 					
 					//current square is occupied
 					this.pieces[square] = piece;
-					this.squaresOccupiedBitVector.set(square);
+					this.squaresOccupiedBitVector.interact(BitVector.SET, square);
 					
 					team.addPiece(piece);
 					
@@ -91,8 +90,8 @@ class Game
 		
 		this.playedMoves = [];
 		
-		this.white.updateReachableSquaresAndBitsAndKingSeers();
-		this.black.updateReachableSquaresAndBitsAndKingSeers();
+		this.white.init();
+		this.black.init();
 	}
 	
 	changeTurns()
@@ -173,10 +172,10 @@ class Game
 			move.targetPiece?.deactivate?.();
 			
 			this.pieces[move.after] = move.movingPiece;
-			this.squaresOccupiedBitVector.set(move.after);
+			this.squaresOccupiedBitVector.interact(BitVector.SET, move.after);
 			
 			this.pieces[move.before] = null;
-			this.squaresOccupiedBitVector.clear(move.before);
+			this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.before);
 			
 			move.movingPiece.square = move.after;
 			move.movingPiece.moved = true;
@@ -196,12 +195,15 @@ class Game
 		this.progressMoveCounters();
 		this.changeTurns();
 		
+		//update the piece that moved and the pieces of the new moving team whose available squares included the move squares
 		move.movingPiece.updateReachableSquaresAndBitsAndKingSeer(move.movingPiece.team.opposition.king.square);
 		const oppositionKingSquare = this.movingTeam.opposition.king.square;
 		this.movingTeam.activePieces.forEach((piece)=>{
 			if(piece instanceof DirectionPiece)
 			{
-				if(piece.reachableBits.get().read(move.before) || piece.reachableBits.get().read(move.after))
+				if(
+				piece.reachableBits.get().interact(BitVector.READ, move.before) ||
+				piece.reachableBits.get().interact(BitVector.READ, move.after))
 				{
 					piece.updateReachableSquaresAndBitsAndKingSeer(oppositionKingSquare);
 				}
@@ -212,11 +214,14 @@ class Game
 	undoMove()
 	{
 		const move = this.playedMoves.pop();
+		//revert the piece that moved and the pieces of the new moving team whose available squares included the move squares
 		move.movingPiece.revertReachableSquaresAndBitsAndKingSeer();
 		this.movingTeam.activePieces.forEach((piece)=>{
 			if(piece instanceof DirectionPiece)
 			{
-				if(piece.reachableBits.get().read(move.before) || piece.reachableBits.get().read(move.after))
+				if(
+				piece.reachableBits.get().interact(BitVector.READ, move.before) ||
+				piece.reachableBits.get().interact(BitVector.READ, move.after))
 				{
 					piece.revertReachableSquaresAndBitsAndKingSeer();
 				}
@@ -227,12 +232,12 @@ class Game
 			move.targetPiece?.activate?.();
 			
 			this.pieces[move.before] = move.movingPiece;
-			this.squaresOccupiedBitVector.set(move.before);
+			this.squaresOccupiedBitVector.interact(BitVector.SET, move.before);
 			
 			this.pieces[move.after] = move.targetPiece;
 			if(!(move.targetPiece))
 			{
-				this.squaresOccupiedBitVector.clear(move.after);
+				this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.after);
 			}
 			
 			move.movingPiece.square = move.before;
@@ -267,17 +272,12 @@ class Game
 	
 	calculateLegals()
 	{
+		//moves are illegal if they leave the team's king vulnerable to capture
 		return this.calculateMoves().filter((move)=>{
 			this.makeMove(move);
 			const numKingSeers = this.movingTeam.numKingSeers;
 			const condition = !(this.kingCapturable());
 			this.undoMove();
-			/*
-			if(this.playedMoves.length==2)
-			{
-				console.log(`${move.toString()} leaves ${numKingSeers} numKingSeers`);
-			}
-			*/
 			return condition;
 		});
 	}

@@ -16,11 +16,11 @@ function squaresAndBitsInPatternFromSquareInGame(pattern,square, game)
 		const newRank = rank + pattern[i][0];
 		const newFile = file + pattern[i][1];
 		//if it is in the board, include it
-		if(((newRank|newFile)>>3)==0)
+		if(Square.validRankAndFile(newRank,newFile))
 		{
 			const newSquare = Square.make(newRank,newFile);
 			squaresArray.push(newSquare);
-			squaresBits.set(newSquare);
+			squaresBits.interact(BitVector.SET, newSquare);
 		}
 	}
 	
@@ -49,14 +49,14 @@ function squaresAndBitsInDirectionsFromSquareInGame(directions,square,game)
 		let newFile = file+fileOffset;
 		let blocked = false;
 		
-		while((((newRank|newFile)>>3)==0) && !blocked)
+		while(Square.validRankAndFile(newRank,newFile) && !blocked)
 		{
 			const newSquare = Square.make(newRank,newFile);
 			
 			squaresArray.push(newSquare);
-			squaresBits.set(newSquare);
+			squaresBits.interact(BitVector.SET, newSquare);
 			
-			blocked = squaresOccupiedBitVector.read(newSquare);
+			blocked = squaresOccupiedBitVector.interact(BitVector.READ, newSquare);
 			newRank += rankOffset;
 			newFile += fileOffset;
 		}
@@ -124,7 +124,7 @@ class Piece
 		this.reachableBits.update(reachables[1]);
 		
 		const oldKingSeer = this.kingSeer.get();
-		this.kingSeer.update(this.reachableBits.get().read(kingSquare));
+		this.kingSeer.update(this.reachableBits.get().interact(BitVector.READ, kingSquare));
 		const currentKingSeer = this.kingSeer.get();
 		this.team.numKingSeers += currentKingSeer - oldKingSeer;
 	}
@@ -181,7 +181,7 @@ class DirectionPiece extends Piece
 		this.reachableBits.update(reachables[1]);
 
 		const oldKingSeer = this.kingSeer.get();
-		this.kingSeer.update(this.reachableBits.get().read(kingSquare));
+		this.kingSeer.update(this.reachableBits.get().interact(BitVector.READ, kingSquare));
 		const currentKingSeer = this.kingSeer.get();
 		this.team.numKingSeers += currentKingSeer - oldKingSeer;
 	}

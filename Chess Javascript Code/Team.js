@@ -81,18 +81,11 @@ class Team
 		this.numKingSeers -= piece.kingSeer.get();
 	}
 	
-	updateReachableSquaresAndBitsAndKingSeers()
+	init()
 	{
 		const oppositionKingSquare = this.opposition.king.square;
 		this.activePieces.forEach((piece)=>{
 			piece.updateReachableSquaresAndBitsAndKingSeer(oppositionKingSquare);
-		});
-	}
-	
-	revertReachableSquaresAndBitsAndKingSeers()
-	{
-		this.activePieces.forEach((piece)=>{
-			piece.revertReachableSquaresAndBitsAndKingSeer();
 		});
 	}
 	
