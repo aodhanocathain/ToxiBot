@@ -1,6 +1,6 @@
 const {mask} = require("./Helpers.js");
 
-const WORD_WIDTH = 32;
+const WORD_WIDTH = 32;	//assuming 32-bit integers in javascript
 const BIT_INDEX_WIDTH = Math.ceil(Math.log2(WORD_WIDTH));
 const BIT_INDEX_MASK = mask(BIT_INDEX_WIDTH);
 
@@ -12,7 +12,7 @@ class BitVector
 	static CLEAR = this.INTERACTION_NAMES.indexOf("clear");
 	static READ = this.INTERACTION_NAMES.indexOf("read");
 
-	words;	//integers
+	words;	//the integers that hold the bits
 	
 	constructor(numBits)
 	{

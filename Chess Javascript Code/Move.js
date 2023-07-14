@@ -1,5 +1,3 @@
-const {Piece, DirectionPiece} = require("./Piece.js");
-const {MIN_RANK, MIN_FILE} = require("./Constants.js");
 const {Square} = require("./Square.js");
 
 class Move
@@ -76,10 +74,6 @@ class Move
 
 class PlainMove extends Move
 {
-	constructor(game, before, after)
-	{
-		super(game, before, after);
-	}
 }
 
 module.exports = {

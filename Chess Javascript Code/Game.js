@@ -17,7 +17,6 @@ const {Manager} = require("./Manager.js");
 const Canvas = require("canvas");
 
 const DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
-//const DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNB1KBNR w KQkq - 0 1";
 
 class Game
 {

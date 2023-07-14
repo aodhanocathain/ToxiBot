@@ -2,7 +2,6 @@ const {asciiOffset, mask} = require("./Helpers.js");
 const {MIN_FILE, MIN_RANK, NUM_FILES, NUM_RANKS} = require("./Constants.js");
 
 const NUM_FILE_BITS = Math.ceil(Math.log2(NUM_FILES));
-const NUM_RANK_BITS = Math.ceil(Math.log2(NUM_RANKS));
 
 const FILE_BITS_MASK = mask(NUM_FILE_BITS);
 
