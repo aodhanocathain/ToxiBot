@@ -323,34 +323,87 @@ class Game
 	toString()
 	{
 		//game stores ranks in ascending order, must reverse a copy for descending order in FEN string
-		const squaresCopy = this.pieces.slice();
-		const boardString = squaresCopy.reverse().map((rankSquares)=>{
-			let emptySquares = 0;
-			let rankString = rankSquares.reduce((accumulator, square)=>{
-				if(square.piece)
+		let descendingRankStrings = [];
+		for(let rank=NUM_RANKS-1; rank>=0; rank--)
+		{
+			let rankString = ``;
+			let emptySquares=0;
+			for(let file=0; file<NUM_FILES; file++)
+			{
+				const square = Square.make(rank,file);
+				const piece = this.pieces[square];
+				if(piece)
 				{
 					if(emptySquares>0)
 					{
 						//denote how many empty squares separate pieces
-						accumulator = accumulator.concat(`${emptySquares}`);
+						rankString = rankString.concat(`${emptySquares}`);
 						emptySquares = 0;
 					}
-					accumulator = accumulator.concat(`${square.piece.toString()}`);
+					rankString = rankString.concat(`${piece.toString()}`);
 				}
 				else
 				{
 					emptySquares++;
 				}
-				return accumulator;
-			}, "")
-			if(emptySquares > 0)
+			}
+			if(emptySquares>0)
 			{
-				//denote how many empty squares remain in the rank after the final piece
 				rankString = rankString.concat(`${emptySquares}`);
 			}
-			return rankString;
-		}).join("/");
+			descendingRankStrings.push(rankString);
+		}
+		const boardString = descendingRankStrings.join("/");
 		return [boardString, this.movingTeam.constructor.char, this.castleRights.join(""), this.enPassantable, this.halfMove, this.fullMove].join(" ");
+	}
+	
+	toPNGBuffer()
+	{
+		const LIGHT_COLOUR = "#e0d0b0";
+		const DARK_COLOUR = "#e0a070";
+		const FONT_COLOUR = "#0000ff";
+		const SQUARE_PIXELS = 50;
+
+		const canvas = Canvas.createCanvas(NUM_FILES*SQUARE_PIXELS, NUM_RANKS*SQUARE_PIXELS);
+		const context = canvas.getContext("2d");
+
+		context.font = `${SQUARE_PIXELS/5}px Arial`;//SQUARE_PIXELS/5 is an arbitrarily chosen size
+
+		const drawCalls = [];
+
+		for(let rank=0; rank<NUM_RANKS; rank++)
+		{
+			for(let file=0; file<NUM_FILES; file++)
+			{
+				const square = Square.make(rank,file);
+				//colour this square
+				context.fillStyle = (((rank+file)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
+				const x = file*SQUARE_PIXELS;
+				const y = ((NUM_RANKS-1)-rank)*SQUARE_PIXELS;
+				context.fillRect(x, y, SQUARE_PIXELS, SQUARE_PIXELS);
+
+				//draw a piece if one is present
+				const piece = this.pieces[square];
+				if(piece)
+				{
+					drawCalls.push(new Promise((resolve, reject)=>{
+						piece.image.then((i)=>{
+							context.drawImage(i, x, y, SQUARE_PIXELS, SQUARE_PIXELS);
+							resolve("done");
+						});
+					}))
+				}
+				
+				//annotate the square name e.g. "f3"
+				context.fillStyle = FONT_COLOUR;
+				context.fillText(Square.fullString(square), x, y+SQUARE_PIXELS);
+			}
+		}
+
+		//make sure all pieces have been drawn
+		return Promise.all(drawCalls).then(()=>{
+			return canvas.toBuffer("image/png");
+		});
 	}
 }
 

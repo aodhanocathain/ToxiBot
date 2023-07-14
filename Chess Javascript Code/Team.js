@@ -6,6 +6,8 @@ class Team
 	static char;
 	static charConverter;
 	
+	static name;
+	
 	static charOfTeamedChar(teamedChar)
 	{
 		return teamClassesArray.find((team)=>{return team.charConverter(teamedChar)==teamedChar}).char;
@@ -100,6 +102,8 @@ const teamClassesArray = [
 	{
 		static char = "w";
 		
+		static name = "white";
+		
 		static charConverter(char)
 		{
 			return char.toUpperCase();
@@ -114,6 +118,8 @@ const teamClassesArray = [
 	class BlackTeam extends Team
 	{
 		static char = "b";
+		
+		static name = "black";
 		
 		static charConverter(char)
 		{

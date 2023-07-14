@@ -2,6 +2,8 @@ const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
 const {BitVector} = require("./BitVector.js");
 
+const Canvas = require("canvas");
+
 //for patterns that depend only on set offsets from a starting square
 function squaresAndBitsInPatternFromSquareInGame(pattern,square, game)
 {
@@ -65,11 +67,18 @@ function squaresAndBitsInDirectionsFromSquareInGame(directions,square,game)
 	return [rays,squaresBits];
 }
 
+function imageFileName(teamName, pieceName)
+{
+	return `./images/chess/${teamName}/${pieceName}.png`;
+}
+
 class Piece
 {
 	static typeChar;
 	
 	static points;
+	
+	static name;
 	
 	static typeCharOfTeamedChar(teamedChar)
 	{
@@ -89,6 +98,8 @@ class Piece
 	
 	kingSeer;
 	
+	image;
+	
 	reachableSquares;
 	reachableBits;
 	
@@ -105,6 +116,8 @@ class Piece
 		this.reachableSquares.update([]);
 		this.reachableBits = new Manager();
 		this.reachableBits.update(new BitVector());
+		
+		this.image = Canvas.loadImage(imageFileName(this.team.constructor.name, this.constructor.name));
 	}
 	
 	activate()
@@ -142,7 +155,7 @@ class Piece
 	
 	toString()
 	{
-		return `${this.team.charConverter(this.constructor.typeChar)}`;
+		return `${this.team.constructor.charConverter(this.constructor.typeChar)}`;
 	}
 }
 
@@ -193,6 +206,8 @@ const pieceClassesArray = [
 	{
 		static typeChar = "K";
 		
+		static name = "king";
+		
 		static points = 0;
 		
 		static pattern = [
@@ -210,6 +225,8 @@ const pieceClassesArray = [
 	class Knight extends PatternPiece
 	{
 		static typeChar = "N";
+		
+		static name = "knight";
 		
 		static points = 3;
 		
@@ -229,6 +246,8 @@ const pieceClassesArray = [
 	{
 		static typeChar = "B";
 		
+		static name = "bishop";
+		
 		static points = 3;
 		
 		static directions = [
@@ -243,6 +262,8 @@ const pieceClassesArray = [
 	{
 		static typeChar = "R";
 		
+		static name = "rook";
+		
 		static points = 5;
 		
 		static directions = [
@@ -256,6 +277,8 @@ const pieceClassesArray = [
 	class Queen extends DirectionPiece
 	{
 		static typeChar = "Q";
+		
+		static name = "queen";
 		
 		static points = 9;
 		
