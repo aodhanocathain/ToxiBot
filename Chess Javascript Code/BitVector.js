@@ -50,13 +50,13 @@ class BitVector
 	toString()
 	{
 		let str = ``;
-		for(let rank=7; rank>=0; rank--)
+		for(let w=0; w<this.words.length; w++)
 		{
-			for(let file=0; file<8; file++)
+			for(let i=0; i<WORD_WIDTH; i++)
 			{
-				str = str.concat(` ${this.read(BitVector64.indexify(rank,file))}`);
+				str = `${str}${this.read(w,i)}`;
 			}
-			str = str.concat("\n");
+			str = str.concat("\t");
 		}
 		return str;
 	}

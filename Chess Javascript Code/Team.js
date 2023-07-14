@@ -18,11 +18,6 @@ class Team
 		throw "subclasses of Team must implement evalPreferredToEval";
 	}
 	
-	static toString()
-	{
-		return `${this.char}`;
-	}
-	
 	game;
 	
 	opposition;
@@ -89,11 +84,6 @@ class Team
 		this.activePieces.forEach((piece)=>{
 			piece.updateReachableSquaresAndBitsAndKingSeer(oppositionKingSquare);
 		});
-	}
-	
-	toString()
-	{
-		return this.constructor.toString();
 	}
 }
 
