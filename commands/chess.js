@@ -1,7 +1,6 @@
 const Discord = require("discord.js");
 const FileSystem = require("fs");
 const {Game} = require("../Chess Javascript Code/Game.js");
-const {WHITE_TEAM, BLACK_TEAM} = require("../Chess Javascript Code/Team.js");
 const commandName = "chess";
 
 const users = {};
@@ -65,7 +64,7 @@ function moveHistoryString(moveHistory)
 			const fullMoveCounter = (index+2)/2;
 			accumulator = accumulator.concat(`${fullMoveCounter>1?"\t":""}${fullMoveCounter}.`);
 		}
-		return accumulator.concat(` ${move.toString()}`);
+		return accumulator.concat(` ${move.discordString}`);
 	},"");
 }
 
@@ -85,16 +84,32 @@ function buildGameMessageFromMove(interaction, move)
 	const playedMovesString = moveHistoryString(user.game.playedMoves);
 	const FENString = user.game.toString();
 	
-	user.availableMoves = user.game.getLegals();
-	user.availableMovesStrings = user.availableMoves.map((move)=>{move.generateString(); return move.toString();});
+	user.availableMoves = user.game.calculateLegals();
+	user.availableMovesStrings = user.availableMoves.map((move)=>{move.generateString(); return move.discordString;});
 	
 	const availableMovesString = user.availableMovesStrings.join("\t");
+	
+	const eval = user.game.evaluate();
+	const bestLine = eval.reverseLine;	bestLine.reverse();
+	//make the moves to get their strings, then undo the moves
+	const bestLineString = bestLine.reduce((accumulator,move)=>{
+		accumulator = accumulator.concat(move.toString());
+		user.game.makeMove(move);
+		accumulator = accumulator.concat("\t");
+		return accumulator;
+	},"");
+	for(const move of bestLine)
+	{
+		user.game.undoMove();
+	}
 	
 	return boardPictureBuffer.then((boardPicture)=>{
 		return {
 			content: `**Played Moves**:\t${playedMovesString}\n`
 			.concat(`**FEN String**:\t${FENString}\n`)
-			.concat(`**Available Moves**:\t${availableMovesString}\n`),
+			.concat(`**Available Moves**:\t${availableMovesString}\n`)
+			.concat(`**Toxibot's Evaluation**:\t${eval.score}\n`)
+			.concat(`**Toxibot's Best Continuation**:\t||${bestLineString}||\n`),
 			files: [boardPicture],
 		}
 	});
@@ -199,8 +214,8 @@ module.exports = {
 			
 			if(user.game.isCheckmate())
 			{
-				const winningTeam = (user.game.turn == WHITE_TEAM)? BLACK_TEAM : WHITE_TEAM;
-				return interaction.reply(`The game has reached checkmate, the result is a win for ${winningTeam==WHITE_TEAM? "white" : "black"}`);
+				const winningTeamName = user.game.movingTeam.opposition.constructor.name;
+				return interaction.reply(`The game has reached checkmate, the result is a win for ${winningTeamName}`);
 			}
 			else if(user.game.isStalemate())
 			{

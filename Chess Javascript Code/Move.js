@@ -7,6 +7,8 @@ class Move
 	
 	movingPiece;
 	
+	discordString;
+	
 	//required to undo the move
 	targetPiece;
 	firstMove;
@@ -25,6 +27,11 @@ class Move
 		this.firstMove = (this.movingPiece.moved == false);
 		this.enPassantable = game.enPassantable;
 		this.castleRights = game.castleRights;
+	}
+	
+	generateString()
+	{
+		this.discordString = this.toString();
 	}
 	
 	toString()

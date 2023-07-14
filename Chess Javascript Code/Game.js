@@ -117,7 +117,7 @@ class Game
 		return (this.calculateLegals().length == 0) && !(this.kingChecked());
 	}
 
-	evaluate(depth = 1)
+	evaluate(depth = 2)
 	{
 		if(this.kingCapturable())
 		{
@@ -196,6 +196,7 @@ class Game
 		
 		//update the piece that moved and the pieces of the new moving team whose available squares included the move squares
 		move.movingPiece.updateReachableSquaresAndBitsAndKingSeer(move.movingPiece.team.opposition.king.square);
+		/*
 		const oppositionKingSquare = this.movingTeam.opposition.king.square;
 		this.movingTeam.activePieces.forEach((piece)=>{
 			if(piece instanceof DirectionPiece)
@@ -208,6 +209,8 @@ class Game
 				}
 			}
 		});
+		*/
+		this.movingTeam.init();
 	}
 	
 	undoMove()
@@ -215,6 +218,7 @@ class Game
 		const move = this.playedMoves.pop();
 		//revert the piece that moved and the pieces of the new moving team whose available squares included the move squares
 		move.movingPiece.revertReachableSquaresAndBitsAndKingSeer();
+		/*
 		this.movingTeam.activePieces.forEach((piece)=>{
 			if(piece instanceof DirectionPiece)
 			{
@@ -226,6 +230,8 @@ class Game
 				}
 			}
 		});
+		*/
+		this.movingTeam.init();
 		if(move instanceof PlainMove)
 		{
 			move.targetPiece?.activate?.();
