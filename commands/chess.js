@@ -86,7 +86,6 @@ function buildGameMessageFromMove(interaction, move)
 	
 	user.availableMoves = user.game.calculateLegals();
 	user.availableMovesStrings = user.availableMoves.map((move)=>{move.generateString(); return move.discordString;});
-	
 	const availableMovesString = user.availableMovesStrings.join("\t");
 	
 	const eval = user.game.evaluate();

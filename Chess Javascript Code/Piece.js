@@ -32,8 +32,8 @@ function squaresAndBitsInPatternFromSquareInGame(pattern,square, game)
 //for patterns that extend as far as possible in directions from a starting square
 function squaresAndBitsInDirectionsFromSquareInGame(directions,square,game)
 {
-	const rays = [];
-	const squaresBits = new BitVector();
+	const squares = [];
+	const bits = new BitVector();
 	
 	const squaresOccupiedBitVector = game.squaresOccupiedBitVector;
 	
@@ -42,8 +42,6 @@ function squaresAndBitsInDirectionsFromSquareInGame(directions,square,game)
 	
 	for(let i=0; i<directions.length; i++)
 	{
-		const squaresArray = [];
-		
 		const rankOffset = directions[i][0];
 		const fileOffset = directions[i][1];
 		
@@ -55,16 +53,15 @@ function squaresAndBitsInDirectionsFromSquareInGame(directions,square,game)
 		{
 			const newSquare = Square.make(newRank,newFile);
 			
-			squaresArray.push(newSquare);
-			squaresBits.interact(BitVector.SET, newSquare);
+			squares.push(newSquare);
+			bits.interact(BitVector.SET, newSquare);
 			
 			blocked = squaresOccupiedBitVector.interact(BitVector.READ, newSquare);
 			newRank += rankOffset;
 			newFile += fileOffset;
 		}
-		rays.push(squaresArray);
 	}
-	return [rays,squaresBits];
+	return [squares,bits];
 }
 
 function imageFileName(teamName, pieceName)
@@ -142,7 +139,7 @@ class Piece
 		this.team.numKingSeers += currentKingSeer - oldKingSeer;
 	}
 	
-	revertReachableSquaresAndBitsAndKingSeer(kingSquare)
+	revertReachableSquaresAndBitsAndKingSeer()
 	{
 		this.reachableSquares.revert();
 		this.reachableBits.revert();
@@ -176,27 +173,6 @@ class DirectionPiece extends Piece
 	static findReachableSquaresAndBitsFromSquareInGame(square, game)
 	{
 		return squaresAndBitsInDirectionsFromSquareInGame(this.directions,square,game);
-	}
-
-	rays;
-	
-	constructor(game, team, square, id, moved)
-	{
-		super(game, team, square, id, moved);
-		this.rays = this.constructor.directions.map((direction)=>{return [];});
-	}
-	
-	updateReachableSquaresAndBitsAndKingSeer(kingSquare)
-	{
-		const reachables = this.constructor.findReachableSquaresAndBitsFromSquareInGame(this.square, this.game);
-		reachables[0].forEach((ray, index)=>{this.rays[index] = ray;})
-		this.reachableSquares.update(this.rays.flat(1));
-		this.reachableBits.update(reachables[1]);
-
-		const oldKingSeer = this.kingSeer.get();
-		this.kingSeer.update(this.reachableBits.get().interact(BitVector.READ, kingSquare));
-		const currentKingSeer = this.kingSeer.get();
-		this.team.numKingSeers += currentKingSeer - oldKingSeer;
 	}
 }
 
