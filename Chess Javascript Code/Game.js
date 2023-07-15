@@ -33,6 +33,8 @@ class Game
 	halfMove;
 	fullMove;
 	
+	updatedPieces;
+	
 	constructor(FENString = DEFAULT_FEN_STRING)
 	{
 		this.squaresOccupiedBitVector = new BitVector();
@@ -88,6 +90,7 @@ class Game
 		this.fullMove = parseInt(FENparts[5]);
 		
 		this.playedMoves = [];
+		this.updatedPieces = new Manager();
 		
 		this.white.init();
 		this.black.init();
@@ -195,27 +198,33 @@ class Game
 		this.changeTurns();
 		
 		//update the piece that moved and the direction pieces of its opposition
+		const updatedPieces = [];
 		move.movingPiece.updateReachableSquaresAndBitsAndKingSeer(move.movingPiece.team.opposition.king.square);
+		updatedPieces.push(move.movingPiece);
 		const oppositionKingSquare = this.movingTeam.opposition.king.square;
 		this.movingTeam.activePieces.forEach((piece)=>{
 			if(piece instanceof DirectionPiece)
 			{
-				piece.updateReachableSquaresAndBitsAndKingSeer(oppositionKingSquare);
+				const reachableBits = piece.reachableBits.get();
+				if(reachableBits.interact(BitVector.READ, move.before) || reachableBits.interact(BitVector.READ, move.after))
+				{
+					piece.updateReachableSquaresAndBitsAndKingSeer(oppositionKingSquare);
+					updatedPieces.push(piece);
+				}
 			}
 		});
+		this.updatedPieces.update(updatedPieces);
 	}
 	
 	undoMove()
 	{
 		const move = this.playedMoves.pop();
-		//revert the piece that moved and the direction pieces of its opposition
-		move.movingPiece.revertReachableSquaresAndBitsAndKingSeer();
-		move.movingPiece.team.opposition.activePieces.forEach((piece)=>{
-			if(piece instanceof DirectionPiece)
-			{
-				piece.revertReachableSquaresAndBitsAndKingSeer();
-			}
-		});
+		const previouslyUpdatedPieces = this.updatedPieces.get();
+		for(const piece of previouslyUpdatedPieces)
+		{
+			piece.revertReachableSquaresAndBitsAndKingSeer();
+		}
+		this.updatedPieces.revert();
 		if(move instanceof PlainMove)
 		{
 			move.targetPiece?.activate();
