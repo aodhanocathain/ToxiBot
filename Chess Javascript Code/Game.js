@@ -380,6 +380,8 @@ class Game
 		const LIGHT_COLOUR = "#e0d0b0";
 		const DARK_COLOUR = "#e0a070";
 		const FONT_COLOUR = "#0000ff";
+		const WHITE_MOVE_COLOUR = "#ffff80";
+		const BLACK_MOVE_COLOUR = "#80ffff";
 		const SQUARE_PIXELS = 50;
 
 		const canvas = Canvas.createCanvas(NUM_FILES*SQUARE_PIXELS, NUM_RANKS*SQUARE_PIXELS);
@@ -389,13 +391,20 @@ class Game
 
 		const drawCalls = [];
 
+		const lastMove = this.playedMoves[this.playedMoves.length-1] ?? {};
+
 		for(let rank=0; rank<NUM_RANKS; rank++)
 		{
 			for(let file=0; file<NUM_FILES; file++)
 			{
 				const square = Square.make(rank,file);
 				//colour this square
-				context.fillStyle = (((rank+file)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
+				context.fillStyle = 
+				//if the square was in the last move, highlight it
+				((square==lastMove.before) || (square==lastMove.after))? 
+					//highlight a different colour depending on the team that last moved
+					((this.movingTeam==this.white)? BLACK_MOVE_COLOUR : WHITE_MOVE_COLOUR) :
+				(((rank+file)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
 				const x = file*SQUARE_PIXELS;
 				const y = ((NUM_RANKS-1)-rank)*SQUARE_PIXELS;
 				context.fillRect(x, y, SQUARE_PIXELS, SQUARE_PIXELS);
