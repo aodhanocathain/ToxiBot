@@ -5,13 +5,9 @@ const {Piece, PatternPiece, DirectionPiece, PieceTypeCharClasses, PieceClassesAr
 const [King] = PieceClassesArray;
 
 const {NUM_RANKS, NUM_FILES} = require("./Constants.js");
-
 const {PlainMove} = require("./Move.js");
-
 const {BitVector} = require("./BitVector.js");
-
 const {Square} = require("./Square.js");
-
 const {Manager} = require("./Manager.js");
 
 const Canvas = require("canvas");
@@ -20,20 +16,24 @@ const DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
 
 class Game
 {
-	pieces;	
-	squaresOccupiedBitVector;
+	pieces;	//indexed by a square on the board
+	squaresOccupiedBitVector;	//indicates whether a square is occupied by a piece
 	
 	white;
 	black;
 	movingTeam;
 	
 	playedMoves;
-	castleRights;
-	enPassantable;
 	halfMove;
 	fullMove;
 	
-	updatedPieces;
+	castleRights;
+	enPassantable;
+	movingPiece;
+	targetPiece;
+	firstMove;
+	
+	previouslyUpdatedPieces;
 	
 	constructor(FENString = DEFAULT_FEN_STRING)
 	{
@@ -70,7 +70,7 @@ class Game
 					this.pieces[square] = piece;
 					this.squaresOccupiedBitVector.interact(BitVector.SET, square);
 					
-					team.addPiece(piece);
+					team.addActivePiece(piece);
 					
 					file += 1;
 				}
@@ -83,14 +83,17 @@ class Game
 		
 		this.movingTeam = (FENparts[1] == WhiteTeam.char)? this.white : this.black;
 		
-		this.castleRights = FENparts[2].split("");
-		this.enPassantable = FENparts[3];
+		this.castleRights = new Manager(FENparts[2].split(""));
+		this.enPassantable = new Manager(FENparts[3]);
+		this.movingPiece = new Manager();
+		this.targetPiece = new Manager();
+		this.firstMove = new Manager();
 		
 		this.halfMove = parseInt(FENparts[4]);
 		this.fullMove = parseInt(FENparts[5]);
 		
 		this.playedMoves = [];
-		this.updatedPieces = new Manager();
+		this.previouslyUpdatedPieces = new Manager([]);
 		
 		this.white.init();
 		this.black.init();
@@ -156,6 +159,11 @@ class Game
 				}
 			}
 			
+			if(!bestEval)
+			{
+				return bestEval;
+			}
+			
 			const reverseLine = bestEval.reverseLine ?? [];
 			reverseLine.push(bestContinuation);
 			
@@ -171,78 +179,100 @@ class Game
 	{
 		if(move instanceof PlainMove)
 		{
-			move.targetPiece?.deactivate();
+			const movingPiece = this.pieces[move.before];
+			const targetPiece = this.pieces[move.after];
 			
-			this.pieces[move.after] = move.movingPiece;
+			//move the moving piece
+			movingPiece.square = move.after;
+			//capture the target piece
+			targetPiece?.deactivate();
+			//manipulate the game position
+			this.pieces[move.after] = movingPiece;
 			this.squaresOccupiedBitVector.interact(BitVector.SET, move.after);
-			
 			this.pieces[move.before] = null;
 			this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.before);
 			
-			move.movingPiece.square = move.after;
-			move.movingPiece.moved = true;
-			
-			if(move.movingPiece instanceof King)
+			//update the necessary information for undoing the move
+			if(movingPiece instanceof King)
 			{
-				//opponent retains castling rights, moving team forfeits castle rights
-				this.castleRights = this.castleRights.filter((wing)=>{
-					return Team.charOfTeamedChar(wing) != move.movingPiece.team.constructor.char;
-				});
+				this.castleRights.update(
+					//opponent retains castling rights, moving team forfeits castle rights
+					this.castleRights.get().filter((wing)=>{
+						return Team.charOfTeamedChar(wing) != movingPiece.team.constructor.char;
+					})
+				);
 			}
-			this.enPassantable = "-";
+			this.enPassantable.update("-");
+			this.movingPiece.update(movingPiece);
+			this.targetPiece.update(targetPiece);
+			this.firstMove.update(movingPiece.moved==false);
+			
+			movingPiece.moved = true;
+			
+			//update the piece that moved and the opposition pieces that could be blocked or unblocked by the move
+			const updatedPieces = [];
+			
+			movingPiece.updateReachableSquaresAndBitsAndKingSeer();
+			updatedPieces.push(movingPiece);
+			
+			movingPiece.team.opposition.activePieces.forEach((piece)=>{
+				if(piece instanceof DirectionPiece)
+				{
+					const reachableBits = piece.reachableBits.get();
+					if
+					(
+						reachableBits.interact(BitVector.READ, move.before) ||
+						reachableBits.interact(BitVector.READ, move.after)
+					)
+					{
+						piece.updateReachableSquaresAndBitsAndKingSeer();
+						updatedPieces.push(piece);
+					}
+				}
+			});
+			this.previouslyUpdatedPieces.update(updatedPieces);
 		}
 		
 		this.playedMoves.push(move);
-		
 		this.progressMoveCounters();
 		this.changeTurns();
-		
-		//update the piece that moved and the direction pieces of its opposition
-		const updatedPieces = [];
-		move.movingPiece.updateReachableSquaresAndBitsAndKingSeer(move.movingPiece.team.opposition.king.square);
-		updatedPieces.push(move.movingPiece);
-		const oppositionKingSquare = this.movingTeam.opposition.king.square;
-		this.movingTeam.activePieces.forEach((piece)=>{
-			if(piece instanceof DirectionPiece)
-			{
-				const reachableBits = piece.reachableBits.get();
-				if(reachableBits.interact(BitVector.READ, move.before) || reachableBits.interact(BitVector.READ, move.after))
-				{
-					piece.updateReachableSquaresAndBitsAndKingSeer(oppositionKingSquare);
-					updatedPieces.push(piece);
-				}
-			}
-		});
-		this.updatedPieces.update(updatedPieces);
 	}
 	
 	undoMove()
 	{
 		const move = this.playedMoves.pop();
-		const previouslyUpdatedPieces = this.updatedPieces.get();
-		for(const piece of previouslyUpdatedPieces)
-		{
-			piece.revertReachableSquaresAndBitsAndKingSeer();
-		}
-		this.updatedPieces.revert();
 		if(move instanceof PlainMove)
 		{
-			move.targetPiece?.activate();
+			const movingPiece = this.movingPiece.get();
+			const targetPiece = this.targetPiece.get();
 			
-			this.pieces[move.before] = move.movingPiece;
+			//move the moving piece back where it came from
+			movingPiece.square = move.before;
+			//revoke the capture of the target piece
+			targetPiece?.activate();
+			//manipulate the game position
+			this.pieces[move.before] = movingPiece;
 			this.squaresOccupiedBitVector.interact(BitVector.SET, move.before);
+			this.pieces[move.after] = targetPiece;
+			if(!targetPiece){this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.after);}
 			
-			this.pieces[move.after] = move.targetPiece;
-			if(!(move.targetPiece))
+			//revert the game state
+			if(movingPiece instanceof King)
 			{
-				this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.after);
+				this.castleRights.revert();
 			}
-			
-			move.movingPiece.square = move.before;
-			move.movingPiece.moved = (move.firstMove == false);
-			
-			this.castleRights = move.castleRights;
-			this.enPassantable = move.enPassantable;
+			this.enPassantable.revert();
+			this.movingPiece.revert();
+			this.targetPiece.revert();
+			movingPiece.moved = (this.firstMove.get() == false);
+			this.firstMove.revert();
+
+			const updatedPieces = this.previouslyUpdatedPieces.get();
+			for(const piece of updatedPieces)
+			{
+				piece.revertReachableSquaresAndBitsAndKingSeer();
+			}
+			this.previouslyUpdatedPieces.revert();			
 		}
 		
 		this.regressMoveCounters();
@@ -277,7 +307,6 @@ class Game
 			const condition = !(this.kingCapturable());
 			this.undoMove();
 			return condition;
-			//return true;
 			//*/
 		});
 	}
@@ -294,34 +323,21 @@ class Game
 	
 	regressMoveCounters()
 	{
-		/*
-		if(this.halfMove==0)
-		{
-			this.fullMove--;
-		}
-		*/
+		//if(this.halfMove==0){this.fullMove--;} halfMove=0 when undoing a white move, i.e. going back to the previous full turn
 		this.fullMove -= 1-this.halfMove;
 		
-		//this.halfMove = (this.halfMove+1)%2;
-		this.halfMove = (this.halfMove + 1) & 1;
+		this.halfMove = (this.halfMove + 1) % 2;
 	}
 	
 	progressMoveCounters()
 	{
-		/*
-		if(this.halfMove==1)
-		{
-			//this corresponds to when black has just moved, meaning a full move has passed
-			this.fullMove ++;
-		}
-		*/
+		//if(this.halfMove==1){this.fullMove++;} halfMove=1 when black has just moved, meaning a full turn has complete
 		this.fullMove += this.halfMove;
 		
-		//this.halfMove = (this.halfMove+1)%2;
-		this.halfMove = (this.halfMove + 1) & 1;
+		this.halfMove = (this.halfMove + 1) % 2;
 	}
 	
-	toString()
+	toString()	//specifically to a FEN string
 	{
 		//game stores ranks in ascending order, must reverse a copy for descending order in FEN string
 		let descendingRankStrings = [];
@@ -350,12 +366,13 @@ class Game
 			}
 			if(emptySquares>0)
 			{
+				//denote how many empty squares separate the last piece in the rank and the end of the rank
 				rankString = rankString.concat(`${emptySquares}`);
 			}
 			descendingRankStrings.push(rankString);
 		}
 		const boardString = descendingRankStrings.join("/");
-		return [boardString, this.movingTeam.constructor.char, this.castleRights.join(""), this.enPassantable, this.halfMove, this.fullMove].join(" ");
+		return [boardString, this.movingTeam.constructor.char, this.castleRights.get().join(""), this.enPassantable.get(), this.halfMove, this.fullMove].join(" ");
 	}
 	
 	toPNGBuffer()

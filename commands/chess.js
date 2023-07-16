@@ -64,7 +64,7 @@ function moveHistoryString(moveHistory)
 			const fullMoveCounter = (index+2)/2;
 			accumulator = accumulator.concat(`${fullMoveCounter>1?"\t":""}${fullMoveCounter}.`);
 		}
-		return accumulator.concat(` ${move.discordString}`);
+		return accumulator.concat(` ${move.string}`);
 	},"");
 }
 
@@ -76,7 +76,7 @@ function buildGameMessageFromMove(interaction, move)
 	//make the move in the game
 	if(move)
 	{
-		move.generateString();
+		move.takeStringSnapshot();
 		user.game.makeMove(move);
 	}
 	
@@ -85,10 +85,10 @@ function buildGameMessageFromMove(interaction, move)
 	const FENString = user.game.toString();
 	
 	user.availableMoves = user.game.calculateLegals();
-	user.availableMovesStrings = user.availableMoves.map((move)=>{move.generateString(); return move.discordString;});
+	user.availableMovesStrings = user.availableMoves.map((move)=>{move.takeStringSnapshot(); return move.string;});
 	const availableMovesString = user.availableMovesStrings.join("\t");
 	
-	const eval = user.game.evaluate();
+	const eval = user.game.evaluate(3);
 	const bestLine = eval.reverseLine;	bestLine.reverse();
 	//make the moves to get their strings, then undo the moves
 	const bestLineString = bestLine.reduce((accumulator,move)=>{

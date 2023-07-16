@@ -5,7 +5,6 @@ class Team
 {
 	static char;
 	static charConverter;
-	
 	static name;
 	
 	static charOfTeamedChar(teamedChar)
@@ -20,17 +19,17 @@ class Team
 	
 	game;
 	
-	opposition;
-	
 	activePieces;
 	inactivePieces;	
 	nextId;
 	
 	points;
-	
 	numKingSeers;
 	
 	king;
+	
+	//assigned by the team's game
+	opposition;
 	
 	constructor(game)
 	{
@@ -40,12 +39,11 @@ class Team
 		this.inactivePieces = [];
 		this.nextId = 0;
 		
-		this.numKingSeers = 0;
-		
 		this.points = 0;
+		this.numKingSeers = 0;
 	}
 	
-	addPiece(piece)
+	addActivePiece(piece)
 	{
 		this.registerPiece(piece);
 		this.activatePiece(piece);
@@ -80,9 +78,8 @@ class Team
 	
 	init()
 	{
-		const oppositionKingSquare = this.opposition.king.square;
 		this.activePieces.forEach((piece)=>{
-			piece.updateReachableSquaresAndBitsAndKingSeer(oppositionKingSquare);
+			piece.updateReachableSquaresAndBitsAndKingSeer();
 		});
 	}
 }
@@ -91,13 +88,11 @@ const teamClassesArray = [
 	class WhiteTeam extends Team
 	{
 		static char = "w";
-		
-		static name = "white";
-		
 		static charConverter(char)
 		{
 			return char.toUpperCase();
 		}
+		static name = "white";
 		
 		static evalPreferredToEval(newEval, oldEval)
 		{
@@ -108,13 +103,11 @@ const teamClassesArray = [
 	class BlackTeam extends Team
 	{
 		static char = "b";
-		
-		static name = "black";
-		
 		static charConverter(char)
 		{
 			return char.toLowerCase();
 		}
+		static name = "black";
 		
 		static evalPreferredToEval(newEval, oldEval)
 		{

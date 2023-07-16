@@ -1,8 +1,8 @@
-const {mask} = require("./Helpers.js");
+const {generateMask} = require("./Helpers.js");
 
 const WORD_WIDTH = 32;	//assuming 32-bit integers in javascript
 const BIT_INDEX_WIDTH = Math.ceil(Math.log2(WORD_WIDTH));
-const BIT_INDEX_MASK = mask(BIT_INDEX_WIDTH);
+const BIT_INDEX_MASK = generateMask(BIT_INDEX_WIDTH);
 
 //store bits using integers, assuming 32 bit integers in javascript
 class BitVector

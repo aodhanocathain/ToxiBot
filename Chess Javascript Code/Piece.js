@@ -5,7 +5,7 @@ const {BitVector} = require("./BitVector.js");
 const Canvas = require("canvas");
 
 //for patterns that depend only on set offsets from a starting square
-function squaresAndBitsInPatternFromSquareInGame(pattern,square, game)
+function squaresAndBitsInPatternFromSquareInGame(pattern, square, game)
 {
 	const squaresArray = [];
 	const squaresBits = new BitVector();
@@ -13,10 +13,11 @@ function squaresAndBitsInPatternFromSquareInGame(pattern,square, game)
 	const rank = Square.rank(square);
 	const file = Square.file(square);
 	
-	for(let i=0; i<pattern.length; i++)
+	for(const [rankOffset,fileOffset] of pattern)
 	{
-		const newRank = rank + pattern[i][0];
-		const newFile = file + pattern[i][1];
+		const newRank = rank + rankOffset;
+		const newFile = file + fileOffset;
+		
 		//if it is in the board, include it
 		if(Square.validRankAndFile(newRank,newFile))
 		{
@@ -30,38 +31,38 @@ function squaresAndBitsInPatternFromSquareInGame(pattern,square, game)
 }
 
 //for patterns that extend as far as possible in directions from a starting square
-function squaresAndBitsInDirectionsFromSquareInGame(directions,square,game)
+function squaresAndBitsInDirectionsFromSquareInGame(directions, square, game)
 {
-	const squares = [];
-	const bits = new BitVector();
+	const squaresArray = [];
+	const squaresBits = new BitVector();
 	
 	const squaresOccupiedBitVector = game.squaresOccupiedBitVector;
 	
 	const rank = Square.rank(square);
 	const file = Square.file(square);
 	
-	for(let i=0; i<directions.length; i++)
+	for(const [rankOffset,fileOffset] of directions)
 	{
-		const rankOffset = directions[i][0];
-		const fileOffset = directions[i][1];
-		
 		let newRank = rank+rankOffset;
 		let newFile = file+fileOffset;
 		let blocked = false;
 		
+		//keep stepping further in the given direction until reaching the edge of the board or another piece
 		while(Square.validRankAndFile(newRank,newFile) && !blocked)
 		{
 			const newSquare = Square.make(newRank,newFile);
 			
-			squares.push(newSquare);
-			bits.interact(BitVector.SET, newSquare);
+			//checking if the way is blocked AFTER adding the potentially blocked square is important
+			//e.g. capturing a piece necessarily involves being able to move to the square that is blocked
+			squaresArray.push(newSquare);
+			squaresBits.interact(BitVector.SET, newSquare);
 			
 			blocked = squaresOccupiedBitVector.interact(BitVector.READ, newSquare);
 			newRank += rankOffset;
 			newFile += fileOffset;
 		}
 	}
-	return [squares,bits];
+	return [squaresArray,squaresBits];
 }
 
 function imageFileName(teamName, pieceName)
@@ -72,9 +73,7 @@ function imageFileName(teamName, pieceName)
 class Piece
 {
 	static typeChar;
-	
 	static points;
-	
 	static name;
 	
 	static typeCharOfTeamedChar(teamedChar)
@@ -90,15 +89,16 @@ class Piece
 	game;
 	team;
 	square;
-	id;
 	moved;
 	
 	kingSeer;
+	reachableSquares;
+	reachableBits;
 	
 	image;
 	
-	reachableSquares;
-	reachableBits;
+	//set by the piece's team
+	id;
 	
 	constructor(game, team, square, moved)
 	{
@@ -107,12 +107,9 @@ class Piece
 		this.square = square;
 		this.moved = false;
 		
-		this.kingSeer = new Manager();
-		this.kingSeer.update(0);
-		this.reachableSquares = new Manager();
-		this.reachableSquares.update([]);
-		this.reachableBits = new Manager();
-		this.reachableBits.update(new BitVector());
+		this.kingSeer = new Manager(0);
+		this.reachableSquares = new Manager([]);
+		this.reachableBits = new Manager(new BitVector());
 		
 		this.image = Canvas.loadImage(imageFileName(this.team.constructor.name, this.constructor.name));
 	}
@@ -133,8 +130,9 @@ class Piece
 		this.reachableSquares.update(reachables[0]);
 		this.reachableBits.update(reachables[1]);
 		
+		//reflect the change in whether this piece sees the king in its team
 		const oldKingSeer = this.kingSeer.get();
-		this.kingSeer.update(this.reachableBits.get().interact(BitVector.READ, kingSquare));
+		this.kingSeer.update(this.reachableBits.get().interact(BitVector.READ, this.team.opposition.king.square));
 		const currentKingSeer = this.kingSeer.get();
 		this.team.numKingSeers += currentKingSeer - oldKingSeer;
 	}
@@ -144,6 +142,7 @@ class Piece
 		this.reachableSquares.revert();
 		this.reachableBits.revert();
 		
+		//reflect the change in whether this piece sees the king in its team
 		const oldKingSeer = this.kingSeer.get();
 		this.kingSeer.revert();
 		const currentKingSeer = this.kingSeer.get();
@@ -181,9 +180,7 @@ const pieceClassesArray = [
 	class King extends PatternPiece
 	{
 		static typeChar = "K";
-		
 		static name = "king";
-		
 		static points = 0;
 		
 		static pattern = [
@@ -201,9 +198,7 @@ const pieceClassesArray = [
 	class Knight extends PatternPiece
 	{
 		static typeChar = "N";
-		
 		static name = "knight";
-		
 		static points = 3;
 		
 		static pattern = [
@@ -221,9 +216,7 @@ const pieceClassesArray = [
 	class Bishop extends DirectionPiece
 	{
 		static typeChar = "B";
-		
 		static name = "bishop";
-		
 		static points = 3;
 		
 		static directions = [
@@ -237,9 +230,7 @@ const pieceClassesArray = [
 	class Rook extends DirectionPiece
 	{
 		static typeChar = "R";
-		
 		static name = "rook";
-		
 		static points = 5;
 		
 		static directions = [
@@ -253,9 +244,7 @@ const pieceClassesArray = [
 	class Queen extends DirectionPiece
 	{
 		static typeChar = "Q";
-		
 		static name = "queen";
-		
 		static points = 9;
 		
 		static directions = [
@@ -268,7 +257,7 @@ const pieceClassesArray = [
 			[0,1],
 			[1,1]
 		];
-	}
+	},
 ];
 
 //match piece type characters to classes

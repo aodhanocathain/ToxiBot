@@ -2,18 +2,11 @@ const {Square} = require("./Square.js");
 
 class Move
 {
-	before;
-	after;
+	game;
+	before;	//the square a piece started at before the move
+	after;	//the square the same piece ended at after the move
 	
-	movingPiece;
-	
-	discordString;
-	
-	//required to undo the move
-	targetPiece;
-	firstMove;
-	enPassantable;
-	castleRights;
+	string;
 	
 	constructor(game, before, after)
 	{
@@ -21,17 +14,13 @@ class Move
 		
 		this.before = before;
 		this.after = after;
-		
-		this.movingPiece = game.pieces[before];
-		this.targetPiece = game.pieces[after];
-		this.firstMove = (this.movingPiece.moved == false);
-		this.enPassantable = game.enPassantable;
-		this.castleRights = game.castleRights;
 	}
 	
-	generateString()
+	//The same move can generate different strings depending on the game position
+	//Can use this method to capture the string at a specific moment
+	takeStringSnapshot()
 	{
-		this.discordString = this.toString();
+		this.string = this.toString();
 	}
 	
 	toString()
@@ -41,41 +30,43 @@ class Move
 		information about the square the piece moves from, to uniquely identify the moving piece.
 		*/
 		
-		//Search for any pieces of this move's piece type, that could also move to the same square
-		//See what squares the piece could have come from at the destination
-		//(this is the same as the new destinations the piece has available from the move destination)
+		//See what squares the piece could have come from at the new square
+		const movingPiece = this.game.pieces[this.before];
+		const targetPiece = this.game.pieces[this.after];
 		
-		let otherOrigins = this.movingPiece.constructor.findReachableSquaresAndBitsFromSquareInGame(this.after,this.game)[0]
-		.filter((square)=>{
-			const otherPiece = this.game.pieces[square];
+		let otherOrigins = movingPiece.constructor.findReachableSquaresAndBitsFromSquareInGame(this.after,this.game)[0]
+		.filter((otherOrigin)=>{
+			const otherPiece = this.game.pieces[otherOrigin];
 			//ignore the square the moving piece came from
-			return (square != this.before) &&
+			if(movingPiece==otherPiece){return false;}
 			//piece teams must match
-			(otherPiece?.team == this.movingPiece.team) &&
+			if(movingPiece.team!=otherPiece?.team){return false;}
 			//piece types must match
-			(otherPiece?.constructor == this.movingPiece.constructor);
+			if(movingPiece.constructor!=otherPiece?.constructor){return false;}
+			
+			return true;
 		})
 		
 		const sameOriginFiles = otherOrigins.filter((square)=>{return Square.file(this.before)==Square.file(square);});
 		const sameOriginRanks = otherOrigins.filter((square)=>{return Square.rank(this.before)==Square.rank(square);});
 		
 		const beforeDetails = 
-		(otherOrigins.length==0)?	//piece is the only possible candidate for the move
+		(otherOrigins.length==0)?	//piece is the only possible candidate for the move, needs no clarification
 		"":
-		(sameOriginFiles.length==0)?	//can uniquely identify piece by its file
+		(sameOriginFiles.length==0)?	//need to uniquely identify piece by its file
 		Square.fileString(this.before) :
-		(sameOriginRanks.length==0)?	//can uniquely identify piece by its rank
+		(sameOriginRanks.length==0)?	//need to uniquely identify piece by its rank
 		Square.rankString(this.before) :
-		//have to fully specify the square the piece starts on
+		//must fully specify the square the piece starts on
 		Square.fullString(this.before);
 		
-		const capture = this.targetPiece? "x" : "";
+		const capture = targetPiece? "x" : "";
 		
 		this.game.makeMove(this);
 		const checkStatus = this.game.isCheckmate()? "#" : this.game.kingChecked()? "+" : "";
 		this.game.undoMove();
 		
-		return `${this.movingPiece.constructor.typeChar}${beforeDetails}${capture}${Square.fullString(this.after)}${checkStatus}`;
+		return `${movingPiece.constructor.typeChar}${beforeDetails}${capture}${Square.fullString(this.after)}${checkStatus}`;
 	}
 }
 

@@ -5,9 +5,10 @@ class Manager
 	cache;
 	item;
 	
-	constructor()
+	constructor(initialItem)
 	{
 		this.cache = [];
+		this.item = initialItem;
 	}
 	
 	update(newItem)

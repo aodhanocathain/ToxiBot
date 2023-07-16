@@ -1,9 +1,9 @@
-const {asciiOffset, mask} = require("./Helpers.js");
+const {asciiOffset, generateMask} = require("./Helpers.js");
 const {MIN_FILE, MIN_RANK, NUM_FILES, NUM_RANKS} = require("./Constants.js");
 
 const NUM_FILE_BITS = Math.ceil(Math.log2(NUM_FILES));
 
-const FILE_BITS_MASK = mask(NUM_FILE_BITS);
+const FILE_BITS_MASK = generateMask(NUM_FILE_BITS);
 
 //represent a square using a single integer
 //[rank bits][file bits]
