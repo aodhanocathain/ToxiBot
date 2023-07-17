@@ -125,12 +125,6 @@ class Game
 
 	evaluate(depth = 2)
 	{
-		if(this.kingCapturable())
-		{
-			return {
-				illegal:true
-			}
-		}
 		if(depth==0)
 		{
 			return {
@@ -150,6 +144,11 @@ class Game
 			{
 				const newContinuation = continuations[i];
 				this.makeMove(newContinuation);
+				if(this.kingCapturable())
+				{
+					this.undoMove();
+					continue;
+				}
 				const newEval = this.evaluate(depth-1);
 				this.undoMove();
 				if(evalPreferredToEval(newEval,bestEval))
@@ -218,6 +217,7 @@ class Game
 			movingPiece.team.opposition.activePieces.forEach((piece)=>{
 				if(piece instanceof DirectionPiece)
 				{
+					
 					const reachableBits = piece.reachableBits.get();
 					if
 					(
@@ -318,7 +318,15 @@ class Game
 	
 	kingChecked()
 	{
-		return this.movingTeam.opposition.numKingSeers > 0;
+		//current implementation only guarantees that the moving team is up-to-date, not its opposition
+		
+		//must update the opposition
+		this.movingTeam.opposition.activePieces.forEach((piece)=>{piece.updateReachableSquaresAndBitsAndKingSeer();});
+		const condition = this.movingTeam.opposition.numKingSeers > 0;
+		//revert the opposition to be safe, leave the game as it was before calling the function
+		this.movingTeam.opposition.activePieces.forEach((piece)=>{piece.revertReachableSquaresAndBitsAndKingSeer();});
+		return condition;
+		
 	}
 	
 	regressMoveCounters()
