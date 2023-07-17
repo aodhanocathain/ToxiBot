@@ -3,13 +3,98 @@ const FileSystem = require("fs");
 const {Game} = require("../Chess Javascript Code/Game.js");
 const commandName = "chess";
 
+class User
+{
+	game;
+	gameDisplay;
+	
+	availableMoves;
+	availableStrings;
+	
+	initGameAndDisplay(FEN, interaction)
+	{
+		if(!(Game.validFENString(FEN)))
+		{
+			return interaction.reply("Invalid FEN string supplied");
+		}
+		this.game = new Game(FEN);
+		this.gameDisplay = interaction;
+		
+		return this.buildGameDisplayMessage().then((message)=>{
+			return interaction.reply(message);
+		});
+	}
+	
+	deleteGameAndDisplay()
+	{
+		delete this.game;
+		delete this.availableMoves;
+		delete this.availableStrings;
+		
+		this.gameDisplay.deleteReply();
+		delete this.gameDisplay;
+	}
+	
+	makeMove(move)
+	{
+		this.move.takeStringSnapshot();
+		this.game.makeMove(move);
+	}
+	
+	buildGameDisplayMessage()
+	{
+		const boardPictureBuffer = this.game.toPNGBuffer();
+		const playedMovesString = this.game.moveHistoryString();
+		const FENString = this.game.toString();
+		
+		this.availableMoves = this.game.calculateLegals();
+		this.availableStrings = this.availableMoves.map((move)=>{move.takeStringSnapshot(); return move.string;});
+		const availableMovesString = this.availableStrings.join("\t");
+		
+		//get the best line in string form
+		const evaluation = this.game.evaluate(2);
+		const bestLine = evaluation.reverseLine; bestLine.reverse();
+		const bestLineString = bestLine.reduce((accumulator,move)=>{
+			//make the moves to get their strings, then undo the moves
+			accumulator = accumulator.concat(move.toString());
+			this.game.makeMove(move);
+			accumulator = accumulator.concat("\t");
+			return accumulator;
+		},"");
+		for(const move of bestLine)
+		{
+			this.game.undoMove();
+		}
+		
+		return boardPictureBuffer.then((boardPicture)=>{
+			return {
+				content: `**Played Moves**:\t${playedMovesString}\n`
+				.concat(`**FEN String**:\t${FENString}\n`)
+				.concat(`**Available Moves**:\t${availableMovesString}\n`)
+				.concat(`**Toxibot's Evaluation**:\t${evaluation.score}\n`)
+				.concat(`**Toxibot's Best Continuation**:\t||${bestLineString}||\n`),
+				files: [boardPicture],
+			}
+		});
+	}
+}
+
 const users = {};
 
 function gamecreateSubcommand(subcommand){
 	return subcommand
 	.setName("gamecreate")
 	.setDescription("create your game")
+	.addStringOption(playAsStringOption)
 	.addStringOption(fenStringOption)
+}
+
+function playAsStringOption(option)
+{
+	return option
+	.setName("playas")
+	.setDescription(`"white" or "black" (leave empty for random assignment)`)
+	.setRequired(false);
 }
 
 function fenStringOption(option)
@@ -55,70 +140,6 @@ function moveundoSubcommand(subcommand)
 	.setDescription("undo a move in your game")
 }
 
-function moveHistoryString(moveHistory)
-{
-	return moveHistory.reduce((accumulator, move, index)=>{
-		//give the full move counter at the start of each full move
-		if(index%2==0)
-		{
-			const fullMoveCounter = (index+2)/2;
-			accumulator = accumulator.concat(`${fullMoveCounter>1?"\t":""}${fullMoveCounter}.`);
-		}
-		return accumulator.concat(` ${move.string}`);
-	},"");
-}
-
-function buildGameMessageFromMove(interaction, move)
-{
-	const user = users[`${interaction.user.id}`];
-	//apply the move in the user's game and return the necessary update to the original reply
-	
-	//make the move in the game
-	if(move)
-	{
-		move.takeStringSnapshot();
-		user.game.makeMove(move);
-	}
-	
-	const boardPictureBuffer = user.game.toPNGBuffer();
-	const playedMovesString = moveHistoryString(user.game.playedMoves);
-	const FENString = user.game.toString();
-	
-	user.availableMoves = user.game.calculateLegals();
-	user.availableMovesStrings = user.availableMoves.map((move)=>{move.takeStringSnapshot(); return move.string;});
-	const availableMovesString = user.availableMovesStrings.join("\t");
-	
-	const eval = user.game.evaluate(3);
-	const bestLine = eval.reverseLine;	bestLine.reverse();
-	//make the moves to get their strings, then undo the moves
-	const bestLineString = bestLine.reduce((accumulator,move)=>{
-		accumulator = accumulator.concat(move.toString());
-		user.game.makeMove(move);
-		accumulator = accumulator.concat("\t");
-		return accumulator;
-	},"");
-	for(const move of bestLine)
-	{
-		user.game.undoMove();
-	}
-	
-	return boardPictureBuffer.then((boardPicture)=>{
-		return {
-			content: `**Played Moves**:\t${playedMovesString}\n`
-			.concat(`**FEN String**:\t${FENString}\n`)
-			.concat(`**Available Moves**:\t${availableMovesString}\n`)
-			.concat(`**Toxibot's Evaluation**:\t${eval.score}\n`)
-			.concat(`**Toxibot's Best Continuation**:\t||${bestLineString}||\n`),
-			files: [boardPicture],
-		}
-	});
-}
-
-function userHasGame(user)
-{
-	return "game" in (user??{});
-}
-
 module.exports = {
 	name: commandName,
 	configure: (client) => {},
@@ -131,50 +152,39 @@ module.exports = {
 	
 	execute: (interaction) => {
 		const userId = interaction.user.id;
+		if(!(userId in users)){users[userId] = new User();}
 		const user = users[userId];
 		
 		const subcommand = interaction.options.getSubcommand();
 		if(subcommand == "gamecreate")
 		{
-			if(userHasGame(user))
+			if(user.game)
 			{
 				return interaction.reply("You already have a game");
 			}
 			
+			//experimental
+			const playAs = interaction.options.getString("playAs");
+			console.log(playAs);
+			
 			const fenString = interaction.options.getString("fen");
 			
-			//initialize the user
-			users[userId] = {
-				"game": new Game(fenString??undefined),
-				"availableMoves": [],
-				"availableMovesStrings": [],
-				"gameDisplay":interaction
-			};
-			
-			return buildGameMessageFromMove(interaction, null)
-			.then((message)=>{
-				return interaction.reply(message);
-			});
+			return user.initGameAndDisplay(fenString, interaction);
 		}
 		else if(subcommand == "gamedelete")
 		{
-			if(!userHasGame(user))
+			if(!(user.game))
 			{
 				return interaction.reply("You have no game to delete");
 			}
 			
-			//remove the user's properties concering the game
-			delete user.game;
-			delete user.availableMoves;
-			delete user.availableMovesStrings;
-			user.gameDisplay.deleteReply();	//also remove the message showing the game
-			delete user.gameDisplay;
+			user.deleteGameAndDisplay();
 			return;
 		}
 		else if(subcommand == "gamebump")
 		{
 			//show the game again in a new message and delete the old message
-			if(!userHasGame(user))
+			if(!(user.game))
 			{
 				return interaction.reply("You have no game to post again");
 			}
@@ -184,14 +194,14 @@ module.exports = {
 			
 			//show new
 			user.gameDisplay = interaction;
-			return buildGameMessageFromMove(interaction, null)
+			return user.buildGameDisplayMessage()
 			.then((message)=>{
 				return interaction.reply(message);
 			});
 		}
 		else if(subcommand == "movemake")
 		{
-			if(!userHasGame(user))
+			if(!(user.game))
 			{
 				return interaction.reply("You have no game in which to make a move");
 			}
@@ -203,12 +213,13 @@ module.exports = {
 			
 			//if the choice string is not in the strings generated by the program then it is not available
 			const moveChoiceString = interaction.options.getString("move");
-			const moveIndex = user.availableMovesStrings.indexOf(moveChoiceString);
+			const moveIndex = user.availableStrings.indexOf(moveChoiceString);
 			if(moveIndex<0){return interaction.reply("The move supplied is invalid");}
 			
 			const moveChoice = user.availableMoves[moveIndex]
-			let response = buildGameMessageFromMove(interaction, moveChoice).then((message)=>{
-				user.gameDisplay.editReply(message);
+			user.makeMove(moveChoice);
+			const response = user.buildGameDisplayMessage().then((message)=>{
+				return user.gameDisplay.editReply(message);
 			});
 			
 			if(user.game.isCheckmate())
@@ -229,15 +240,20 @@ module.exports = {
 		}
 		else if(subcommand == "moveundo")
 		{
+			if(!(user.game))
+			{
+				return interaction.reply("No game in which to undo a move");
+			}
 			if(user.game.playedMoves.length==0)
 			{
 				return interaction.reply("No move to undo");
 			}
+			
 			interaction.deferReply();
 			interaction.deleteReply();
 			user.game.undoMove();
-			return buildGameMessageFromMove(interaction, null).then((message)=>{
-				user.gameDisplay.editReply(message);
+			return user.buildGameDisplayMessage().then((message)=>{
+				return user.gameDisplay.editReply(message);
 			});
 		}
 	},

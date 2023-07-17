@@ -35,8 +35,15 @@ class Game
 	
 	previouslyUpdatedPieces;
 	
-	constructor(FENString = DEFAULT_FEN_STRING)
+	static validFENString(FENString)
 	{
+		if(!FENString){return true;}
+		return true;
+	}
+	
+	constructor(FENString)
+	{
+		if(!FENString){FENString = DEFAULT_FEN_STRING;}
 		this.squaresOccupiedBitVector = new BitVector();
 		
 		this.white = new WhiteTeam(this);
@@ -343,6 +350,20 @@ class Game
 		this.fullMove += this.halfMove;
 		
 		this.halfMove = (this.halfMove + 1) % 2;
+	}
+	
+	moveHistoryString()
+	{
+		//turn a list of moves into something like "1. whitemove blackmove 2.whitemove blackmove ..."
+		return this.playedMoves.reduce((accumulator, move, index)=>{
+			//give the full move counter at the start of each full move
+			if(index%2==0)
+			{
+				const fullMoveCounter = (index+2)/2;
+				accumulator = accumulator.concat(`${fullMoveCounter>1?"\t":""}${fullMoveCounter}.`);
+			}
+			return accumulator.concat(` ${move.string}`);
+		},"");
 	}
 	
 	toString()	//specifically to a FEN string
