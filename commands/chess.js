@@ -17,6 +17,7 @@ class User
 		{
 			return interaction.reply("Invalid FEN string supplied");
 		}
+		
 		this.game = new Game(FEN);
 		this.gameDisplay = interaction;
 		
@@ -37,7 +38,7 @@ class User
 	
 	makeMove(move)
 	{
-		this.move.takeStringSnapshot();
+		move.takeStringSnapshot();
 		this.game.makeMove(move);
 	}
 	
@@ -71,7 +72,7 @@ class User
 				content: `**Played Moves**:\t${playedMovesString}\n`
 				.concat(`**FEN String**:\t${FENString}\n`)
 				.concat(`**Available Moves**:\t${availableMovesString}\n`)
-				.concat(`**Toxibot's Evaluation**:\t${evaluation.score}\n`)
+				.concat(`**Toxibot's Evaluation**:\t||${evaluation.score}||\n`)
 				.concat(`**Toxibot's Best Continuation**:\t||${bestLineString}||\n`),
 				files: [boardPicture],
 			}
@@ -164,7 +165,7 @@ module.exports = {
 			}
 			
 			//experimental
-			const playAs = interaction.options.getString("playAs");
+			const playAs = interaction.options.getString("playas");
 			console.log(playAs);
 			
 			const fenString = interaction.options.getString("fen");
