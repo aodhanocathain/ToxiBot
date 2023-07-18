@@ -3,9 +3,9 @@ const [King] = PieceClassesArray;
 
 class Team
 {
-	static char;
-	static charConverter;
-	static name;
+	char;
+	charConverter;
+	name;
 	
 	static charOfTeamedChar(teamedChar)
 	{
@@ -116,8 +116,10 @@ const teamClassesArray = [
 	}
 ];
 
+const teamClassNames = teamClassesArray.map((teamClass)=>{return teamClass.name;});
+
 module.exports = {
 	Team:Team,
-	
+	TeamClassNames: teamClassNames,
 	TeamClassesArray: teamClassesArray
 }

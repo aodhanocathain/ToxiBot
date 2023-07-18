@@ -1,45 +1,42 @@
 const Discord = require("discord.js");
 const FileSystem = require("fs");
 const {Game} = require("../Chess Javascript Code/Game.js");
+const {TeamClassNames, TeamClassesArray} = require("../Chess Javascript Code/Team.js");
 const commandName = "chess";
 
-class User
+const users = {};
+const games = {};
+
+class DiscordGame
 {
 	game;
-	gameDisplay;
+	display;
+	
+	botTeam;
 	
 	availableMoves;
 	availableStrings;
 	
-	initGameAndDisplay(FEN, interaction)
+	constructor(fen)
 	{
-		if(!(Game.validFENString(FEN)))
-		{
-			return interaction.reply("Invalid FEN string supplied");
-		}
-		
-		this.game = new Game(FEN);
-		this.gameDisplay = interaction;
-		
-		return this.buildGameDisplayMessage().then((message)=>{
-			return interaction.reply(message);
-		});
+		this.game = new Game(fen);
 	}
 	
-	deleteGameAndDisplay()
+	advanceIfBotTurn()
 	{
-		delete this.game;
-		delete this.availableMoves;
-		delete this.availableStrings;
-		
-		this.gameDisplay.deleteReply();
-		delete this.gameDisplay;
+		if(this.game.movingTeam == this.game[this.botTeam])
+		{
+			const bestMove = this.game.evaluate(2).bestMove;
+			bestMove.takeStringSnapshot();
+			this.game.makeMove(bestMove);
+		}
 	}
 	
 	makeMove(move)
 	{
 		move.takeStringSnapshot();
 		this.game.makeMove(move);
+		this.advanceIfBotTurn();
 	}
 	
 	buildGameDisplayMessage()
@@ -80,12 +77,19 @@ class User
 	}
 }
 
-const users = {};
+class User
+{
+	discordGame;
+	playas;
+	
+	opponent;
+}
 
 function gamecreateSubcommand(subcommand){
 	return subcommand
 	.setName("gamecreate")
 	.setDescription("create your game")
+	.addUserOption(playAgainstUserOption)
 	.addStringOption(playAsStringOption)
 	.addStringOption(fenStringOption)
 }
@@ -94,7 +98,15 @@ function playAsStringOption(option)
 {
 	return option
 	.setName("playas")
-	.setDescription(`"white" or "black" (leave empty for random assignment)`)
+	.setDescription("white or black (leave blank for random assignment)")
+	.setRequired(false);
+}
+
+function playAgainstUserOption(option)
+{
+	return option
+	.setName("playagainst")
+	.setDescription("the user you want to play against (leave blank for toxibot)")
 	.setRequired(false);
 }
 
@@ -106,11 +118,11 @@ function fenStringOption(option)
 	.setRequired(false)
 }
 
-function gamedeleteSubcommand(subcommand)
+function gameendSubcommand(subcommand)
 {
 	return subcommand
-	.setName("gamedelete")
-	.setDescription("delete your game")
+	.setName("gameend")
+	.setDescription("end your game")
 }
 
 function gamebumpSubcommand(subcommand)
@@ -146,7 +158,7 @@ module.exports = {
 	configure: (client) => {},
 	discordCommand : new Discord.SlashCommandBuilder().setName(commandName).setDescription("Utilize chess functionality")
 	.addSubcommand(gamecreateSubcommand)
-	.addSubcommand(gamedeleteSubcommand)
+	.addSubcommand(gameendSubcommand)
 	.addSubcommand(gamebumpSubcommand)
 	.addSubcommand(movemakeSubcommand)
 	.addSubcommand(moveundoSubcommand),
@@ -159,76 +171,150 @@ module.exports = {
 		const subcommand = interaction.options.getSubcommand();
 		if(subcommand == "gamecreate")
 		{
-			if(user.game)
+			//check if the command is feasible
+			
+			//do not overwrite existing games of the user
+			if(user.discordGame)
 			{
 				return interaction.reply("You already have a game");
 			}
 			
-			//experimental
-			const playAs = interaction.options.getString("playas");
-			console.log(playAs);
-			
-			const fenString = interaction.options.getString("fen");
-			
-			return user.initGameAndDisplay(fenString, interaction);
-		}
-		else if(subcommand == "gamedelete")
-		{
-			if(!(user.game))
+			//do not overwrite existing games of the user's opponent
+			const playagainst = interaction.options.getUser("playagainst");
+			if(playagainst)
 			{
-				return interaction.reply("You have no game to delete");
+				if(!(playagainst.id in users)){users[playagainst.id] = new User();}
+				if(users[playagainst.id].discordGame)
+				{
+					return interaction.reply(`${playagainst.username} already has a game`);
+				}
 			}
 			
-			user.deleteGameAndDisplay();
+			let playas = interaction.options.getString("playas");
+			if(playas)	//can be wrong only if the user specified one at all
+			{
+				if(!(TeamClassNames.find((name)=>{return name==playas})))
+				{
+					return interaction.reply("Invalid team chosen");
+				}
+			}
+			else
+			{
+				playas = TeamClassNames[Math.floor(Math.random()*TeamClassNames.length)];
+			}
+			
+			let fen = interaction.options.getString("fen");
+			if(fen)	//can be wrong only if the user specified one at all
+			{
+				if(!(Game.validFENString(fen)))
+				{
+					return interaction.reply("Invalid FEN string supplied");
+				}
+			}
+			else
+			{
+				fen = Game.DEFAULT_FEN_STRING;
+			}
+			
+			const discordGame = new DiscordGame(fen);
+			
+			user.discordGame = discordGame;
+			user.playas = playas;
+			
+			const oppositionPlayAs = TeamClassNames.find((name)=>{return name!=playas});
+			
+			if(playagainst)
+			{
+				const opponent = users[playagainst.id];
+				
+				opponent.discordGame = discordGame;
+				opponent.playas = oppositionPlayAs;
+				
+				user.opponent = opponent;
+				opponent.opponent = user;
+				
+				discordGame.botTeam = null;
+			}
+			else
+			{
+				discordGame.botTeam = oppositionPlayAs;
+			}
+			
+			//start the game by making the bot's move if it is the moving team
+			discordGame.advanceIfBotTurn();
+			
+			console.log(user.playas);
+			
+			return discordGame.buildGameDisplayMessage().then((message)=>{
+				discordGame.display = interaction;
+				return interaction.reply(message);
+			});
+		}
+		else if(subcommand == "gameend")
+		{
+			if(!(user.discordGame))
+			{
+				return interaction.reply("You have no game to end");
+			}
+			
+			user.discordGame.display.deleteReply();
+			delete user.discordGame;
+			delete user.opponent?.discordGame;
+			
 			return;
 		}
 		else if(subcommand == "gamebump")
 		{
 			//show the game again in a new message and delete the old message
-			if(!(user.game))
+			if(!(user.discordGame))
 			{
 				return interaction.reply("You have no game to post again");
 			}
 			
 			//delete old
-			user.gameDisplay.deleteReply();
+			user.discordGame.display.deleteReply();
 			
 			//show new
-			user.gameDisplay = interaction;
-			return user.buildGameDisplayMessage()
+			user.discordGame.display = interaction;
+			return user.discordGame.buildGameDisplayMessage()
 			.then((message)=>{
 				return interaction.reply(message);
 			});
 		}
 		else if(subcommand == "movemake")
 		{
-			if(!(user.game))
+			if(!(user.discordGame))
 			{
 				return interaction.reply("You have no game in which to make a move");
 			}
 			
-			if(user.game.isCheckmate() || user.game.isStalemate())
+			if(user.discordGame.game[user.playas] != user.discordGame.game.movingTeam)
+			{
+				return interaction.reply("It is not your turn in the game");
+			}
+			
+			if(user.discordGame.game.isCheckmate() || user.discordGame.game.isStalemate())
 			{
 				return interaction.reply("Your game is already over");
 			}
 			
 			//if the choice string is not in the strings generated by the program then it is not available
 			const moveChoiceString = interaction.options.getString("move");
-			const moveIndex = user.availableStrings.indexOf(moveChoiceString);
+			const moveIndex = user.discordGame.availableStrings.indexOf(moveChoiceString);
 			if(moveIndex<0){return interaction.reply("The move supplied is invalid");}
 			
-			const moveChoice = user.availableMoves[moveIndex]
-			user.makeMove(moveChoice);
-			const response = user.buildGameDisplayMessage().then((message)=>{
-				return user.gameDisplay.editReply(message);
+			const moveChoice = user.discordGame.availableMoves[moveIndex]
+			user.discordGame.makeMove(moveChoice);
+			const response = user.discordGame.buildGameDisplayMessage().then((message)=>{
+				return user.discordGame.display.editReply(message);
 			});
 			
-			if(user.game.isCheckmate())
+			if(user.discordGame.game.isCheckmate())
 			{
-				const winningTeamName = user.game.movingTeam.opposition.constructor.name;
+				const winningTeamName = user.discordGame.game.movingTeam.opposition.constructor.name;
 				return interaction.reply(`The game has reached checkmate, the result is a win for ${winningTeamName}`);
 			}
-			else if(user.game.isStalemate())
+			else if(user.discordGame.game.isStalemate())
 			{
 				return interaction.reply("The game has reached stalemate, the result is a draw");
 			}
@@ -241,25 +327,31 @@ module.exports = {
 		}
 		else if(subcommand == "moveundo")
 		{
-			if(!(user.game))
+			if(!(user.discordGame))
 			{
 				return interaction.reply("No game in which to undo a move");
 			}
-			if(user.game.playedMoves.length==0)
+			if(user.discordGame.game.playedMoves.length==0)
 			{
 				return interaction.reply("No move to undo");
 			}
 			
 			interaction.deferReply();
 			interaction.deleteReply();
-			user.game.undoMove();
-			return user.buildGameDisplayMessage().then((message)=>{
-				return user.gameDisplay.editReply(message);
+			
+			user.discordGame.game.undoMove();
+			if(user.discordGame.game.playedMoves.length>0)
+			{
+				user.discordGame.game.undoMove();
+			}
+			user.discordGame.advanceIfBotTurn();
+			return user.discordGame.buildGameDisplayMessage().then((message)=>{
+				return user.discordGame.display.editReply(message);
 			});
 		}
 	},
 	exiter: (client)=>{
-		Object.values(users).forEach(({gameDisplay})=>{
+		Object.values(users).forEach(()=>{
 			//gameDisplay?.deleteReply();
 		})
 	}

@@ -12,10 +12,10 @@ const {Manager} = require("./Manager.js");
 
 const Canvas = require("canvas");
 
-const DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
-
 class Game
 {
+	static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
+	
 	pieces;	//indexed by a square on the board
 	squaresOccupiedBitVector;	//indicates whether a square is occupied by a piece
 	
@@ -37,19 +37,17 @@ class Game
 	
 	static validFENString(FENString)
 	{
-		if(!FENString){return true;}
 		return true;
 	}
 	
 	constructor(FENString)
 	{
-		if(!FENString){FENString = DEFAULT_FEN_STRING;}
 		this.squaresOccupiedBitVector = new BitVector();
 		
-		this.white = new WhiteTeam(this);
-		this.black = new BlackTeam(this);
-		this.white.opposition = this.black;
-		this.black.opposition = this.white;
+		this[WhiteTeam.name] = new WhiteTeam(this);
+		this[BlackTeam.name] = new BlackTeam(this);
+		this[WhiteTeam.name].opposition = this[BlackTeam.name];
+		this[BlackTeam.name].opposition = this[WhiteTeam.name];
 		
 		//initialize an empty board
 		this.pieces = Array(NUM_RANKS*NUM_FILES).fill(null);
@@ -68,7 +66,7 @@ class Game
 					const pieceClass = PieceTypeCharClasses[typeChar];
 					
 					const teamChar = Team.charOfTeamedChar(character);
-					const team = (teamChar == WhiteTeam.char)? this.white : this.black;
+					const team = (teamChar == WhiteTeam.char)? this[WhiteTeam.name] : this[BlackTeam.name];
 					
 					const square = Square.make(rank,file);
 					const piece = new pieceClass(this,team,square,false);	
@@ -88,7 +86,7 @@ class Game
 			})
 		})
 		
-		this.movingTeam = (FENparts[1] == WhiteTeam.char)? this.white : this.black;
+		this.movingTeam = (FENparts[1] == WhiteTeam.char)? this[WhiteTeam.name] : this[BlackTeam.name];
 		
 		this.castleRights = new Manager(FENparts[2].split(""));
 		this.enPassantable = new Manager(FENparts[3]);
@@ -102,8 +100,8 @@ class Game
 		this.playedMoves = [];
 		this.previouslyUpdatedPieces = new Manager([]);
 		
-		this.white.init();
-		this.black.init();
+		this[WhiteTeam.name].init();
+		this[BlackTeam.name].init();
 	}
 	
 	changeTurns()
@@ -115,7 +113,7 @@ class Game
 	immediatePositionScore()
 	{
 		//loose heuristic for now
-		return this.white.points - this.black.points;
+		return this[WhiteTeam.name].points - this[BlackTeam.name].points;
 	}
 	
 	isCheckmate()
@@ -416,27 +414,40 @@ class Game
 		const canvas = Canvas.createCanvas(NUM_FILES*SQUARE_PIXELS, NUM_RANKS*SQUARE_PIXELS);
 		const context = canvas.getContext("2d");
 
-		context.font = `${SQUARE_PIXELS/5}px Arial`;//SQUARE_PIXELS/5 is an arbitrarily chosen size
+		context.font = `${SQUARE_PIXELS/4}px Arial`;//SQUARE_PIXELS/4 is an arbitrarily chosen size
 
 		const drawCalls = [];
 
+		const lastLastMove = this.playedMoves[this.playedMoves.length-2] ?? {};
 		const lastMove = this.playedMoves[this.playedMoves.length-1] ?? {};
 
-		for(let rank=0; rank<NUM_RANKS; rank++)
+		//draw the board bottom up so that higher squares' text does not get blocked by lower squares
+		//start at the highest drawing rank, because highest coordinate is lowest on the display
+		for(let drawRank=7; drawRank>=0; drawRank--)	//the "rank" on the drawn board, not necessarily the real rank
 		{
-			for(let file=0; file<NUM_FILES; file++)
+			for(let drawFile=0; drawFile<NUM_FILES; drawFile++)	//the "file" on the drawn board, not necessarily the real file
 			{
-				const square = Square.make(rank,file);
-				//colour this square
-				context.fillStyle = 
-				//if the square was in the last move, highlight it
-				((square==lastMove.before) || (square==lastMove.after))? 
-					//highlight a different colour depending on the team that last moved
-					((this.movingTeam==this.white)? BLACK_MOVE_COLOUR : WHITE_MOVE_COLOUR) :
-				(((rank+file)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
-				const x = file*SQUARE_PIXELS;
-				const y = ((NUM_RANKS-1)-rank)*SQUARE_PIXELS;
+				const realRank = (this.movingTeam == this[WhiteTeam.name])? (NUM_RANKS-1)-drawRank : drawRank;
+				const realFile = (this.movingTeam == this[WhiteTeam.name])? drawFile : (NUM_FILES-1)-drawFile;
+				const square = Square.make(realRank,realFile);
+				
+				const x = drawFile*SQUARE_PIXELS;
+				const y = drawRank*SQUARE_PIXELS;
+				
+				//colour the square
+				const defaultColour = (((realRank+realFile)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
+				
+				const fillColour = ((square == lastMove.before) || (square == lastMove.after))?
+				((this.movingTeam==this[WhiteTeam.name])? BLACK_MOVE_COLOUR : WHITE_MOVE_COLOUR) : defaultColour;
+				
+				const borderColour = ((square == lastLastMove.before) || (square == lastLastMove.after))?
+				((this.movingTeam==this[WhiteTeam.name])? WHITE_MOVE_COLOUR : BLACK_MOVE_COLOUR) : fillColour;
+				
+				context.fillStyle = borderColour;
 				context.fillRect(x, y, SQUARE_PIXELS, SQUARE_PIXELS);
+				
+				context.fillStyle = fillColour;
+				context.fillRect(x+1,y+1,SQUARE_PIXELS-2,SQUARE_PIXELS-2);
 
 				//draw a piece if one is present
 				const piece = this.pieces[square];
