@@ -15,6 +15,7 @@ const Canvas = require("canvas");
 class Game
 {
 	static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
+	//static DEFAULT_FEN_STRING = "k7/8/K7/Q7/8/8/8/8 w KQkq - 0 1";
 	
 	pieces;	//indexed by a square on the board
 	squaresOccupiedBitVector;	//indicates whether a square is occupied by a piece
@@ -130,6 +131,21 @@ class Game
 
 	evaluate(depth = 2)
 	{
+		if(this.calculateLegals().length==0)
+		{
+			if(this.kingChecked())
+			{
+				return {
+					checkmate_in_halfmoves: 0
+				}
+			}
+			else
+			{
+				return {
+					score: 0
+				}
+			}
+		}
 		if(depth==0)
 		{
 			return {
@@ -171,11 +187,24 @@ class Game
 			const reverseLine = bestEval.reverseLine ?? [];
 			reverseLine.push(bestContinuation);
 			
-			return {
-				score: bestEval.score,
-				bestMove: bestContinuation,
-				reverseLine: reverseLine
-			};
+			if("checkmate_in_halfmoves" in bestEval)
+			{
+				return {
+					checkmate_in_halfmoves: bestEval.checkmate_in_halfmoves+1,
+					bestMove: bestContinuation,
+					reverseLine: reverseLine
+				};
+			}
+			else
+			{
+				//console.log("bestEval is:");
+				//console.log(bestEval);
+				return {
+					score: bestEval.score,
+					bestMove: bestContinuation,
+					reverseLine: reverseLine
+				};
+			}
 		}
 	}
 	
@@ -220,8 +249,8 @@ class Game
 			updatedPieces.push(movingPiece);
 			
 			movingPiece.team.opposition.activePieces.forEach((piece)=>{
-				if(piece instanceof DirectionPiece)
-				{
+				//if(piece instanceof DirectionPiece)
+				//{
 					
 					const reachableBits = piece.reachableBits.get();
 					if
@@ -233,7 +262,7 @@ class Game
 						piece.updateReachableSquaresAndBitsAndKingSeer();
 						updatedPieces.push(piece);
 					}
-				}
+				//}
 			});
 			this.previouslyUpdatedPieces.update(updatedPieces);
 		}
@@ -443,11 +472,13 @@ class Game
 				const borderColour = ((square == lastLastMove.before) || (square == lastLastMove.after))?
 				((this.movingTeam==this[WhiteTeam.name])? WHITE_MOVE_COLOUR : BLACK_MOVE_COLOUR) : fillColour;
 				
+				const BORDER_WIDTH = 3;
+				
 				context.fillStyle = borderColour;
 				context.fillRect(x, y, SQUARE_PIXELS, SQUARE_PIXELS);
 				
 				context.fillStyle = fillColour;
-				context.fillRect(x+1,y+1,SQUARE_PIXELS-2,SQUARE_PIXELS-2);
+				context.fillRect(x+BORDER_WIDTH,y+BORDER_WIDTH,SQUARE_PIXELS-(2*BORDER_WIDTH),SQUARE_PIXELS-(2*BORDER_WIDTH));
 
 				//draw a piece if one is present
 				const piece = this.pieces[square];

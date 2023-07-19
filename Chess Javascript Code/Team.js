@@ -96,7 +96,28 @@ const teamClassesArray = [
 		
 		static evalPreferredToEval(newEval, oldEval)
 		{
-			return (newEval?.score) > (oldEval?.score ?? -Infinity);
+			const iGiveCheckmate = (newEval?.checkmate_in_halfmoves % 2) == 0;
+			const iGaveCheckmate = (oldEval?.checkmate_in_halfmoves % 2) == 0;
+			const iTakeCheckmate = (newEval?.checkmate_in_halfmoves % 2) == 1;
+			const iTookCheckmate = (oldEval?.checkmate_in_halfmoves % 2) == 1;
+			const giveMateInHalfmoves = newEval?.checkmate_in_halfmoves;
+			const gaveMateInHalfMoves = oldEval?.checkmate_in_halfmoves;
+			
+			if(iTookCheckmate)
+			{
+				return (!iTakeCheckmate) || (iTakeCheckmate && (giveMateInHalfmoves > gaveMateInHalfMoves));
+			}
+			else
+			{
+				if(iGaveCheckmate)
+				{
+					return (iGiveCheckmate) && (giveMateInHalfmoves < gaveMateInHalfMoves);
+				}
+				else
+				{
+					return (iGiveCheckmate) || (newEval?.score > ((oldEval?.score) ?? -Infinity));
+				}
+			}
 		}
 	},
 
@@ -111,7 +132,28 @@ const teamClassesArray = [
 		
 		static evalPreferredToEval(newEval, oldEval)
 		{
-			return (newEval?.score) < (oldEval?.score ?? Infinity);
+			const iGiveCheckmate = (newEval?.checkmate_in_halfmoves % 2) == 0;
+			const iGaveCheckmate = (oldEval?.checkmate_in_halfmoves % 2) == 0;
+			const iTakeCheckmate = (newEval?.checkmate_in_halfmoves % 2) == 1;
+			const iTookCheckmate = (oldEval?.checkmate_in_halfmoves % 2) == 1;
+			const giveMateInHalfmoves = newEval?.checkmate_in_halfmoves;
+			const gaveMateInHalfMoves = oldEval?.checkmate_in_halfmoves;
+			
+			if(iTookCheckmate)
+			{
+				return (!iTakeCheckmate) || (iTakeCheckmate && (giveMateInHalfmoves > gaveMateInHalfMoves));
+			}
+			else
+			{
+				if(iGaveCheckmate)
+				{
+					return (iGiveCheckmate) && (giveMateInHalfmoves < gaveMateInHalfMoves);
+				}
+				else
+				{
+					return (iGiveCheckmate) || (newEval?.score < ((oldEval?.score) ?? Infinity));
+				}
+			}
 		}
 	}
 ];

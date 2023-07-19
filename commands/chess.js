@@ -2,6 +2,7 @@ const Discord = require("discord.js");
 const FileSystem = require("fs");
 const {Game} = require("../Chess Javascript Code/Game.js");
 const {TeamClassNames, TeamClassesArray} = require("../Chess Javascript Code/Team.js");
+const [WhiteTeam, BlackTeam] = TeamClassesArray;
 const commandName = "chess";
 
 const users = {};
@@ -13,6 +14,10 @@ class DiscordGame
 	display;
 	
 	botTeam;
+	
+	//users
+	white;
+	black;
 	
 	availableMoves;
 	availableStrings;
@@ -26,7 +31,15 @@ class DiscordGame
 	{
 		if(this.game.movingTeam == this.game[this.botTeam])
 		{
-			const bestMove = this.game.evaluate(2).bestMove;
+			let bestMove;
+			try
+			{
+				bestMove = this.game.evaluate(2).bestMove;
+			}
+			catch(error)
+			{
+				bestMove = this.game.evaluate(1).bestMove;
+			}
 			bestMove.takeStringSnapshot();
 			this.game.makeMove(bestMove);
 		}
@@ -36,7 +49,10 @@ class DiscordGame
 	{
 		move.takeStringSnapshot();
 		this.game.makeMove(move);
-		this.advanceIfBotTurn();
+		if(!(this.game.calculateLegals().length==0))
+		{
+			this.advanceIfBotTurn();
+		}
 	}
 	
 	buildGameDisplayMessage()
@@ -51,7 +67,7 @@ class DiscordGame
 		
 		//get the best line in string form
 		const evaluation = this.game.evaluate(2);
-		const bestLine = evaluation.reverseLine; bestLine.reverse();
+		const bestLine = evaluation.reverseLine ?? []; bestLine.reverse();
 		const bestLineString = bestLine.reduce((accumulator,move)=>{
 			//make the moves to get their strings, then undo the moves
 			accumulator = accumulator.concat(move.toString());
@@ -64,13 +80,19 @@ class DiscordGame
 			this.game.undoMove();
 		}
 		
+		const evaluationString = this.game.isCheckmate()? `${this.game.movingTeam.opposition.constructor.name} wins` :
+		this.game.isStalemate()? "draw by stalemate" :
+		("score" in evaluation)? evaluation.score :
+		`${this.game.movingTeam instanceof WhiteTeam? "+" : "-"}M${Math.floor((evaluation.checkmate_in_halfmoves+1)/2)}`;
+		
 		return boardPictureBuffer.then((boardPicture)=>{
 			return {
-				content: `**Played Moves**:\t${playedMovesString}\n`
+				content: `(white) **${this.white?.username ?? "ToxiBot"}** vs **${this.black?.username ?? "ToxiBot"}** (black)\n`
+				.concat(`**Played Moves**:\t${playedMovesString}\n`)
 				.concat(`**FEN String**:\t${FENString}\n`)
 				.concat(`**Available Moves**:\t${availableMovesString}\n`)
-				.concat(`**Toxibot's Evaluation**:\t||${evaluation.score}||\n`)
-				.concat(`**Toxibot's Best Continuation**:\t||${bestLineString}||\n`),
+				.concat(`**Toxibot's Evaluation**:\t||${evaluationString}||\n`)
+				.concat(`**Toxibot's Best Continuation**:\t||${bestLineString==""?"none":bestLineString}||\n`),
 				files: [boardPicture],
 			}
 		});
@@ -219,6 +241,7 @@ module.exports = {
 			const discordGame = new DiscordGame(fen);
 			
 			user.discordGame = discordGame;
+			user.discordGame[playas] = interaction.user;
 			user.playas = playas;
 			
 			const oppositionPlayAs = TeamClassNames.find((name)=>{return name!=playas});
@@ -228,6 +251,7 @@ module.exports = {
 				const opponent = users[playagainst.id];
 				
 				opponent.discordGame = discordGame;
+				opponent.discordGame[playas=="white"?"black":"white"] = playagainst;
 				opponent.playas = oppositionPlayAs;
 				
 				user.opponent = opponent;
