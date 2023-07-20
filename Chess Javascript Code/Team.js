@@ -1,16 +1,19 @@
-const {Piece, PatternPiece, DirectionPiece, PieceTypeCharClasses, PieceClassesArray} = require("./Piece.js");
-const [King] = PieceClassesArray;
+const {Piece, PatternPiece, DirectionPiece, PieceClassesByTypeChar, PieceClasses} = require("./Piece.js");
+const [King] = PieceClasses;
 
 class Team
 {
-	char;
-	charConverter;
-	name;
-	
-	static charOfTeamedChar(teamedChar)
+	static char;
+	static charConverter(char)
 	{
-		return teamClassesArray.find((team)=>{return team.charConverter(teamedChar)==teamedChar}).char;
+		throw "subclasses of Team must implement charConverter";
 	}
+	static name;
+	static classOfTeamedChar(teamedChar)
+	{
+		return TEAM_CLASSES.find((teamClass)=>{return teamClass.charConverter(teamedChar)==teamedChar;});
+	}
+	static MOVE_COLOUR;
 	
 	game;
 	
@@ -111,50 +114,52 @@ class Team
 			}
 			else	//not due to give checkmate in old continuation
 			{
-				//better continuations find checkmate or else a better score than old continuation
+				//better continuations find checkmate or beat old score, or exist if old does not exist
 				return (iGiveCheckmate) ||	//checkmate
-				this.scorePreferredToScore(newEval?.score, oldEval?.score);	//better score
+				this.scorePreferredToScore(newEval?.score, oldEval?.score) ||	//better score
+				(newEval && !oldEval);	//if old does not exist in the first place
 			}
 		}
 	}
 }
 
-const teamClassesArray = [
-	class WhiteTeam extends Team
+const Team0 = class extends Team
+{
+	static char = "w";
+	static charConverter(char)
 	{
-		static char = "w";
-		static charConverter(char)
-		{
-			return char.toUpperCase();
-		}
-		static name = "white";
-		
-		scorePreferredToScore(newScore, oldScore)
-		{
-			return (newScore > (oldScore ?? -Infinity));
-		}
-	},
-
-	class BlackTeam extends Team
-	{
-		static char = "b";
-		static charConverter(char)
-		{
-			return char.toLowerCase();
-		}
-		static name = "black";
-		
-		scorePreferredToScore(newScore, oldScore)
-		{
-			return (newScore < (oldScore ?? Infinity));
-		}
+		return char.toUpperCase();
 	}
-];
+	static name = "white";
+	static MOVE_COLOUR = "#ffff80";
+	
+	scorePreferredToScore(newScore, oldScore)
+	{
+		return (newScore > (oldScore ?? -Infinity));
+	}
+};
 
-const teamClassNames = teamClassesArray.map((teamClass)=>{return teamClass.name;});
+const Team1 = class extends Team
+{
+	static char = "b";
+	static charConverter(char)
+	{
+		return char.toLowerCase();
+	}
+	static name = "black";
+	static MOVE_COLOUR = "#80ffff";
+	
+	scorePreferredToScore(newScore, oldScore)
+	{
+		return (newScore < (oldScore ?? Infinity));
+	}
+}
+
+const TEAM_CLASSES = [Team0, Team1];
 
 module.exports = {
 	Team:Team,
-	TeamClassNames: teamClassNames,
-	TeamClassesArray: teamClassesArray
+	Team0:Team0,
+	Team1:Team1,
+	TEAM_CLASSES:TEAM_CLASSES
 }

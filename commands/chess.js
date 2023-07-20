@@ -1,23 +1,20 @@
 const Discord = require("discord.js");
 const FileSystem = require("fs");
 const {Game} = require("../Chess Javascript Code/Game.js");
-const {TeamClassNames, TeamClassesArray} = require("../Chess Javascript Code/Team.js");
-const [WhiteTeam, BlackTeam] = TeamClassesArray;
+const {Team, Team0, Team1, TEAM_CLASSES} = require("../Chess Javascript Code/Team.js");
 const commandName = "chess";
 
-const users = {};
-const games = {};
+const usersById = {};
 
 class DiscordGame
 {
 	game;
 	display;
 	
-	botTeam;
+	botPlayas;
 	
 	//users
-	white;
-	black;
+	discordUsersByPlayas;
 	
 	availableMoves;
 	availableStrings;
@@ -25,11 +22,29 @@ class DiscordGame
 	constructor(fen)
 	{
 		this.game = new Game(fen);
+		this.discordUsersByPlayas = {};
+	}
+	
+	isCheckmate()
+	{
+		//by definition
+		return (this.game.calculateLegals().length == 0) && this.game.kingChecked();
+	}
+
+	isStalemate()
+	{
+		//by definition
+		return (this.game.calculateLegals().length == 0) && !(this.game.kingChecked());
+	}
+	
+	isBotTurn()
+	{
+		return this.game.movingTeam == this.game.teamsByName[this.botPlayas];
 	}
 	
 	advanceIfBotTurn()
 	{
-		if(this.game.movingTeam == this.game[this.botTeam])
+		if(this.isBotTurn())
 		{
 			let bestMove = this.game.evaluate().bestMove;
 			bestMove.takeStringSnapshot();
@@ -37,11 +52,11 @@ class DiscordGame
 		}
 	}
 	
-	makeMove(move)
+	advanceWithUserMove(move)
 	{
 		move.takeStringSnapshot();
 		this.game.makeMove(move);
-		if(!(this.game.calculateLegals().length==0))
+		if(this.game.calculateLegals().length>0)
 		{
 			this.advanceIfBotTurn();
 		}
@@ -89,7 +104,7 @@ class DiscordGame
 		{
 			const teamToGiveMate = ((evaluation.checkmate_in_halfmoves % 2) == 0) ?
 			this.game.movingTeam : this.game.movingTeam.opposition;
-			const sign = teamToGiveMate instanceof WhiteTeam? "+" : "+";
+			const sign = teamToGiveMate instanceof Team0? "+" : "+";
 			return `${sign}M${Math.floor((evaluation.checkmate_in_halfmoves+1)/2)}`;
 		}
 		else
@@ -97,7 +112,7 @@ class DiscordGame
 			return `${evaluation.score>0? "+":""}${evaluation.score}`;
 		}
 	}
-	
+
 	buildGameDisplayMessage()
 	{
 		const boardPictureBuffer = this.game.toPNGBuffer();
@@ -112,20 +127,21 @@ class DiscordGame
 		const evaluation = this.game.evaluate(2);
 		
 		const bestLineString = this.lineString(evaluation.reverseLine?.slice().reverse() ?? []);
-		const statusString = this.game.isCheckmate()? `${this.game.movingTeam.opposition.constructor.name} wins` :
-		this.game.isStalemate()? "draw by stalemate" :
+		const statusString = this.isCheckmate()? `${this.game.movingTeam.opposition.constructor.name} wins` :
+		this.isStalemate()? "draw by stalemate" :
 		this.scoreString(evaluation);
 		
 		return boardPictureBuffer.then((boardPicture)=>{
 			return {
-				content: `# (white) ${this.white?.username ?? "ToxiBot"} vs ${this.black?.username ?? "ToxiBot"} (black)\n`
+				content: `# (${Team0.name}) ${this.discordUsersByPlayas[Team0.name] ?? process.env.BOT_NAME} vs `
+				.concat(`${this.discordUsersByPlayas[Team1.name] ?? process.env.BOT_NAME} (${Team1.name})\n`)
 				.concat(`**Played Moves**:\t${playedMovesString}\n`)
 				.concat(`**FEN String**:\t${FENString}\n`)
 				.concat(`\n`)
 				.concat(`**Available Moves**:\t${availableMovesString}\n`)
 				.concat(`\n`)
-				.concat(`**Toxibot's Evaluation**:\t||${statusString}||\n`)
-				.concat(`**Toxibot's Best Continuation**:\t||${bestLineString==""?"none":bestLineString}||\n`),
+				.concat(`**${process.env.BOT_NAME}'s Evaluation**:\t||${statusString}||\n`)
+				.concat(`**${process.env.BOT_NAME}'s Best Continuation**:\t||${bestLineString==""?"none":bestLineString}||\n`),
 				files: [boardPicture],
 			}
 		});
@@ -136,8 +152,6 @@ class User
 {
 	discordGame;
 	playas;
-	
-	opponent;
 }
 
 function gamecreateSubcommand(subcommand){
@@ -161,7 +175,7 @@ function playAgainstUserOption(option)
 {
 	return option
 	.setName("playagainst")
-	.setDescription("the user you want to play against (leave blank for toxibot)")
+	.setDescription(`the user you want to play against (leave blank for ${process.env.BOT_NAME})`)
 	.setRequired(false);
 }
 
@@ -220,8 +234,8 @@ module.exports = {
 	
 	execute: (interaction) => {
 		const userId = interaction.user.id;
-		if(!(userId in users)){users[userId] = new User();}
-		const user = users[userId];
+		if(!(userId in usersById)){usersById[userId] = new User();}
+		const user = usersById[userId];
 		
 		const subcommand = interaction.options.getSubcommand();
 		if(subcommand == "gamecreate")
@@ -238,8 +252,16 @@ module.exports = {
 			const playagainst = interaction.options.getUser("playagainst");
 			if(playagainst)
 			{
-				if(!(playagainst.id in users)){users[playagainst.id] = new User();}
-				if(users[playagainst.id].discordGame)
+				if(playagainst.bot)
+				{
+					return interaction.reply("Challenging bot accounts is forbidden");
+				}
+				if(playagainst.id==interaction.user.id)
+				{
+					return interaction.reply("Challenging yourself is forbidden");
+				}
+				if(!(playagainst.id in usersById)){usersById[playagainst.id] = new User();}
+				if(usersById[playagainst.id].discordGame)
 				{
 					return interaction.reply(`${playagainst.username} already has a game`);
 				}
@@ -248,14 +270,14 @@ module.exports = {
 			let playas = interaction.options.getString("playas");
 			if(playas)	//can be wrong only if the user specified one at all
 			{
-				if(!(TeamClassNames.find((name)=>{return name==playas})))
+				if(!(TEAM_CLASSES.find((teamClass)=>{return teamClass.name==playas})))
 				{
 					return interaction.reply("Invalid team chosen");
 				}
 			}
 			else
 			{
-				playas = TeamClassNames[Math.floor(Math.random()*TeamClassNames.length)];
+				playas = TEAM_CLASSES[Math.floor(Math.random()*TEAM_CLASSES.length)].name;
 			}
 			
 			let fen = interaction.options.getString("fen");
@@ -271,36 +293,33 @@ module.exports = {
 				fen = Game.DEFAULT_FEN_STRING;
 			}
 			
+			//command is valid and feasible
+			
+			//set up the user and their game
 			const discordGame = new DiscordGame(fen);
-			
 			user.discordGame = discordGame;
-			user.discordGame[playas] = interaction.user;
 			user.playas = playas;
+			discordGame.discordUsersByPlayas[playas] = interaction.user;
 			
-			const oppositionPlayAs = TeamClassNames.find((name)=>{return name!=playas});
-			
-			if(playagainst)
-			{
-				const opponent = users[playagainst.id];
+			//set up the user's opposition
+			const oppositionPlayAs = TEAM_CLASSES.find((teamClass)=>{return teamClass.name!=playas}).name;
+			if(playagainst)	//a real player
+			{			
+				const opponent = usersById[playagainst.id];
 				
 				opponent.discordGame = discordGame;
-				opponent.discordGame[playas=="white"?"black":"white"] = playagainst;
 				opponent.playas = oppositionPlayAs;
+				discordGame.discordUsersByPlayas[oppositionPlayAs] = playagainst;
 				
-				user.opponent = opponent;
-				opponent.opponent = user;
-				
-				discordGame.botTeam = null;
+				discordGame.botPlayas = null;
 			}
-			else
+			else	//the bot
 			{
-				discordGame.botTeam = oppositionPlayAs;
+				discordGame.botPlayas = oppositionPlayAs;
 			}
 			
 			//start the game by making the bot's move if it is the moving team
 			discordGame.advanceIfBotTurn();
-			
-			console.log(user.playas);
 			
 			return discordGame.buildGameDisplayMessage().then((message)=>{
 				discordGame.display = interaction;
@@ -315,8 +334,9 @@ module.exports = {
 			}
 			
 			user.discordGame.display.deleteReply();
-			delete user.discordGame;
-			delete user.opponent?.discordGame;
+			Object.values(user.discordGame.discordUsersByPlayas).forEach((discordUser)=>{
+				delete usersById[discordUser.id].discordGame;
+			});
 			
 			return;
 		}
@@ -345,12 +365,12 @@ module.exports = {
 				return interaction.reply("You have no game in which to make a move");
 			}
 			
-			if(user.discordGame.game[user.playas] != user.discordGame.game.movingTeam)
+			if(user.discordGame.game.teamsByName[user.playas] != user.discordGame.game.movingTeam)
 			{
 				return interaction.reply("It is not your turn in the game");
 			}
 			
-			if(user.discordGame.game.isCheckmate() || user.discordGame.game.isStalemate())
+			if(user.discordGame.isCheckmate() || user.discordGame.isStalemate())
 			{
 				return interaction.reply("Your game is already over");
 			}
@@ -361,17 +381,17 @@ module.exports = {
 			if(moveIndex<0){return interaction.reply("The move supplied is invalid");}
 			
 			const moveChoice = user.discordGame.availableMoves[moveIndex]
-			user.discordGame.makeMove(moveChoice);
+			user.discordGame.advanceWithUserMove(moveChoice);
 			const response = user.discordGame.buildGameDisplayMessage().then((message)=>{
 				return user.discordGame.display.editReply(message);
 			});
 			
-			if(user.discordGame.game.isCheckmate())
+			if(user.discordGame.isCheckmate())
 			{
-				const winningTeamName = user.discordGame.game.movingTeam.opposition.constructor.name;
+				const winningTeamName = user.discordGame.game.teamsByName[user.playas].constructor.name;
 				return interaction.reply(`The game has reached checkmate, the result is a win for ${winningTeamName}`);
 			}
-			else if(user.discordGame.game.isStalemate())
+			else if(user.discordGame.isStalemate())
 			{
 				return interaction.reply("The game has reached stalemate, the result is a draw");
 			}
@@ -396,19 +416,29 @@ module.exports = {
 			interaction.deferReply();
 			interaction.deleteReply();
 			
-			user.discordGame.game.undoMove();
 			if(user.discordGame.game.playedMoves.length>0)
 			{
 				user.discordGame.game.undoMove();
+				//if the user is playing against the bot, undo another move to make it the user's turn
+				if(user.discordGame.isBotTurn())
+				{
+					if(user.discordGame.game.playedMoves.length>0)
+					{
+						user.discordGame.game.undoMove();
+					}
+					else
+					{
+						user.discordGame.advanceIfBotTurn();
+					}
+				}
 			}
-			user.discordGame.advanceIfBotTurn();
 			return user.discordGame.buildGameDisplayMessage().then((message)=>{
 				return user.discordGame.display.editReply(message);
 			});
 		}
 	},
 	exiter: (client)=>{
-		Object.values(users).forEach(()=>{
+		Object.values(usersById).forEach(()=>{
 			//gameDisplay?.deleteReply();
 		})
 	}

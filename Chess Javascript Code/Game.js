@@ -1,8 +1,7 @@
-const {Team, TeamClassesArray} = require("./Team.js");
-const [WhiteTeam, BlackTeam] = TeamClassesArray;
+const {Team, Team0, Team1, TEAM_CLASSES} = require("./Team.js");
 
-const {Piece, PatternPiece, DirectionPiece, PieceTypeCharClasses, PieceClassesArray} = require("./Piece.js");
-const [King] = PieceClassesArray;
+const {Piece, PatternPiece, DirectionPiece, PieceClassesByTypeChar, PieceClasses} = require("./Piece.js");
+const [King] = PieceClasses;
 
 const {NUM_RANKS, NUM_FILES} = require("./Constants.js");
 const {PlainMove} = require("./Move.js");
@@ -15,13 +14,13 @@ const Canvas = require("canvas");
 class Game
 {
 	//static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
-	static DEFAULT_FEN_STRING = "k7/8/K7/Q7/8/8/8/8 w KQkq - 0 1";
+	//static DEFAULT_FEN_STRING = "k7/8/K7/Q7/8/8/8/8 w KQkq - 0 1";
+	static DEFAULT_FEN_STRING = "k7/8/K7/3Q4/8/8/8/8 b KQkq - 0 1";
 	
 	pieces;	//indexed by a square on the board
 	squaresOccupiedBitVector;	//indicates whether a square is occupied by a piece
 	
-	white;
-	black;
+	teamsByName;
 	movingTeam;
 	
 	playedMoves;
@@ -45,10 +44,17 @@ class Game
 	{
 		this.squaresOccupiedBitVector = new BitVector();
 		
-		this[WhiteTeam.name] = new WhiteTeam(this);
-		this[BlackTeam.name] = new BlackTeam(this);
-		this[WhiteTeam.name].opposition = this[BlackTeam.name];
-		this[BlackTeam.name].opposition = this[WhiteTeam.name];
+		this.teamsByName = TEAM_CLASSES.reduce((accumulator, teamClass, index)=>{
+			accumulator[teamClass.name] = new teamClass(this);
+			return accumulator;
+		}, {});
+		
+		Object.values(this.teamsByName).forEach((team)=>{
+			//each team's opposition is not the team's own class
+			team.opposition = this.teamsByName[TEAM_CLASSES.find((teamClass)=>{
+				return !(team instanceof teamClass);
+			}).name];
+		});
 		
 		//initialize an empty board
 		this.pieces = Array(NUM_RANKS*NUM_FILES).fill(null);
@@ -64,10 +70,10 @@ class Game
 				if(isNaN(character))	//character denotes a piece
 				{
 					const typeChar = Piece.typeCharOfTeamedChar(character);
-					const pieceClass = PieceTypeCharClasses[typeChar];
+					const pieceClass = PieceClassesByTypeChar[typeChar];
 					
-					const teamChar = Team.charOfTeamedChar(character);
-					const team = (teamChar == WhiteTeam.char)? this[WhiteTeam.name] : this[BlackTeam.name];
+					const teamClass = Team.classOfTeamedChar(character);
+					const team = this.teamsByName[teamClass.name];
 					
 					const square = Square.make(rank,file);
 					const piece = new pieceClass(this,team,square,false);	
@@ -87,7 +93,7 @@ class Game
 			})
 		})
 		
-		this.movingTeam = (FENparts[1] == WhiteTeam.char)? this[WhiteTeam.name] : this[BlackTeam.name];
+		this.movingTeam = Object.values(this.teamsByName).find((team)=>{return team.constructor.char == FENparts[1];});
 		
 		this.castleRights = new Manager(FENparts[2].split(""));
 		this.enPassantable = new Manager(FENparts[3]);
@@ -101,32 +107,13 @@ class Game
 		this.playedMoves = [];
 		this.previouslyUpdatedPieces = new Manager([]);
 		
-		this[WhiteTeam.name].init();
-		this[BlackTeam.name].init();
+		Object.values(this.teamsByName).forEach((team)=>{team.init();});
 	}
 	
 	changeTurns()
 	{
 		//the new moving team is the opposition of the old moving team
 		this.movingTeam = this.movingTeam.opposition;
-	}
-	
-	immediatePositionScore()
-	{
-		//loose heuristic for now
-		return this[WhiteTeam.name].points - this[BlackTeam.name].points;
-	}
-	
-	isCheckmate()
-	{
-		//by definition
-		return (this.calculateLegals().length == 0) && this.kingChecked();
-	}
-
-	isStalemate()
-	{
-		//by definition
-		return (this.calculateLegals().length == 0) && !(this.kingChecked());
 	}
 
 	evaluate(depth = 2)
@@ -149,7 +136,7 @@ class Game
 		if(depth==0)
 		{
 			return {
-				score: this.immediatePositionScore(),
+				score: this.teamsByName[Team0.name].points - this.teamsByName[Team1.name].points
 			}
 		}
 		else
@@ -218,7 +205,7 @@ class Game
 				this.castleRights.update(
 					//opponent retains castling rights, moving team forfeits castle rights
 					this.castleRights.get().filter((wing)=>{
-						return Team.charOfTeamedChar(wing) != movingPiece.team.constructor.char;
+						return Team.classOfTeamedChar(wing) != movingPiece.team.constructor;
 					})
 				);
 			}
@@ -423,8 +410,7 @@ class Game
 		const LIGHT_COLOUR = "#e0d0b0";
 		const DARK_COLOUR = "#e0a070";
 		const FONT_COLOUR = "#0000ff";
-		const WHITE_MOVE_COLOUR = "#ffff80";
-		const BLACK_MOVE_COLOUR = "#80ffff";
+		
 		const SQUARE_PIXELS = 50;
 
 		const canvas = Canvas.createCanvas(NUM_FILES*SQUARE_PIXELS, NUM_RANKS*SQUARE_PIXELS);
@@ -443,8 +429,8 @@ class Game
 		{
 			for(let drawFile=0; drawFile<NUM_FILES; drawFile++)	//the "file" on the drawn board, not necessarily the real file
 			{
-				const realRank = (this.movingTeam == this[WhiteTeam.name])? (NUM_RANKS-1)-drawRank : drawRank;
-				const realFile = (this.movingTeam == this[WhiteTeam.name])? drawFile : (NUM_FILES-1)-drawFile;
+				const realRank = (this.movingTeam instanceof Team0)? (NUM_RANKS-1)-drawRank : drawRank;
+				const realFile = (this.movingTeam instanceof Team0)? drawFile : (NUM_FILES-1)-drawFile;
 				const square = Square.make(realRank,realFile);
 				
 				const x = drawFile*SQUARE_PIXELS;
@@ -454,10 +440,10 @@ class Game
 				const defaultColour = (((realRank+realFile)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
 				
 				const fillColour = ((square == lastMove.before) || (square == lastMove.after))?
-				((this.movingTeam==this[WhiteTeam.name])? BLACK_MOVE_COLOUR : WHITE_MOVE_COLOUR) : defaultColour;
+				(this.movingTeam.opposition.constructor.MOVE_COLOUR) : defaultColour;
 				
 				const borderColour = ((square == lastLastMove.before) || (square == lastLastMove.after))?
-				((this.movingTeam==this[WhiteTeam.name])? WHITE_MOVE_COLOUR : BLACK_MOVE_COLOUR) : fillColour;
+				(this.movingTeam.constructor.MOVE_COLOUR) : fillColour;
 				
 				const BORDER_WIDTH = 3;
 				

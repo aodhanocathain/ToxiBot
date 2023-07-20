@@ -175,7 +175,7 @@ class DirectionPiece extends Piece
 	}
 }
 
-const pieceClassesArray = [
+const PieceClasses = [
 
 	class King extends PatternPiece
 	{
@@ -261,7 +261,7 @@ const pieceClassesArray = [
 ];
 
 //match piece type characters to classes
-const pieceTypeCharClasses = pieceClassesArray.reduce((accumulator, pieceClass)=>{
+const PieceClassesByTypeChar = PieceClasses.reduce((accumulator, pieceClass)=>{
 	accumulator[pieceClass.typeChar] = pieceClass;
 	return accumulator;
 }, {});
@@ -271,7 +271,7 @@ module.exports = {
 	PatternPiece:PatternPiece,
 	DirectionPiece:DirectionPiece,
 	
-	PieceClassesArray: pieceClassesArray,
+	PieceClasses: PieceClasses,
 	
-	PieceTypeCharClasses: pieceTypeCharClasses,
+	PieceClassesByTypeChar: PieceClassesByTypeChar,
 }
