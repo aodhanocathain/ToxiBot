@@ -12,11 +12,6 @@ class Team
 		return teamClassesArray.find((team)=>{return team.charConverter(teamedChar)==teamedChar}).char;
 	}
 	
-	static evalPreferredToEval(newEval, oldEval)
-	{
-		throw "subclasses of Team must implement evalPreferredToEval";
-	}
-	
 	game;
 	
 	activePieces;
@@ -82,6 +77,46 @@ class Team
 			piece.updateReachableSquaresAndBitsAndKingSeer();
 		});
 	}
+	
+	scorePreferredToScore(newScore, oldScore)
+	{
+		throw "subclasses of Team must implement scorePreferredToScore";
+	}
+	
+	evalPreferredToEval(newEval, oldEval)
+	{
+		//any even number of halfmoves ago, the same team was moving
+		const iGiveCheckmate = (newEval?.checkmate_in_halfmoves % 2) == 0;
+		const iGaveCheckmate = (oldEval?.checkmate_in_halfmoves % 2) == 0;
+		
+		//any odd number of halfmoves ago, the other team was moving
+		const iTakeCheckmate = (newEval?.checkmate_in_halfmoves % 2) == 1;
+		const iTookCheckmate = (oldEval?.checkmate_in_halfmoves % 2) == 1;
+		
+		const giveMateInHalfmoves = newEval?.checkmate_in_halfmoves;
+		const gaveMateInHalfMoves = oldEval?.checkmate_in_halfmoves;
+		
+		if(iTookCheckmate)	//due to be checkmated in old continuation
+		{
+			//better continuations escape or delay the checkmate
+			return (newEval && !iTakeCheckmate) ||	//escape checkmate
+			(iTakeCheckmate && (giveMateInHalfmoves > gaveMateInHalfMoves));	//delay checkmate
+		}
+		else	//not due to be checkmated in old continuation
+		{
+			if(iGaveCheckmate)	//due to give checkmate in old continuation
+			{
+				//better continuations give checkmate sooner
+				return (iGiveCheckmate) && (giveMateInHalfmoves < gaveMateInHalfMoves);
+			}
+			else	//not due to give checkmate in old continuation
+			{
+				//better continuations find checkmate or else a better score than old continuation
+				return (iGiveCheckmate) ||	//checkmate
+				this.scorePreferredToScore(newEval?.score, oldEval?.score);	//better score
+			}
+		}
+	}
 }
 
 const teamClassesArray = [
@@ -94,30 +129,9 @@ const teamClassesArray = [
 		}
 		static name = "white";
 		
-		static evalPreferredToEval(newEval, oldEval)
+		scorePreferredToScore(newScore, oldScore)
 		{
-			const iGiveCheckmate = (newEval?.checkmate_in_halfmoves % 2) == 0;
-			const iGaveCheckmate = (oldEval?.checkmate_in_halfmoves % 2) == 0;
-			const iTakeCheckmate = (newEval?.checkmate_in_halfmoves % 2) == 1;
-			const iTookCheckmate = (oldEval?.checkmate_in_halfmoves % 2) == 1;
-			const giveMateInHalfmoves = newEval?.checkmate_in_halfmoves;
-			const gaveMateInHalfMoves = oldEval?.checkmate_in_halfmoves;
-			
-			if(iTookCheckmate)
-			{
-				return (!iTakeCheckmate) || (iTakeCheckmate && (giveMateInHalfmoves > gaveMateInHalfMoves));
-			}
-			else
-			{
-				if(iGaveCheckmate)
-				{
-					return (iGiveCheckmate) && (giveMateInHalfmoves < gaveMateInHalfMoves);
-				}
-				else
-				{
-					return (iGiveCheckmate) || (newEval?.score > ((oldEval?.score) ?? -Infinity));
-				}
-			}
+			return (newScore > (oldScore ?? -Infinity));
 		}
 	},
 
@@ -130,30 +144,9 @@ const teamClassesArray = [
 		}
 		static name = "black";
 		
-		static evalPreferredToEval(newEval, oldEval)
+		scorePreferredToScore(newScore, oldScore)
 		{
-			const iGiveCheckmate = (newEval?.checkmate_in_halfmoves % 2) == 0;
-			const iGaveCheckmate = (oldEval?.checkmate_in_halfmoves % 2) == 0;
-			const iTakeCheckmate = (newEval?.checkmate_in_halfmoves % 2) == 1;
-			const iTookCheckmate = (oldEval?.checkmate_in_halfmoves % 2) == 1;
-			const giveMateInHalfmoves = newEval?.checkmate_in_halfmoves;
-			const gaveMateInHalfMoves = oldEval?.checkmate_in_halfmoves;
-			
-			if(iTookCheckmate)
-			{
-				return (!iTakeCheckmate) || (iTakeCheckmate && (giveMateInHalfmoves > gaveMateInHalfMoves));
-			}
-			else
-			{
-				if(iGaveCheckmate)
-				{
-					return (iGiveCheckmate) && (giveMateInHalfmoves < gaveMateInHalfMoves);
-				}
-				else
-				{
-					return (iGiveCheckmate) || (newEval?.score < ((oldEval?.score) ?? Infinity));
-				}
-			}
+			return (newScore < (oldScore ?? Infinity));
 		}
 	}
 ];

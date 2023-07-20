@@ -14,8 +14,8 @@ const Canvas = require("canvas");
 
 class Game
 {
-	static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
-	//static DEFAULT_FEN_STRING = "k7/8/K7/Q7/8/8/8/8 w KQkq - 0 1";
+	//static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
+	static DEFAULT_FEN_STRING = "k7/8/K7/Q7/8/8/8/8 w KQkq - 0 1";
 	
 	pieces;	//indexed by a square on the board
 	squaresOccupiedBitVector;	//indicates whether a square is occupied by a piece
@@ -155,7 +155,6 @@ class Game
 		else
 		{
 			const continuations = this.calculateMoves();
-			const evalPreferredToEval = this.movingTeam.constructor.evalPreferredToEval;
 			
 			let bestContinuation;
 			let bestEval;
@@ -172,7 +171,7 @@ class Game
 				}
 				const newEval = this.evaluate(depth-1);
 				this.undoMove();
-				if(evalPreferredToEval(newEval,bestEval))
+				if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
 				{
 					bestContinuation = newContinuation;
 					bestEval = newEval;
@@ -187,24 +186,12 @@ class Game
 			const reverseLine = bestEval.reverseLine ?? [];
 			reverseLine.push(bestContinuation);
 			
-			if("checkmate_in_halfmoves" in bestEval)
-			{
-				return {
-					checkmate_in_halfmoves: bestEval.checkmate_in_halfmoves+1,
-					bestMove: bestContinuation,
-					reverseLine: reverseLine
-				};
-			}
-			else
-			{
-				//console.log("bestEval is:");
-				//console.log(bestEval);
-				return {
-					score: bestEval.score,
-					bestMove: bestContinuation,
-					reverseLine: reverseLine
-				};
-			}
+			const checkmate = "checkmate_in_halfmoves" in bestEval;
+			return {
+				[checkmate? "checkmate_in_halfmoves" : "score"]: checkmate? bestEval.checkmate_in_halfmoves+1 : bestEval.score,
+				bestMove: bestContinuation,
+				reverseLine: reverseLine
+			};
 		}
 	}
 	

@@ -31,15 +31,7 @@ class DiscordGame
 	{
 		if(this.game.movingTeam == this.game[this.botTeam])
 		{
-			let bestMove;
-			try
-			{
-				bestMove = this.game.evaluate(2).bestMove;
-			}
-			catch(error)
-			{
-				bestMove = this.game.evaluate(1).bestMove;
-			}
+			let bestMove = this.game.evaluate().bestMove;
 			bestMove.takeStringSnapshot();
 			this.game.makeMove(bestMove);
 		}
@@ -55,10 +47,61 @@ class DiscordGame
 		}
 	}
 	
+	moveHistoryString()
+	{
+		//turn a list of moves into something like "1. whitemove blackmove 2.whitemove blackmove ..."
+		//REQUIRES that move strings are generated in advance
+		return this.game.playedMoves.reduce((accumulator, moveWithString, index)=>{
+			//give the full move counter at the start of each full move
+			if(index%2==0)
+			{
+				const fullMoveCounter = (index+2)/2;
+				accumulator = accumulator.concat(`${fullMoveCounter>1?"\t":""}${fullMoveCounter}.`);
+			}
+			return accumulator.concat(` ${moveWithString.string}`);
+		},"");
+	}
+	
+	lineString(line)
+	{
+		//play each move in the line to obtain the next move's string
+		//then undo the moves to retain current position	
+		const string = line.reduce((accumulator,move,index)=>{
+			if(index>0)
+			{
+				accumulator = accumulator.concat("\t");
+			}
+			accumulator = accumulator.concat(move.toString());
+			this.game.makeMove(move);
+			return accumulator;
+		},"");
+		for(const move of line)
+		{
+			this.game.undoMove();
+		}
+		
+		return string;
+	}
+	
+	scoreString(evaluation)
+	{
+		if("checkmate_in_halfmoves" in evaluation)
+		{
+			const teamToGiveMate = ((evaluation.checkmate_in_halfmoves % 2) == 0) ?
+			this.game.movingTeam : this.game.movingTeam.opposition;
+			const sign = teamToGiveMate instanceof WhiteTeam? "+" : "+";
+			return `${sign}M${Math.floor((evaluation.checkmate_in_halfmoves+1)/2)}`;
+		}
+		else
+		{
+			return `${evaluation.score>0? "+":""}${evaluation.score}`;
+		}
+	}
+	
 	buildGameDisplayMessage()
 	{
 		const boardPictureBuffer = this.game.toPNGBuffer();
-		const playedMovesString = this.game.moveHistoryString();
+		const playedMovesString = this.moveHistoryString();
 		const FENString = this.game.toString();
 		
 		this.availableMoves = this.game.calculateLegals();
@@ -67,31 +110,21 @@ class DiscordGame
 		
 		//get the best line in string form
 		const evaluation = this.game.evaluate(2);
-		const bestLine = evaluation.reverseLine ?? []; bestLine.reverse();
-		const bestLineString = bestLine.reduce((accumulator,move)=>{
-			//make the moves to get their strings, then undo the moves
-			accumulator = accumulator.concat(move.toString());
-			this.game.makeMove(move);
-			accumulator = accumulator.concat("\t");
-			return accumulator;
-		},"");
-		for(const move of bestLine)
-		{
-			this.game.undoMove();
-		}
 		
-		const evaluationString = this.game.isCheckmate()? `${this.game.movingTeam.opposition.constructor.name} wins` :
+		const bestLineString = this.lineString(evaluation.reverseLine?.slice().reverse() ?? []);
+		const statusString = this.game.isCheckmate()? `${this.game.movingTeam.opposition.constructor.name} wins` :
 		this.game.isStalemate()? "draw by stalemate" :
-		("score" in evaluation)? evaluation.score :
-		`${this.game.movingTeam instanceof WhiteTeam? "+" : "-"}M${Math.floor((evaluation.checkmate_in_halfmoves+1)/2)}`;
+		this.scoreString(evaluation);
 		
 		return boardPictureBuffer.then((boardPicture)=>{
 			return {
-				content: `(white) **${this.white?.username ?? "ToxiBot"}** vs **${this.black?.username ?? "ToxiBot"}** (black)\n`
+				content: `# (white) ${this.white?.username ?? "ToxiBot"} vs ${this.black?.username ?? "ToxiBot"} (black)\n`
 				.concat(`**Played Moves**:\t${playedMovesString}\n`)
 				.concat(`**FEN String**:\t${FENString}\n`)
+				.concat(`\n`)
 				.concat(`**Available Moves**:\t${availableMovesString}\n`)
-				.concat(`**Toxibot's Evaluation**:\t||${evaluationString}||\n`)
+				.concat(`\n`)
+				.concat(`**Toxibot's Evaluation**:\t||${statusString}||\n`)
 				.concat(`**Toxibot's Best Continuation**:\t||${bestLineString==""?"none":bestLineString}||\n`),
 				files: [boardPicture],
 			}
