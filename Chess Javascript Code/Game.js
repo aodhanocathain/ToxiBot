@@ -33,8 +33,6 @@ class Game
 	targetPiece;
 	firstMove;
 	
-	previouslyUpdatedPieces;
-	
 	static validFENString(FENString)
 	{
 		return true;
@@ -93,6 +91,8 @@ class Game
 			})
 		})
 		
+		Object.values(this.teamsByName).forEach((team)=>{team.init();});
+		
 		this.movingTeam = Object.values(this.teamsByName).find((team)=>{return team.constructor.char == FENparts[1];});
 		
 		this.castleRights = new Manager(FENparts[2].split(""));
@@ -105,7 +105,6 @@ class Game
 		this.fullMove = parseInt(FENparts[5]);
 		
 		this.playedMoves = [];
-		this.previouslyUpdatedPieces = new Manager([]);
 		
 		Object.values(this.teamsByName).forEach((team)=>{team.init();});
 	}
@@ -162,14 +161,17 @@ class Game
 			for(let i=0; i<continuations.length; i++)
 			{
 				const newContinuation = continuations[i];
-				this.makeMove(newContinuation);
+				this.makeMoveForSearchExpansion(newContinuation);
+				//this.makeProperMove(newContinuation);
 				if(this.kingCapturable())
 				{
-					this.undoMove();
+					this.undoMoveForSearchExpansion();
+					//this.undoProperMove();
 					continue;
 				}
 				const newEval = this.evaluate(depth-1);
-				this.undoMove();
+				this.undoMoveForSearchExpansion();
+				//this.undoProperMove();
 				if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
 				{
 					bestContinuation = newContinuation;
@@ -194,7 +196,7 @@ class Game
 		}
 	}
 	
-	makeMove(move)
+	makeMoveForSearchExpansion(move)
 	{
 		if(move instanceof PlainMove)
 		{
@@ -229,15 +231,10 @@ class Game
 			movingPiece.moved = true;
 			
 			//update the piece that moved and the opposition pieces that could be blocked or unblocked by the move
-			const updatedPieces = [];
-			
 			movingPiece.updateReachableSquaresAndBitsAndKingSeer();
-			updatedPieces.push(movingPiece);
-			
 			movingPiece.team.opposition.activePieces.forEach((piece)=>{
-				//if(piece instanceof DirectionPiece)
-				//{
-					
+				if(piece instanceof DirectionPiece)
+				{
 					const reachableBits = piece.reachableBits.get();
 					if
 					(
@@ -246,11 +243,13 @@ class Game
 					)
 					{
 						piece.updateReachableSquaresAndBitsAndKingSeer();
-						updatedPieces.push(piece);
 					}
-				//}
+				}
+				else
+				{
+					piece.updateKingSeer();
+				}
 			});
-			this.previouslyUpdatedPieces.update(updatedPieces);
 		}
 		
 		this.playedMoves.push(move);
@@ -258,7 +257,7 @@ class Game
 		this.changeTurns();
 	}
 	
-	undoMove()
+	undoMoveForSearchExpansion()
 	{
 		const move = this.playedMoves.pop();
 		if(move instanceof PlainMove)
@@ -268,8 +267,115 @@ class Game
 			
 			//move the moving piece back where it came from
 			movingPiece.square = move.before;
+			
 			//revoke the capture of the target piece
+			//NOT BEFORE REVERTING, do later
+			//because the target piece may be reverted in error (could not have updated in makeMoveForSearchExpansion)
+			//targetPiece?.activate();
+			
+			//manipulate the game position
+			this.pieces[move.before] = movingPiece;
+			this.squaresOccupiedBitVector.interact(BitVector.SET, move.before);
+			this.pieces[move.after] = targetPiece;
+			if(!targetPiece){this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.after);}
+			
+			//revert the game state
+			if(movingPiece instanceof King)
+			{
+				this.castleRights.revert();
+			}
+			this.enPassantable.revert();
+			this.movingPiece.revert();
+			this.targetPiece.revert();
+			movingPiece.moved = (this.firstMove.get() == false);
+			this.firstMove.revert();
+			
+			movingPiece.revertReachableSquaresAndBitsAndKingSeer();
+			movingPiece.team.opposition.activePieces.forEach((piece)=>{
+				if(piece instanceof DirectionPiece)
+				{
+					const reachableBits = piece.reachableBits.get();
+					if
+					(
+						reachableBits.interact(BitVector.READ, move.before) ||
+						reachableBits.interact(BitVector.READ, move.after)
+					)
+					{
+						piece.revertReachableSquaresAndBitsAndKingSeer();
+					}
+				}
+				else
+				{
+					piece.revertKingSeer();
+				}
+			})
+			
+			//NOW revoke the capture of the target piece
 			targetPiece?.activate();
+		}
+		
+		this.regressMoveCounters();
+		this.changeTurns();
+	}
+	
+	
+	makeProperMove(move)
+	{
+		if(move instanceof PlainMove)
+		{
+			const movingPiece = this.pieces[move.before];
+			const targetPiece = this.pieces[move.after];
+			
+			//move the moving piece
+			movingPiece.square = move.after;
+			//capture the target piece
+			targetPiece?.deactivate();
+			//manipulate the game position
+			this.pieces[move.after] = movingPiece;
+			this.squaresOccupiedBitVector.interact(BitVector.SET, move.after);
+			this.pieces[move.before] = null;
+			this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.before);
+			
+			//update the necessary information for undoing the move
+			if(movingPiece instanceof King)
+			{
+				this.castleRights.update(
+					//opponent retains castling rights, moving team forfeits castle rights
+					this.castleRights.get().filter((wing)=>{
+						return Team.classOfTeamedChar(wing) != movingPiece.team.constructor;
+					})
+				);
+			}
+			this.enPassantable.update("-");
+			this.movingPiece.update(movingPiece);
+			this.targetPiece.update(targetPiece);
+			this.firstMove.update(movingPiece.moved==false);
+			
+			movingPiece.moved = true;
+			
+			movingPiece.team.activePieces.forEach((piece)=>{piece.updateReachableSquaresAndBitsAndKingSeer();});
+			movingPiece.team.opposition.activePieces.forEach((piece)=>{piece.updateReachableSquaresAndBitsAndKingSeer();});
+		}
+		
+		this.playedMoves.push(move);
+		this.progressMoveCounters();
+		this.changeTurns();
+	}
+	
+	undoProperMove()
+	{
+		const move = this.playedMoves.pop();
+		if(move instanceof PlainMove)
+		{
+			const movingPiece = this.movingPiece.get();
+			const targetPiece = this.targetPiece.get();
+			
+			//move the moving piece back where it came from
+			movingPiece.square = move.before;
+			
+			//revoke the capture of the target piece AFTER REVERTING, the targetPiece was not updated before
+			// ---->  targetPiece?.activate();
+			
 			//manipulate the game position
 			this.pieces[move.before] = movingPiece;
 			this.squaresOccupiedBitVector.interact(BitVector.SET, move.before);
@@ -287,12 +393,11 @@ class Game
 			movingPiece.moved = (this.firstMove.get() == false);
 			this.firstMove.revert();
 
-			const updatedPieces = this.previouslyUpdatedPieces.get();
-			for(const piece of updatedPieces)
-			{
-				piece.revertReachableSquaresAndBitsAndKingSeer();
-			}
-			this.previouslyUpdatedPieces.revert();			
+			movingPiece.team.activePieces.forEach((piece)=>{piece.revertReachableSquaresAndBitsAndKingSeer();});
+			movingPiece.team.opposition.activePieces.forEach((piece)=>{piece.revertReachableSquaresAndBitsAndKingSeer();});	
+			
+			//revoke the capture of the target piece AFTER REVERTING, the targetPiece was not updated before
+			targetPiece?.activate();
 		}
 		
 		this.regressMoveCounters();
@@ -323,9 +428,9 @@ class Game
 		//moves are illegal if they leave the team's king vulnerable to capture
 		return this.calculateMoves().filter((move)=>{
 			///*
-			this.makeMove(move);
+			this.makeProperMove(move);
 			const condition = !(this.kingCapturable());
-			this.undoMove();
+			this.undoProperMove();
 			return condition;
 			//*/
 		});
@@ -338,15 +443,7 @@ class Game
 	
 	kingChecked()
 	{
-		//current implementation only guarantees that the moving team is up-to-date, not its opposition
-		
-		//must update the opposition
-		this.movingTeam.opposition.activePieces.forEach((piece)=>{piece.updateReachableSquaresAndBitsAndKingSeer();});
-		const condition = this.movingTeam.opposition.numKingSeers > 0;
-		//revert the opposition to be safe, leave the game as it was before calling the function
-		this.movingTeam.opposition.activePieces.forEach((piece)=>{piece.revertReachableSquaresAndBitsAndKingSeer();});
-		return condition;
-		
+		return this.movingTeam.opposition.numKingSeers > 0;
 	}
 	
 	regressMoveCounters()
@@ -390,12 +487,12 @@ class Game
 				accumulator = accumulator.concat("\t");
 			}
 			accumulator = accumulator.concat(move.toString());
-			this.makeMove(move);
+			this.makeProperMove(move);
 			return accumulator;
 		},"");
 		for(const move of line)
 		{
-			this.undoMove();
+			this.undoProperMove();
 		}
 		
 		return string;

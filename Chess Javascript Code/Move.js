@@ -62,9 +62,9 @@ class Move
 		
 		const capture = targetPiece? "x" : "";
 		
-		this.game.makeMove(this);
+		this.game.makeProperMove(this);
 		const checkStatus = this.game.kingChecked()? (this.game.calculateLegals().length==0? "#": "+") : "";
-		this.game.undoMove();
+		this.game.undoProperMove();
 		
 		return `${movingPiece.constructor.typeChar}${beforeDetails}${capture}${Square.fullString(this.after)}${checkStatus}`;
 	}

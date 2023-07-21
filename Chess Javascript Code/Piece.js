@@ -124,12 +124,17 @@ class Piece
 		this.team.deactivatePiece(this);
 	}
 	
-	updateReachableSquaresAndBitsAndKingSeer(kingSquare)
+	updateReachableSquaresAndBitsAndKingSeer()
 	{
 		const reachables = this.constructor.findReachableSquaresAndBitsFromSquareInGame(this.square, this.game);
 		this.reachableSquares.update(reachables[0]);
 		this.reachableBits.update(reachables[1]);
 		
+		this.updateKingSeer();
+	}
+	
+	updateKingSeer()
+	{
 		//reflect the change in whether this piece sees the king in its team
 		const oldKingSeer = this.kingSeer.get();
 		this.kingSeer.update(this.reachableBits.get().interact(BitVector.READ, this.team.opposition.king.square));
@@ -142,6 +147,11 @@ class Piece
 		this.reachableSquares.revert();
 		this.reachableBits.revert();
 		
+		this.revertKingSeer();
+	}
+	
+	revertKingSeer()
+	{
 		//reflect the change in whether this piece sees the king in its team
 		const oldKingSeer = this.kingSeer.get();
 		this.kingSeer.revert();
