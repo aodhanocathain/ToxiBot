@@ -10,6 +10,7 @@ const doNotReplyWithOK = true;
 class DiscordGame
 {
 	chessGame;
+	IdsByTeamName;	//the players
 	
 	//updated internally
 	availableMoves;
@@ -18,7 +19,6 @@ class DiscordGame
 	//assigned by command handlers
 	botTeam;
 	interaction;
-	IdsByTeamName;	//the players
 	
 	constructor(fen)
 	{
@@ -90,14 +90,18 @@ class DiscordGame
 		const FENString = this.chessGame.toString();
 		
 		this.availableMoves = this.chessGame.calculateLegals();
-		this.availableStrings = this.availableMoves.map((move)=>{move.takeStringSnapshot(); return move.string;});
+		this.availableStrings = this.availableMoves.map((move)=>{
+			move.takeStringSnapshot();
+			return move.string;
+		});
 		const availableMovesString = this.availableStrings.join("\t");
 		
 		//get the best line in string form
-		const evaluation = this.chessGame.evaluate(2);
+		const evaluation = this.chessGame.evaluate();
 		
 		const bestLineString = this.chessGame.lineString(evaluation.reverseLine?.slice().reverse() ?? []);
-		const statusString = this.chessGame.isCheckmate()? `${this.chessGame.movingTeam.opposition.constructor.name} wins` :
+		const statusString = 
+		this.chessGame.isCheckmate()? `${this.chessGame.movingTeam.opposition.constructor.name} wins` :
 		this.chessGame.isStalemate()? "draw by stalemate" :
 		this.chessGame.scoreString(evaluation);
 		
@@ -109,9 +113,9 @@ class DiscordGame
 				content:`# (${Team0.name}) ${team0Username} vs ${team1Username} (${Team1.name})\n`
 				.concat(`**Played Moves**:\t${playedMovesString}\n`)
 				.concat(`**FEN String**:\t${FENString}\n`)
-				.concat(`\n`)
+				//.concat(`\n`)
 				.concat(`**Available Moves**:\t${availableMovesString}\n`)
-				.concat(`\n`)
+				//.concat(`\n`)
 				.concat(`**${process.env.BOT_NAME}'s Evaluation**:\t||${statusString}||\n`)
 				.concat(`**${process.env.BOT_NAME}'s Best Continuation**:\t||${bestLineString==""?"none":bestLineString}||\n`),
 				files: [boardPicture],
@@ -304,14 +308,13 @@ module.exports = {
 				discordGame.botTeam = discordGame.chessGame.teamsByName[opponentPlayAs];
 			}
 			
-			return discordGame.buildDisplayMessage()
+			discordGame.buildDisplayMessage()
 			.then((displayMessage)=>{
-				return interaction.reply(displayMessage);
-			})
-			.then((value)=>{
+				interaction.reply(displayMessage);
 				setTimeout(()=>{discordGame.advanceGameIfBotTurnAndEditInteraction();}, 3000);
-				return value;
-			});
+			})
+			
+			return doNotReplyWithOK;
 		}
 		else if(subcommand == "gameend")
 		{
@@ -320,7 +323,8 @@ module.exports = {
 				return interaction.reply("You have no game to end");
 			}
 			
-			player.discordGame.end();		
+			player.discordGame.end();
+			
 			return;
 		}
 		else if(subcommand == "gamebump")
@@ -336,10 +340,10 @@ module.exports = {
 			
 			//show new
 			player.discordGame.interaction = interaction;
-			return player.discordGame.buildDisplayMessage()
-			.then((message)=>{
-				return interaction.reply(message);
-			});
+			player.discordGame.buildDisplayMessage()
+			.then((message)=>{interaction.reply(message);});
+			
+			return doNotReplyWithOK;
 		}
 		else if(subcommand == "movemake")
 		{			
@@ -369,9 +373,8 @@ module.exports = {
 			const moveChoice = player.discordGame.availableMoves[moveIndex]
 			
 			player.discordGame.makeMoveAndEditInteraction(moveChoice);
-			setTimeout(()=>{
-				player.discordGame.advanceGameIfBotTurnAndEditInteraction();
-			}, 3000);
+			setTimeout(()=>{player.discordGame.advanceGameIfBotTurnAndEditInteraction();}, 3000);
+			
 			return doNotReplyWithOK;
 		}
 		else if(subcommand == "moveundo")
@@ -389,6 +392,7 @@ module.exports = {
 			interaction.deleteReply();
 			
 			player.discordGame.undoMoveAndEditInteraction();
+			
 			return doNotReplyWithOK;
 		}
 	},
