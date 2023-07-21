@@ -1,140 +1,112 @@
-const Discord = require("discord.js");
-const FileSystem = require("fs");
 const {Game} = require("../Chess Javascript Code/Game.js");
 const {Team, Team0, Team1, TEAM_CLASSES} = require("../Chess Javascript Code/Team.js");
+
+const Discord = require("discord.js");
 const commandName = "chess";
 
-const usersById = {};
+const playersById = {};
+const doNotReplyWithOK = true;
 
 class DiscordGame
 {
-	game;
-	display;
+	chessGame;
 	
-	botPlayas;
-	
-	//users
-	discordUsersByPlayas;
-	
+	//updated internally
 	availableMoves;
 	availableStrings;
 	
+	//assigned by command handlers
+	botTeam;
+	interaction;
+	IdsByTeamName;	//the players
+	
 	constructor(fen)
 	{
-		this.game = new Game(fen);
-		this.discordUsersByPlayas = {};
+		this.chessGame = new Game(fen);
+		this.IdsByTeamName = {};
 	}
 	
-	isCheckmate()
+	end()
 	{
-		//by definition
-		return (this.game.calculateLegals().length == 0) && this.game.kingChecked();
-	}
-
-	isStalemate()
-	{
-		//by definition
-		return (this.game.calculateLegals().length == 0) && !(this.game.kingChecked());
+		TEAM_CLASSES.forEach((teamClass)=>{
+			delete playersById[this.IdsByTeamName[teamClass.name]]?.discordGame;
+		});
+		this.interaction.deleteReply();
 	}
 	
 	isBotTurn()
 	{
-		return this.game.movingTeam == this.game.teamsByName[this.botPlayas];
+		return this.chessGame.movingTeam == this.botTeam;
 	}
 	
-	advanceIfBotTurn()
+	advanceGameIfBotTurnAndEditInteraction()
 	{
-		if(this.isBotTurn())
+		//if it is the bot's turn and there are legal moves to play
+		if(this.isBotTurn() && (this.chessGame.calculateLegals().length>0))
 		{
-			let bestMove = this.game.evaluate().bestMove;
-			bestMove.takeStringSnapshot();
-			this.game.makeMove(bestMove);
+			this.makeMoveAndEditInteraction(this.chessGame.evaluate().bestMove)
 		}
 	}
 	
-	advanceWithUserMove(move)
+	makeMoveAndEditInteraction(move)
 	{
 		move.takeStringSnapshot();
-		this.game.makeMove(move);
-		if(this.game.calculateLegals().length>0)
-		{
-			this.advanceIfBotTurn();
-		}
+		this.chessGame.makeMove(move);
+		this.editInteraction();
 	}
 	
-	moveHistoryString()
+	undoMoveAndEditInteraction()
 	{
-		//turn a list of moves into something like "1. whitemove blackmove 2.whitemove blackmove ..."
-		//REQUIRES that move strings are generated in advance
-		return this.game.playedMoves.reduce((accumulator, moveWithString, index)=>{
-			//give the full move counter at the start of each full move
-			if(index%2==0)
+		this.chessGame.undoMove();
+		//if first undo gives turn to bot, must undo a second move to give turn to user
+		if(this.isBotTurn())
+		{
+			if(this.chessGame.playedMoves.length>0)
 			{
-				const fullMoveCounter = (index+2)/2;
-				accumulator = accumulator.concat(`${fullMoveCounter>1?"\t":""}${fullMoveCounter}.`);
+				this.chessGame.undoMove();
 			}
-			return accumulator.concat(` ${moveWithString.string}`);
-		},"");
-	}
-	
-	lineString(line)
-	{
-		//play each move in the line to obtain the next move's string
-		//then undo the moves to retain current position	
-		const string = line.reduce((accumulator,move,index)=>{
-			if(index>0)
+			else	//no second move to undo, have to make a bot move to give turn back to user
 			{
-				accumulator = accumulator.concat("\t");
+				const discordGame = this;
+				setTimeout(()=>{
+					discordGame.advanceGameIfBotTurnAndEditInteraction();
+				}, 3000);
 			}
-			accumulator = accumulator.concat(move.toString());
-			this.game.makeMove(move);
-			return accumulator;
-		},"");
-		for(const move of line)
-		{
-			this.game.undoMove();
 		}
-		
-		return string;
+		this.editInteraction();
 	}
 	
-	scoreString(evaluation)
+	editInteraction()
 	{
-		if("checkmate_in_halfmoves" in evaluation)
-		{
-			const teamToGiveMate = ((evaluation.checkmate_in_halfmoves % 2) == 0) ?
-			this.game.movingTeam : this.game.movingTeam.opposition;
-			const sign = teamToGiveMate instanceof Team0? "+" : "+";
-			return `${sign}M${Math.floor((evaluation.checkmate_in_halfmoves+1)/2)}`;
-		}
-		else
-		{
-			return `${evaluation.score>0? "+":""}${evaluation.score}`;
-		}
+		this.buildDisplayMessage().then((updatedDisplayMessage)=>{
+			return this.interaction.editReply(updatedDisplayMessage);
+		});
 	}
 
-	buildGameDisplayMessage()
+	buildDisplayMessage()
 	{
-		const boardPictureBuffer = this.game.toPNGBuffer();
-		const playedMovesString = this.moveHistoryString();
-		const FENString = this.game.toString();
+		const boardPictureBuffer = this.chessGame.toPNGBuffer();
+		const playedMovesString = this.chessGame.moveHistoryString();
+		const FENString = this.chessGame.toString();
 		
-		this.availableMoves = this.game.calculateLegals();
+		this.availableMoves = this.chessGame.calculateLegals();
 		this.availableStrings = this.availableMoves.map((move)=>{move.takeStringSnapshot(); return move.string;});
 		const availableMovesString = this.availableStrings.join("\t");
 		
 		//get the best line in string form
-		const evaluation = this.game.evaluate(2);
+		const evaluation = this.chessGame.evaluate(2);
 		
-		const bestLineString = this.lineString(evaluation.reverseLine?.slice().reverse() ?? []);
-		const statusString = this.isCheckmate()? `${this.game.movingTeam.opposition.constructor.name} wins` :
-		this.isStalemate()? "draw by stalemate" :
-		this.scoreString(evaluation);
+		const bestLineString = this.chessGame.lineString(evaluation.reverseLine?.slice().reverse() ?? []);
+		const statusString = this.chessGame.isCheckmate()? `${this.chessGame.movingTeam.opposition.constructor.name} wins` :
+		this.chessGame.isStalemate()? "draw by stalemate" :
+		this.chessGame.scoreString(evaluation);
+		
+		const team0Username = playersById[this.IdsByTeamName[Team0.name]]?.username ?? process.env.BOT_NAME;
+		const team1Username = playersById[this.IdsByTeamName[Team1.name]]?.username ?? process.env.BOT_NAME;
 		
 		return boardPictureBuffer.then((boardPicture)=>{
 			return {
-				content: `# (${Team0.name}) ${this.discordUsersByPlayas[Team0.name] ?? process.env.BOT_NAME} vs `
-				.concat(`${this.discordUsersByPlayas[Team1.name] ?? process.env.BOT_NAME} (${Team1.name})\n`)
+				content:`# (${Team0.name}) ${team0Username} vs ${team1Username} (${Team1.name})\n`
 				.concat(`**Played Moves**:\t${playedMovesString}\n`)
 				.concat(`**FEN String**:\t${FENString}\n`)
 				.concat(`\n`)
@@ -148,10 +120,18 @@ class DiscordGame
 	}
 }
 
-class User
+class Player
 {
+	username;
+	
+	//assigned by command handlers
 	discordGame;
-	playas;
+	team;
+	
+	constructor(username)
+	{
+		this.username = username;
+	}
 }
 
 function gamecreateSubcommand(subcommand){
@@ -165,9 +145,17 @@ function gamecreateSubcommand(subcommand){
 
 function playAsStringOption(option)
 {
+	const teamOptions = TEAM_CLASSES.reduce((accumulator, teamClass, index)=>{
+		accumulator = accumulator.concat(teamClass.name);
+		if(index != (TEAM_CLASSES.length-1))
+		{
+			accumulator = accumulator.concat(" or ");
+		}
+		return accumulator;
+	}, "");
 	return option
 	.setName("playas")
-	.setDescription("white or black (leave blank for random assignment)")
+	.setDescription(`${teamOptions} (leave blank for random assignment)`)
 	.setRequired(false);
 }
 
@@ -233,38 +221,34 @@ module.exports = {
 	.addSubcommand(moveundoSubcommand),
 	
 	execute: (interaction) => {
-		const userId = interaction.user.id;
-		if(!(userId in usersById)){usersById[userId] = new User();}
-		const user = usersById[userId];
+		const playerId = interaction.user.id;
+		const player = playersById[playerId] = playersById[playerId] || new Player(interaction.user.username);
 		
 		const subcommand = interaction.options.getSubcommand();
 		if(subcommand == "gamecreate")
 		{
-			//check if the command is feasible
+			//begin by checking whether the command is allowed
 			
-			//do not overwrite existing games of the user
-			if(user.discordGame)
+			//do not overwrite player's existing game
+			if(player.discordGame)
 			{
 				return interaction.reply("You already have a game");
 			}
-			
-			//do not overwrite existing games of the user's opponent
 			const playagainst = interaction.options.getUser("playagainst");
-			if(playagainst)
+			//do not overwrite opponent's existing game
+			if(playersById[playagainst?.id]?.discordGame)
 			{
-				if(playagainst.bot)
-				{
-					return interaction.reply("Challenging bot accounts is forbidden");
-				}
-				if(playagainst.id==interaction.user.id)
-				{
-					return interaction.reply("Challenging yourself is forbidden");
-				}
-				if(!(playagainst.id in usersById)){usersById[playagainst.id] = new User();}
-				if(usersById[playagainst.id].discordGame)
-				{
-					return interaction.reply(`${playagainst.username} already has a game`);
-				}
+				return interaction.reply(`${playagainst.username} already has a game`);
+			}
+			//do not challenge bots (including ToxiBot)
+			if(playagainst?.bot)
+			{
+				return interaction.reply("Challenging bot accounts is forbidden");
+			}
+			//do not challenge oneself
+			if(playagainst?.id==playerId)
+			{
+				return interaction.reply("Challenging yourself is forbidden");
 			}
 			
 			let playas = interaction.options.getString("playas");
@@ -297,149 +281,116 @@ module.exports = {
 			
 			//set up the user and their game
 			const discordGame = new DiscordGame(fen);
-			user.discordGame = discordGame;
-			user.playas = playas;
-			discordGame.discordUsersByPlayas[playas] = interaction.user;
+			discordGame.interaction = interaction;
+			discordGame.IdsByTeamName[playas] = playerId;
+			
+			player.discordGame = discordGame;
+			player.team = discordGame.chessGame.teamsByName[playas];
 			
 			//set up the user's opposition
-			const oppositionPlayAs = TEAM_CLASSES.find((teamClass)=>{return teamClass.name!=playas}).name;
+			const opponentPlayAs = TEAM_CLASSES.find((teamClass)=>{return teamClass.name!=playas}).name;
 			if(playagainst)	//a real player
 			{			
-				const opponent = usersById[playagainst.id];
+				const opponent = playersById[playagainst.id] = playersById[playagainst.id] || new Player(playagainst.username);
+				discordGame.IdsByTeamName[opponentPlayAs] = playagainst.id;
 				
 				opponent.discordGame = discordGame;
-				opponent.playas = oppositionPlayAs;
-				discordGame.discordUsersByPlayas[oppositionPlayAs] = playagainst;
+				opponent.team = discordGame.chessGame.teamsByName[opponentPlayAs];
 				
-				discordGame.botPlayas = null;
+				discordGame.botTeam = null;
 			}
 			else	//the bot
 			{
-				discordGame.botPlayas = oppositionPlayAs;
+				discordGame.botTeam = discordGame.chessGame.teamsByName[opponentPlayAs];
 			}
 			
-			//start the game by making the bot's move if it is the moving team
-			discordGame.advanceIfBotTurn();
-			
-			return discordGame.buildGameDisplayMessage().then((message)=>{
-				discordGame.display = interaction;
-				return interaction.reply(message);
+			return discordGame.buildDisplayMessage()
+			.then((displayMessage)=>{
+				return interaction.reply(displayMessage);
+			})
+			.then((value)=>{
+				setTimeout(()=>{discordGame.advanceGameIfBotTurnAndEditInteraction();}, 3000);
+				return value;
 			});
 		}
 		else if(subcommand == "gameend")
 		{
-			if(!(user.discordGame))
+			if(!(player.discordGame))
 			{
 				return interaction.reply("You have no game to end");
 			}
 			
-			user.discordGame.display.deleteReply();
-			Object.values(user.discordGame.discordUsersByPlayas).forEach((discordUser)=>{
-				delete usersById[discordUser.id].discordGame;
-			});
-			
+			player.discordGame.end();		
 			return;
 		}
 		else if(subcommand == "gamebump")
 		{
 			//show the game again in a new message and delete the old message
-			if(!(user.discordGame))
+			if(!(player.discordGame))
 			{
 				return interaction.reply("You have no game to post again");
 			}
 			
 			//delete old
-			user.discordGame.display.deleteReply();
+			player.discordGame.interaction.deleteReply();
 			
 			//show new
-			user.discordGame.display = interaction;
-			return user.discordGame.buildGameDisplayMessage()
+			player.discordGame.interaction = interaction;
+			return player.discordGame.buildDisplayMessage()
 			.then((message)=>{
 				return interaction.reply(message);
 			});
 		}
 		else if(subcommand == "movemake")
-		{
-			if(!(user.discordGame))
+		{			
+			if(!(player.discordGame))
 			{
 				return interaction.reply("You have no game in which to make a move");
 			}
 			
-			if(user.discordGame.game.teamsByName[user.playas] != user.discordGame.game.movingTeam)
+			if(player.team != player.discordGame.chessGame.movingTeam)
 			{
 				return interaction.reply("It is not your turn in the game");
 			}
 			
-			if(user.discordGame.isCheckmate() || user.discordGame.isStalemate())
+			if(player.discordGame.chessGame.isCheckmate() || player.discordGame.chessGame.isStalemate())
 			{
 				return interaction.reply("Your game is already over");
 			}
 			
 			//if the choice string is not in the strings generated by the program then it is not available
 			const moveChoiceString = interaction.options.getString("move");
-			const moveIndex = user.discordGame.availableStrings.indexOf(moveChoiceString);
+			const moveIndex = player.discordGame.availableStrings.indexOf(moveChoiceString);
 			if(moveIndex<0){return interaction.reply("The move supplied is invalid");}
 			
-			const moveChoice = user.discordGame.availableMoves[moveIndex]
-			user.discordGame.advanceWithUserMove(moveChoice);
-			const response = user.discordGame.buildGameDisplayMessage().then((message)=>{
-				return user.discordGame.display.editReply(message);
-			});
+			interaction.deferReply();
+			interaction.deleteReply();
 			
-			if(user.discordGame.isCheckmate())
-			{
-				const winningTeamName = user.discordGame.game.teamsByName[user.playas].constructor.name;
-				return interaction.reply(`The game has reached checkmate, the result is a win for ${winningTeamName}`);
-			}
-			else if(user.discordGame.isStalemate())
-			{
-				return interaction.reply("The game has reached stalemate, the result is a draw");
-			}
-			else
-			{
-				interaction.deferReply();
-				interaction.deleteReply();
-				return response;
-			}
+			const moveChoice = player.discordGame.availableMoves[moveIndex]
+			
+			player.discordGame.makeMoveAndEditInteraction(moveChoice);
+			setTimeout(()=>{
+				player.discordGame.advanceGameIfBotTurnAndEditInteraction();
+			}, 3000);
+			return doNotReplyWithOK;
 		}
 		else if(subcommand == "moveundo")
 		{
-			if(!(user.discordGame))
+			if(!(player.discordGame))
 			{
-				return interaction.reply("No game in which to undo a move");
+				return interaction.reply("You have no game in which to undo a move");
 			}
-			if(user.discordGame.game.playedMoves.length==0)
+			if(player.discordGame.chessGame.playedMoves.length==0)
 			{
-				return interaction.reply("No move to undo");
+				return interaction.reply("Your game has no move to undo");
 			}
 			
 			interaction.deferReply();
 			interaction.deleteReply();
 			
-			if(user.discordGame.game.playedMoves.length>0)
-			{
-				user.discordGame.game.undoMove();
-				//if the user is playing against the bot, undo another move to make it the user's turn
-				if(user.discordGame.isBotTurn())
-				{
-					if(user.discordGame.game.playedMoves.length>0)
-					{
-						user.discordGame.game.undoMove();
-					}
-					else
-					{
-						user.discordGame.advanceIfBotTurn();
-					}
-				}
-			}
-			return user.discordGame.buildGameDisplayMessage().then((message)=>{
-				return user.discordGame.display.editReply(message);
-			});
+			player.discordGame.undoMoveAndEditInteraction();
+			return doNotReplyWithOK;
 		}
 	},
-	exiter: (client)=>{
-		Object.values(usersById).forEach(()=>{
-			//gameDisplay?.deleteReply();
-		})
-	}
+	exiter: (client)=>{}
 };

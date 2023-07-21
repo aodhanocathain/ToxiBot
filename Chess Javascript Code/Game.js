@@ -116,6 +116,18 @@ class Game
 		this.movingTeam = this.movingTeam.opposition;
 	}
 
+	isCheckmate()
+	{
+		//by definition
+		return (this.calculateLegals().length == 0) && this.kingChecked();
+	}
+
+	isStalemate()
+	{
+		//by definition
+		return (this.calculateLegals().length == 0) && !(this.kingChecked());
+	}
+
 	evaluate(depth = 2)
 	{
 		if(this.calculateLegals().length==0)
@@ -356,15 +368,52 @@ class Game
 	moveHistoryString()
 	{
 		//turn a list of moves into something like "1. whitemove blackmove 2.whitemove blackmove ..."
-		return this.playedMoves.reduce((accumulator, move, index)=>{
+		//REQUIRES that move strings are generated in advance
+		return this.playedMoves.reduce((accumulator, moveWithString, index)=>{
 			//give the full move counter at the start of each full move
 			if(index%2==0)
 			{
 				const fullMoveCounter = (index+2)/2;
 				accumulator = accumulator.concat(`${fullMoveCounter>1?"\t":""}${fullMoveCounter}.`);
 			}
-			return accumulator.concat(` ${move.string}`);
+			return accumulator.concat(` ${moveWithString.string}`);
 		},"");
+	}
+	
+	lineString(line)
+	{
+		//play each move in the line to obtain the next move's string
+		//then undo the moves to retain current position	
+		const string = line.reduce((accumulator,move,index)=>{
+			if(index>0)
+			{
+				accumulator = accumulator.concat("\t");
+			}
+			accumulator = accumulator.concat(move.toString());
+			this.makeMove(move);
+			return accumulator;
+		},"");
+		for(const move of line)
+		{
+			this.undoMove();
+		}
+		
+		return string;
+	}
+	
+	scoreString(evaluation)
+	{
+		if("checkmate_in_halfmoves" in evaluation)
+		{
+			const teamToGiveMate = ((evaluation.checkmate_in_halfmoves % 2) == 0) ?
+			this.movingTeam : this.movingTeam.opposition;
+			const sign = teamToGiveMate instanceof Team0? "+" : "+";
+			return `${sign}M${Math.floor((evaluation.checkmate_in_halfmoves+1)/2)}`;
+		}
+		else
+		{
+			return `${evaluation.score>0? "+":""}${evaluation.score}`;
+		}
 	}
 	
 	toString()	//specifically to a FEN string
