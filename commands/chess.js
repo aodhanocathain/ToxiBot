@@ -51,19 +51,19 @@ class DiscordGame
 	makeMoveAndEditInteraction(move)
 	{
 		move.takeStringSnapshot();
-		this.chessGame.makeMove(move);
+		this.chessGame.makeProperMove(move);
 		this.editInteraction();
 	}
 	
 	undoMoveAndEditInteraction()
 	{
-		this.chessGame.undoMove();
+		this.chessGame.undoProperMove();
 		//if first undo gives turn to bot, must undo a second move to give turn to user
 		if(this.isBotTurn())
 		{
 			if(this.chessGame.playedMoves.length>0)
 			{
-				this.chessGame.undoMove();
+				this.chessGame.undoProperMove();
 			}
 			else	//no second move to undo, have to make a bot move to give turn back to user
 			{
