@@ -11,11 +11,14 @@ const {Manager} = require("./Manager.js");
 
 const Canvas = require("canvas");
 
+const DEFAULT_ANALYSIS_DEPTH = 3;
+
 class Game
-{
+{	
 	static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
 	//static DEFAULT_FEN_STRING = "k7/8/K7/Q7/8/8/8/8 w KQkq - 0 1";
 	//static DEFAULT_FEN_STRING = "k7/8/K7/3Q4/8/8/8/8 b KQkq - 0 1";
+	//static DEFAULT_FEN_STRING = "3k4/5Q2/K7/8/8/8/8/8 b - - 0 1";
 	
 	pieces;	//indexed by a square on the board
 	squaresOccupiedBitVector;	//indicates whether a square is occupied by a piece
@@ -95,7 +98,7 @@ class Game
 		
 		this.movingTeam = Object.values(this.teamsByName).find((team)=>{return team.constructor.char == FENparts[1];});
 		
-		this.castleRights = new Manager(FENparts[2].split(""));
+		this.castleRights = new Manager(FENparts[2]=="-"? [] : FENparts[2].split(""));
 		this.enPassantable = new Manager(FENparts[3]);
 		this.movingPiece = new Manager();
 		this.targetPiece = new Manager();
@@ -127,74 +130,129 @@ class Game
 		return (this.calculateLegals().length == 0) && !(this.kingChecked());
 	}
 
-	evaluate(depth = 2)
+	///*
+	
+	evaluate(depth = DEFAULT_ANALYSIS_DEPTH)
 	{
-		if(this.calculateLegals().length==0)
-		{
-			if(this.kingChecked())
-			{
-				return {
-					checkmate_in_halfmoves: 0
-				}
-			}
-			else
-			{
-				return {
-					score: 0
-				}
-			}
-		}
-		if(depth==0)
-		{
+		if(this.movingTeam.numKingSeers>0){return;}
+		if(depth==0){
 			return {
 				score: this.teamsByName[Team0.name].points - this.teamsByName[Team1.name].points
 			}
 		}
-		else
+		const continuations = this.calculateMoves();
+		
+		let bestContinuation;
+		let bestEval;
+		
+		//check for better continuations
+		for(let i=0; i<continuations.length; i++)
 		{
-			const continuations = this.calculateMoves();
-			
-			let bestContinuation;
-			let bestEval;
-			
-			//check for better continuations
-			for(let i=0; i<continuations.length; i++)
+			//if(depth==DEFAULT_ANALYSIS_DEPTH){console.log(`${i}/${continuations.length}`)}
+			const newContinuation = continuations[i];
+			this.makeMoveForSearchExpansion(newContinuation);
+			const newEval = this.evaluate(depth-1);
+			this.undoMoveForSearchExpansion();
+			if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
 			{
-				const newContinuation = continuations[i];
-				this.makeMoveForSearchExpansion(newContinuation);
-				//this.makeProperMove(newContinuation);
-				if(this.kingCapturable())
-				{
-					this.undoMoveForSearchExpansion();
-					//this.undoProperMove();
-					continue;
-				}
-				const newEval = this.evaluate(depth-1);
-				this.undoMoveForSearchExpansion();
-				//this.undoProperMove();
-				if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
-				{
-					bestContinuation = newContinuation;
-					bestEval = newEval;
-				}
+				bestContinuation = newContinuation;
+				bestEval = newEval;
 			}
-			
-			if(!bestEval)
-			{
-				return bestEval;
-			}
-			
-			const reverseLine = bestEval.reverseLine ?? [];
-			reverseLine.push(bestContinuation);
-			
-			const checkmate = "checkmate_in_halfmoves" in bestEval;
-			return {
-				[checkmate? "checkmate_in_halfmoves" : "score"]: checkmate? bestEval.checkmate_in_halfmoves+1 : bestEval.score,
-				bestMove: bestContinuation,
-				reverseLine: reverseLine
-			};
 		}
+		
+		if(!bestEval)
+		{
+			//No VALID continuation found, i.e. can't make a move without leaving king vulnerable.
+			//This means the current position is either checkmate or stalemate.
+			//The move functions specific to search expansion do not guarantee up to date opposition,
+			//so must update the opposition, check if king vulnerable (checkmate vs stalemate),
+			//then revert opposition to leave them as they were found
+			
+			//Can selectively update pieces that need it, or update every piece regardless
+			//Either approach seems to be as fast as the other
+			const lastMove = this.playedMoves[this.playedMoves.length-1];
+			const lastLastMove = this.playedMoves[this.playedMoves.length-2] ?? lastMove;
+			if(!this.playedMoves.length==0)
+			{
+				/*	//update selectively
+				this.movingTeam.opposition.activePieces.forEach((piece)=>{
+					if(piece instanceof DirectionPiece)
+					{
+						const reachableBits = piece.reachableBits.get();
+						if
+						(
+							reachableBits.interact(BitVector.READ, lastMove.before) ||
+							reachableBits.interact(BitVector.READ, lastMove.after) ||
+							reachableBits.interact(BitVector.READ, lastLastMove.before) ||
+							reachableBits.interact(BitVector.READ, lastLastMove.after)
+						)
+						{
+							piece.updateReachableSquaresAndBitsAndKingSeer();
+						}
+					}
+					else
+					{
+						piece.updateKingSeer();
+					}
+				});
+				*/
+				///*	//update everything
+				this.movingTeam.opposition.activePieces.forEach((piece)=>{
+					piece.updateReachableSquaresAndBitsAndKingSeer();
+				});
+				//*/
+			}
+			const returnVal = (this.movingTeam.opposition.numKingSeers>0)?
+			{
+				checkmate_in_halfmoves: 0
+			}:
+			{
+				score: 0
+			};
+			if(!this.playedMoves.length==0)
+			{
+				/*	//revert selectively
+				this.movingTeam.opposition.activePieces.forEach((piece)=>{
+					if(piece instanceof DirectionPiece)
+					{
+						const reachableBits = piece.reachableBits.get();
+						if
+						(
+							reachableBits.interact(BitVector.READ, lastMove.before) ||
+							reachableBits.interact(BitVector.READ, lastMove.after) ||
+							reachableBits.interact(BitVector.READ, lastLastMove.before) ||
+							reachableBits.interact(BitVector.READ, lastLastMove.after)
+						)
+						{
+							piece.revertReachableSquaresAndBitsAndKingSeer();
+						}
+					}
+					else
+					{
+						piece.revertKingSeer();
+					}
+				});
+				*/
+				///*	//revert everything
+				this.movingTeam.opposition.activePieces.forEach((piece)=>{
+					piece.revertReachableSquaresAndBitsAndKingSeer();
+				});
+				//*/
+			}
+			return returnVal;
+		}
+		
+		const reverseLine = bestEval.reverseLine ?? [];
+		reverseLine.push(bestContinuation);
+		
+		const checkmate = "checkmate_in_halfmoves" in bestEval;
+		return {
+			[checkmate? "checkmate_in_halfmoves" : "score"]: checkmate? bestEval.checkmate_in_halfmoves+1 : bestEval.score,
+			bestMove: bestContinuation,
+			reverseLine: reverseLine
+		};
 	}
+	//*/
 	
 	makeMoveForSearchExpansion(move)
 	{
@@ -230,8 +288,11 @@ class Game
 			
 			movingPiece.moved = true;
 			
-			//update the piece that moved and the opposition pieces that could be blocked or unblocked by the move
+			//update the piece that moved and the opposition pieces that could be blocked or unblocked by the 
+			//move or the previous move (the previous move was missed by the entire opposition)
 			movingPiece.updateReachableSquaresAndBitsAndKingSeer();
+			
+			const lastMove = this.playedMoves[this.playedMoves.length-1] ?? move;
 			movingPiece.team.opposition.activePieces.forEach((piece)=>{
 				if(piece instanceof DirectionPiece)
 				{
@@ -239,7 +300,9 @@ class Game
 					if
 					(
 						reachableBits.interact(BitVector.READ, move.before) ||
-						reachableBits.interact(BitVector.READ, move.after)
+						reachableBits.interact(BitVector.READ, move.after) ||
+						reachableBits.interact(BitVector.READ, lastMove.before) ||
+						reachableBits.interact(BitVector.READ, lastMove.after)
 					)
 					{
 						piece.updateReachableSquaresAndBitsAndKingSeer();
@@ -291,6 +354,8 @@ class Game
 			this.firstMove.revert();
 			
 			movingPiece.revertReachableSquaresAndBitsAndKingSeer();
+			
+			const lastMove = this.playedMoves[this.playedMoves.length-1] ?? move;
 			movingPiece.team.opposition.activePieces.forEach((piece)=>{
 				if(piece instanceof DirectionPiece)
 				{
@@ -298,7 +363,9 @@ class Game
 					if
 					(
 						reachableBits.interact(BitVector.READ, move.before) ||
-						reachableBits.interact(BitVector.READ, move.after)
+						reachableBits.interact(BitVector.READ, move.after) ||
+						reachableBits.interact(BitVector.READ, lastMove.before) ||
+						reachableBits.interact(BitVector.READ, lastMove.after)
 					)
 					{
 						piece.revertReachableSquaresAndBitsAndKingSeer();
@@ -309,7 +376,7 @@ class Game
 					piece.revertKingSeer();
 				}
 			})
-			
+						
 			//NOW revoke the capture of the target piece
 			targetPiece?.activate();
 		}
