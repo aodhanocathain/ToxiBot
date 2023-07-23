@@ -1,0 +1,3 @@
+Standard chess rules, terminology and notation in general.
+Taken for granted that chess rules, terminology or notation are never to change.
+No expected application in variants such as Fischer Random, more than 2 players, etc.
