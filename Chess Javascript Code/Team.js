@@ -1,5 +1,4 @@
-const {Piece, PatternPiece, DirectionPiece, PieceClassesByTypeChar, PieceClasses} = require("./Piece.js");
-const [King] = PieceClasses;
+const {Piece, PatternPiece, DirectionPiece, PieceClassesByTypeChar, King} = require("./Piece.js");
 
 class Team
 {

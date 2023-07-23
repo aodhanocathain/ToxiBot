@@ -1,7 +1,6 @@
 const {Team, Team0, Team1, TEAM_CLASSES} = require("./Team.js");
 
-const {Piece, PatternPiece, DirectionPiece, PieceClassesByTypeChar, PieceClasses} = require("./Piece.js");
-const [King] = PieceClasses;
+const {Piece, PatternPiece, DirectionPiece, PieceClassesByTypeChar, King} = require("./Piece.js");
 
 const {NUM_RANKS, NUM_FILES} = require("./Constants.js");
 const {PlainMove} = require("./Move.js");

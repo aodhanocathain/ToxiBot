@@ -206,95 +206,100 @@ class DirectionPiece extends Piece
 	}
 }
 
+class King extends PatternPiece
+{
+	static typeChar = "K";
+	static name = "king";
+	static points = 0;
+	
+	static pattern = [
+		[-1,-1],
+		[0,-1],
+		[1,-1],
+		[-1,0],
+		[1,0],
+		[-1,1],
+		[0,1],
+		[1,1]
+	];
+	
+	addMovesToArray(array)
+	{
+		this.addPlainMovesToArray(array);
+		//implement castle moves here
+	}
+}
+
+class Knight extends PatternPiece
+{
+	static typeChar = "N";
+	static name = "knight";
+	static points = 3;
+	
+	static pattern = [
+		[-2,-1],
+		[-2,1],
+		[-1,-2],
+		[-1,2],
+		[1,-2],
+		[1,2],
+		[2,-1],
+		[2,1]
+	];
+}
+
+class Bishop extends DirectionPiece
+{
+	static typeChar = "B";
+	static name = "bishop";
+	static points = 3;
+	
+	static directions = [
+		[-1,-1],
+		[1,-1],
+		[-1,1],
+		[1,1]
+	];
+}
+
+class Rook extends DirectionPiece
+{
+	static typeChar = "R";
+	static name = "rook";
+	static points = 5;
+	
+	static directions = [
+		[0,-1],
+		[-1,0],
+		[1,0],
+		[0,1]
+	];
+}
+
+class Queen extends DirectionPiece
+{
+	static typeChar = "Q";
+	static name = "queen";
+	static points = 9;
+	
+	static directions = [
+		[-1,-1],
+		[0,-1],
+		[1,-1],
+		[-1,0],
+		[1,0],
+		[-1,1],
+		[0,1],
+		[1,1]
+	];
+}
+
 const PieceClasses = [
-
-	class King extends PatternPiece
-	{
-		static typeChar = "K";
-		static name = "king";
-		static points = 0;
-		
-		static pattern = [
-			[-1,-1],
-			[0,-1],
-			[1,-1],
-			[-1,0],
-			[1,0],
-			[-1,1],
-			[0,1],
-			[1,1]
-		];
-		
-		addMovesToArray(array)
-		{
-			this.addPlainMovesToArray(array);
-			//implement castle moves here
-		}
-	},
-
-	class Knight extends PatternPiece
-	{
-		static typeChar = "N";
-		static name = "knight";
-		static points = 3;
-		
-		static pattern = [
-			[-2,-1],
-			[-2,1],
-			[-1,-2],
-			[-1,2],
-			[1,-2],
-			[1,2],
-			[2,-1],
-			[2,1]
-		];
-	},
-
-	class Bishop extends DirectionPiece
-	{
-		static typeChar = "B";
-		static name = "bishop";
-		static points = 3;
-		
-		static directions = [
-			[-1,-1],
-			[1,-1],
-			[-1,1],
-			[1,1]
-		];
-	},
-
-	class Rook extends DirectionPiece
-	{
-		static typeChar = "R";
-		static name = "rook";
-		static points = 5;
-		
-		static directions = [
-			[0,-1],
-			[-1,0],
-			[1,0],
-			[0,1]
-		];
-	},
-
-	class Queen extends DirectionPiece
-	{
-		static typeChar = "Q";
-		static name = "queen";
-		static points = 9;
-		
-		static directions = [
-			[-1,-1],
-			[0,-1],
-			[1,-1],
-			[-1,0],
-			[1,0],
-			[-1,1],
-			[0,1],
-			[1,1]
-		];
-	},
+	King,
+	Queen,
+	Rook,
+	Bishop,
+	Knight
 ];
 
 //match piece type characters to classes
@@ -308,7 +313,11 @@ module.exports = {
 	PatternPiece:PatternPiece,
 	DirectionPiece:DirectionPiece,
 	
-	PieceClasses: PieceClasses,
+	King:King,
+	Queen:Queen,
+	Rook:Rook,
+	Bishop:Bishop,
+	Knight:Knight,
 	
 	PieceClassesByTypeChar: PieceClassesByTypeChar,
 }
