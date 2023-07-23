@@ -62,9 +62,12 @@ class Move
 		
 		const capture = targetPiece? "x" : "";
 		
-		this.game.makeProperMove(this);
-		const checkStatus = this.game.kingChecked()? (this.game.calculateLegals().length==0? "#": "+") : "";
-		this.game.undoProperMove();
+		this.game.makeMove(this);
+		const checkStatus = 
+		this.game.isCheckmate()? "#":
+		this.game.kingChecked()? "+":
+		"";
+		this.game.undoMove();
 		
 		return `${movingPiece.constructor.typeChar}${beforeDetails}${capture}${Square.fullString(this.after)}${checkStatus}`;
 	}

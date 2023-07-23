@@ -4,4 +4,4 @@ module.exports = {
 	
 	MIN_FILE:"a",
 	MIN_RANK:"1",
-}
+};

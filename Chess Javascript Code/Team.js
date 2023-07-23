@@ -87,6 +87,8 @@ class Team
 	
 	evalPreferredToEval(newEval, oldEval)
 	{
+		//work out if what happens in newEval is better than what happened in oldEval
+		
 		//any even number of halfmoves ago, the same team was moving
 		const iGiveCheckmate = (newEval?.checkmate_in_halfmoves % 2) == 0;
 		const iGaveCheckmate = (oldEval?.checkmate_in_halfmoves % 2) == 0;
@@ -106,7 +108,7 @@ class Team
 		}
 		else	//not due to be checkmated in old continuation
 		{
-			if(iGaveCheckmate)	//due to give checkmate in old continuation
+			if(iGaveCheckmate)	//already due to give checkmate in old continuation
 			{
 				//better continuations give checkmate sooner
 				return (iGiveCheckmate) && (giveMateInHalfmoves < gaveMateInHalfMoves);
@@ -122,7 +124,7 @@ class Team
 	}
 }
 
-const Team0 = class extends Team
+const WhiteTeam = class extends Team
 {
 	static char = "w";
 	static charConverter(char)
@@ -138,7 +140,7 @@ const Team0 = class extends Team
 	}
 };
 
-const Team1 = class extends Team
+const BlackTeam = class extends Team
 {
 	static char = "b";
 	static charConverter(char)
@@ -154,11 +156,11 @@ const Team1 = class extends Team
 	}
 }
 
-const TEAM_CLASSES = [Team0, Team1];
+const TEAM_CLASSES = [WhiteTeam, BlackTeam];
 
 module.exports = {
 	Team:Team,
-	Team0:Team0,
-	Team1:Team1,
+	WhiteTeam:WhiteTeam,
+	BlackTeam:BlackTeam,
 	TEAM_CLASSES:TEAM_CLASSES
 }

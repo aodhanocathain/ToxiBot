@@ -1,10 +1,14 @@
 const {generateMask} = require("./Helpers.js");
 
+//store bits using an array of integers, assuming 32 bit integers in javascript
+//index a bit as [which integer][which bit in the integer]
+//e.g. bit 0 is [0][0]
+//bit 32 is [1][0]
+//bit 33 is [1][1]
+
 const WORD_WIDTH = 32;	//assuming 32-bit integers in javascript
 const BIT_INDEX_WIDTH = Math.ceil(Math.log2(WORD_WIDTH));
 const BIT_INDEX_MASK = generateMask(BIT_INDEX_WIDTH);
-
-//store bits using integers, assuming 32 bit integers in javascript
 class BitVector
 {
 	static INTERACTION_NAMES = ["set","clear","read"];

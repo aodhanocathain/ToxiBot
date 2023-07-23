@@ -1,4 +1,4 @@
-const {Team, Team0, Team1, TEAM_CLASSES} = require("./Team.js");
+const {Team, WhiteTeam, BlackTeam, TEAM_CLASSES} = require("./Team.js");
 
 const {Piece, PatternPiece, DirectionPiece, PieceClassesByTypeChar, King} = require("./Piece.js");
 
@@ -136,7 +136,7 @@ class Game
 		if(this.movingTeam.numKingSeers>0){return;}
 		if(depth==0){
 			return {
-				score: this.teamsByName[Team0.name].points - this.teamsByName[Team1.name].points
+				score: this.teamsByName[WhiteTeam.name].points - this.teamsByName[BlackTeam.name].points
 			}
 		}
 		const continuations = this.calculateMoves();
@@ -149,9 +149,9 @@ class Game
 		{
 			//if(depth==DEFAULT_ANALYSIS_DEPTH){console.log(`${i}/${continuations.length}`)}
 			const newContinuation = continuations[i];
-			this.makeMoveForSearchExpansion(newContinuation);
+			this.makeMove(newContinuation);
 			const newEval = this.evaluate(depth-1);
-			this.undoMoveForSearchExpansion();
+			this.undoMove();
 			if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
 			{
 				bestContinuation = newContinuation;
@@ -162,83 +162,14 @@ class Game
 		if(!bestEval)
 		{
 			//No VALID continuation found, i.e. can't make a move without leaving king vulnerable.
-			//This means the current position is either checkmate or stalemate.
-			//The move functions specific to search expansion do not guarantee up to date opposition,
-			//so must update the opposition, check if king vulnerable (checkmate vs stalemate),
-			//then revert opposition to leave them as they were found
-			
-			//Can selectively update pieces that need it, or update every piece regardless
-			//Either approach seems to be as fast as the other
-			const lastMove = this.playedMoves[this.playedMoves.length-1];
-			const lastLastMove = this.playedMoves[this.playedMoves.length-2] ?? lastMove;
-			if(!this.playedMoves.length==0)
-			{
-				/*	//update selectively
-				this.movingTeam.opposition.activePieces.forEach((piece)=>{
-					if(piece instanceof DirectionPiece)
-					{
-						const reachableBits = piece.reachableBits.get();
-						if
-						(
-							reachableBits.interact(BitVector.READ, lastMove.before) ||
-							reachableBits.interact(BitVector.READ, lastMove.after) ||
-							reachableBits.interact(BitVector.READ, lastLastMove.before) ||
-							reachableBits.interact(BitVector.READ, lastLastMove.after)
-						)
-						{
-							piece.updateReachableSquaresAndBitsAndKingSeer();
-						}
-					}
-					else
-					{
-						piece.updateKingSeer();
-					}
-				});
-				*/
-				///*	//update everything
-				this.movingTeam.opposition.activePieces.forEach((piece)=>{
-					piece.updateReachableSquaresAndBitsAndKingSeer();
-				});
-				//*/
-			}
-			const returnVal = (this.movingTeam.opposition.numKingSeers>0)?
+			//This means the current position is either checkmate or stalemate against movingTeam
+			return (this.movingTeam.opposition.numKingSeers>0)?
 			{
 				checkmate_in_halfmoves: 0
 			}:
 			{
 				score: 0
 			};
-			if(!this.playedMoves.length==0)
-			{
-				/*	//revert selectively
-				this.movingTeam.opposition.activePieces.forEach((piece)=>{
-					if(piece instanceof DirectionPiece)
-					{
-						const reachableBits = piece.reachableBits.get();
-						if
-						(
-							reachableBits.interact(BitVector.READ, lastMove.before) ||
-							reachableBits.interact(BitVector.READ, lastMove.after) ||
-							reachableBits.interact(BitVector.READ, lastLastMove.before) ||
-							reachableBits.interact(BitVector.READ, lastLastMove.after)
-						)
-						{
-							piece.revertReachableSquaresAndBitsAndKingSeer();
-						}
-					}
-					else
-					{
-						piece.revertKingSeer();
-					}
-				});
-				*/
-				///*	//revert everything
-				this.movingTeam.opposition.activePieces.forEach((piece)=>{
-					piece.revertReachableSquaresAndBitsAndKingSeer();
-				});
-				//*/
-			}
-			return returnVal;
 		}
 		
 		const reverseLine = bestEval.reverseLine ?? [];
@@ -253,7 +184,7 @@ class Game
 	}
 	//*/
 	
-	makeMoveForSearchExpansion(move)
+	makeMove(move)
 	{
 		if(move instanceof PlainMove)
 		{
@@ -287,30 +218,29 @@ class Game
 			
 			movingPiece.moved = true;
 			
-			//update the piece that moved and the opposition pieces that could be blocked or unblocked by the 
-			//move or the previous move (the previous move was missed by the entire opposition)
-			movingPiece.updateReachableSquaresAndBitsAndKingSeer();
-			
-			const lastMove = this.playedMoves[this.playedMoves.length-1] ?? move;
-			movingPiece.team.opposition.activePieces.forEach((piece)=>{
-				if(piece instanceof DirectionPiece)
-				{
-					const reachableBits = piece.reachableBits.get();
-					if
-					(
-						reachableBits.interact(BitVector.READ, move.before) ||
-						reachableBits.interact(BitVector.READ, move.after) ||
-						reachableBits.interact(BitVector.READ, lastMove.before) ||
-						reachableBits.interact(BitVector.READ, lastMove.after)
-					)
+			[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
+				team.activePieces.forEach((piece)=>{
+					if(piece instanceof DirectionPiece)
+					{
+						const reachableBits = piece.reachableBits.get();
+						if
+						(
+							reachableBits.interact(BitVector.READ, move.before) ||
+							reachableBits.interact(BitVector.READ, move.after)
+						)
+						{
+							piece.updateReachableSquaresAndBitsAndKingSeer();
+						}
+					}
+					else if(piece==movingPiece)
 					{
 						piece.updateReachableSquaresAndBitsAndKingSeer();
 					}
-				}
-				else
-				{
-					piece.updateKingSeer();
-				}
+					else
+					{
+						piece.updateKingSeer();
+					}
+				});
 			});
 		}
 		
@@ -319,7 +249,7 @@ class Game
 		this.changeTurns();
 	}
 	
-	undoMoveForSearchExpansion()
+	undoMove()
 	{
 		const move = this.playedMoves.pop();
 		if(move instanceof PlainMove)
@@ -332,7 +262,7 @@ class Game
 			
 			//revoke the capture of the target piece
 			//NOT BEFORE REVERTING, do later
-			//because the target piece may be reverted in error (could not have updated in makeMoveForSearchExpansion)
+			//because the target piece may be reverted in error (could not have updated in makeMove)
 			//targetPiece?.activate();
 			
 			//manipulate the game position
@@ -352,117 +282,32 @@ class Game
 			movingPiece.moved = (this.firstMove.get() == false);
 			this.firstMove.revert();
 			
-			movingPiece.revertReachableSquaresAndBitsAndKingSeer();
-			
-			const lastMove = this.playedMoves[this.playedMoves.length-1] ?? move;
-			movingPiece.team.opposition.activePieces.forEach((piece)=>{
-				if(piece instanceof DirectionPiece)
-				{
-					const reachableBits = piece.reachableBits.get();
-					if
-					(
-						reachableBits.interact(BitVector.READ, move.before) ||
-						reachableBits.interact(BitVector.READ, move.after) ||
-						reachableBits.interact(BitVector.READ, lastMove.before) ||
-						reachableBits.interact(BitVector.READ, lastMove.after)
-					)
+			[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
+				team.activePieces.forEach((piece)=>{
+					if(piece instanceof DirectionPiece)
+					{
+						const reachableBits = piece.reachableBits.get();
+						if
+						(
+							reachableBits.interact(BitVector.READ, move.before) ||
+							reachableBits.interact(BitVector.READ, move.after)
+						)
+						{
+							piece.revertReachableSquaresAndBitsAndKingSeer();
+						}
+					}
+					else if(piece==movingPiece)
 					{
 						piece.revertReachableSquaresAndBitsAndKingSeer();
 					}
-				}
-				else
-				{
-					piece.revertKingSeer();
-				}
-			})
+					else
+					{
+						piece.revertKingSeer();
+					}
+				});
+			});
 						
 			//NOW revoke the capture of the target piece
-			targetPiece?.activate();
-		}
-		
-		this.regressMoveCounters();
-		this.changeTurns();
-	}
-	
-	
-	makeProperMove(move)
-	{
-		if(move instanceof PlainMove)
-		{
-			const movingPiece = this.pieces[move.before];
-			const targetPiece = this.pieces[move.after];
-			
-			//move the moving piece
-			movingPiece.square = move.after;
-			//capture the target piece
-			targetPiece?.deactivate();
-			//manipulate the game position
-			this.pieces[move.after] = movingPiece;
-			this.squaresOccupiedBitVector.interact(BitVector.SET, move.after);
-			this.pieces[move.before] = null;
-			this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.before);
-			
-			//update the necessary information for undoing the move
-			if(movingPiece instanceof King)
-			{
-				this.castleRights.update(
-					//opponent retains castling rights, moving team forfeits castle rights
-					this.castleRights.get().filter((wing)=>{
-						return Team.classOfTeamedChar(wing) != movingPiece.team.constructor;
-					})
-				);
-			}
-			this.enPassantable.update("-");
-			this.movingPiece.update(movingPiece);
-			this.targetPiece.update(targetPiece);
-			this.firstMove.update(movingPiece.moved==false);
-			
-			movingPiece.moved = true;
-			
-			movingPiece.team.activePieces.forEach((piece)=>{piece.updateReachableSquaresAndBitsAndKingSeer();});
-			movingPiece.team.opposition.activePieces.forEach((piece)=>{piece.updateReachableSquaresAndBitsAndKingSeer();});
-		}
-		
-		this.playedMoves.push(move);
-		this.progressMoveCounters();
-		this.changeTurns();
-	}
-	
-	undoProperMove()
-	{
-		const move = this.playedMoves.pop();
-		if(move instanceof PlainMove)
-		{
-			const movingPiece = this.movingPiece.get();
-			const targetPiece = this.targetPiece.get();
-			
-			//move the moving piece back where it came from
-			movingPiece.square = move.before;
-			
-			//revoke the capture of the target piece AFTER REVERTING, the targetPiece was not updated before
-			// ---->  targetPiece?.activate();
-			
-			//manipulate the game position
-			this.pieces[move.before] = movingPiece;
-			this.squaresOccupiedBitVector.interact(BitVector.SET, move.before);
-			this.pieces[move.after] = targetPiece;
-			if(!targetPiece){this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.after);}
-			
-			//revert the game state
-			if(movingPiece instanceof King)
-			{
-				this.castleRights.revert();
-			}
-			this.enPassantable.revert();
-			this.movingPiece.revert();
-			this.targetPiece.revert();
-			movingPiece.moved = (this.firstMove.get() == false);
-			this.firstMove.revert();
-
-			movingPiece.team.activePieces.forEach((piece)=>{piece.revertReachableSquaresAndBitsAndKingSeer();});
-			movingPiece.team.opposition.activePieces.forEach((piece)=>{piece.revertReachableSquaresAndBitsAndKingSeer();});	
-			
-			//revoke the capture of the target piece AFTER REVERTING, the targetPiece was not updated before
 			targetPiece?.activate();
 		}
 		
@@ -485,9 +330,9 @@ class Game
 		//moves are illegal if they leave the team's king vulnerable to capture
 		return this.calculateMoves().filter((move)=>{
 			///*
-			this.makeProperMove(move);
+			this.makeMove(move);
 			const condition = !(this.kingCapturable());
-			this.undoProperMove();
+			this.undoMove();
 			return condition;
 			//*/
 		});
@@ -544,12 +389,12 @@ class Game
 				accumulator = accumulator.concat("\t");
 			}
 			accumulator = accumulator.concat(move.toString());
-			this.makeProperMove(move);
+			this.makeMove(move);
 			return accumulator;
 		},"");
 		for(const move of line)
 		{
-			this.undoProperMove();
+			this.undoMove();
 		}
 		
 		return string;
@@ -561,7 +406,7 @@ class Game
 		{
 			const teamToGiveMate = ((evaluation.checkmate_in_halfmoves % 2) == 0) ?
 			this.movingTeam : this.movingTeam.opposition;
-			const sign = teamToGiveMate instanceof Team0? "+" : "+";
+			const sign = teamToGiveMate instanceof WhiteTeam? "+" : "+";
 			return `${sign}M${Math.floor((evaluation.checkmate_in_halfmoves+1)/2)}`;
 		}
 		else
@@ -632,8 +477,8 @@ class Game
 		{
 			for(let drawFile=0; drawFile<NUM_FILES; drawFile++)	//the "file" on the drawn board, not necessarily the real file
 			{
-				const realRank = (this.movingTeam instanceof Team0)? (NUM_RANKS-1)-drawRank : drawRank;
-				const realFile = (this.movingTeam instanceof Team0)? drawFile : (NUM_FILES-1)-drawFile;
+				const realRank = (this.movingTeam instanceof WhiteTeam)? (NUM_RANKS-1)-drawRank : drawRank;
+				const realFile = (this.movingTeam instanceof WhiteTeam)? drawFile : (NUM_FILES-1)-drawFile;
 				const square = Square.make(realRank,realFile);
 				
 				const x = drawFile*SQUARE_PIXELS;

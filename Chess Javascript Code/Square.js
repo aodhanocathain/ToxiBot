@@ -1,17 +1,12 @@
-const {asciiOffset, generateMask} = require("./Helpers.js");
+const {asciiOffset} = require("./Helpers.js");
 const {MIN_FILE, MIN_RANK, NUM_FILES, NUM_RANKS} = require("./Constants.js");
 
-const NUM_FILE_BITS = Math.ceil(Math.log2(NUM_FILES));
-
-const FILE_BITS_MASK = generateMask(NUM_FILE_BITS);
-
-//represent a square using a single integer
-//[rank bits][file bits]
+//represent a square as a single integer
 class Square
 {
 	static make(rank,file)
 	{
-		return (rank << NUM_FILE_BITS) | file;
+		return (rank*NUM_FILES) + file;
 	}
 	
 	static validRankAndFile(rank,file)
@@ -21,12 +16,12 @@ class Square
 	
 	static rank(square)
 	{
-		return square >> NUM_FILE_BITS;
+		return Math.floor(square / NUM_FILES);
 	}
 	
 	static file(square)
 	{
-		return square & FILE_BITS_MASK;
+		return square % NUM_FILES;
 	}
 	
 	static rankString(square)
