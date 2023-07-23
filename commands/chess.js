@@ -1,5 +1,5 @@
 const {Game} = require("../Chess Javascript Code/Game.js");
-const {Team, Team0, Team1, TEAM_CLASSES} = require("../Chess Javascript Code/Team.js");
+const {Team, WhiteTeam, BlackTeam, TEAM_CLASSES} = require("../Chess Javascript Code/Team.js");
 
 const Discord = require("discord.js");
 const commandName = "chess";
@@ -51,19 +51,19 @@ class DiscordGame
 	makeMoveAndEditInteraction(move)
 	{
 		move.takeStringSnapshot();
-		this.chessGame.makeProperMove(move);
+		this.chessGame.makeMove(move);
 		this.editInteraction();
 	}
 	
 	undoMoveAndEditInteraction()
 	{
-		this.chessGame.undoProperMove();
+		this.chessGame.undoMove();
 		//if first undo gives turn to bot, must undo a second move to give turn to user
 		if(this.isBotTurn())
 		{
 			if(this.chessGame.playedMoves.length>0)
 			{
-				this.chessGame.undoProperMove();
+				this.chessGame.undoMove();
 			}
 			else	//no second move to undo, have to make a bot move to give turn back to user
 			{
@@ -105,12 +105,12 @@ class DiscordGame
 		this.chessGame.isStalemate()? "draw by stalemate" :
 		this.chessGame.scoreString(evaluation);
 		
-		const team0Username = playersById[this.IdsByTeamName[Team0.name]]?.username ?? process.env.BOT_NAME;
-		const team1Username = playersById[this.IdsByTeamName[Team1.name]]?.username ?? process.env.BOT_NAME;
+		const team0Username = playersById[this.IdsByTeamName[WhiteTeam.name]]?.username ?? process.env.BOT_NAME;
+		const team1Username = playersById[this.IdsByTeamName[BlackTeam.name]]?.username ?? process.env.BOT_NAME;
 		
 		return boardPictureBuffer.then((boardPicture)=>{
 			return {
-				content:`# (${Team0.name}) ${team0Username} vs ${team1Username} (${Team1.name})\n`
+				content:`# (${WhiteTeam.name}) ${team0Username} vs ${team1Username} (${BlackTeam.name})\n`
 				.concat(`**Played Moves**:\t${playedMovesString}\n`)
 				.concat(`**FEN String**:\t${FENString}\n`)
 				//.concat(`\n`)
