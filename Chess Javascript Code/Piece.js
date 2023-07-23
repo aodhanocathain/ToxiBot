@@ -164,7 +164,7 @@ class Piece
 		this.team.numKingSeers += currentKingSeer - oldKingSeer;
 	}
 	
-	addMovesToArray(array)
+	addPlainMovesToArray(array)
 	{
 		this.reachableSquares.get().forEach((reachableSquare)=>{
 			//only allow moves that do not capture pieces from the same team
@@ -173,6 +173,11 @@ class Piece
 				array.push(new PlainMove(this.game, this.square, reachableSquare));
 			}
 		});
+	}
+	
+	addMovesToArray(array)
+	{
+		this.addPlainMovesToArray(array);
 	}
 	
 	toString()
@@ -219,6 +224,12 @@ const PieceClasses = [
 			[0,1],
 			[1,1]
 		];
+		
+		addMovesToArray(array)
+		{
+			this.addPlainMovesToArray(array);
+			//implement castle moves here
+		}
 	},
 
 	class Knight extends PatternPiece
