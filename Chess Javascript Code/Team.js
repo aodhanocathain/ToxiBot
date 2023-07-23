@@ -1,4 +1,7 @@
-const {Piece, PatternPiece, DirectionPiece, PieceClassesByTypeChar, King} = require("./Piece.js");
+const {Piece, PatternPiece, DirectionPiece, PieceClassesByTypeChar, King, Queen, Rook} = require("./Piece.js");
+const {Square} = require("./Square.js");
+
+const {NUM_FILES, NUM_RANKS} = require("./Constants.js");
 
 class Team
 {
@@ -24,6 +27,7 @@ class Team
 	numKingSeers;
 	
 	king;
+	rooksInDefaultSquaresByStartingWingChar;
 	
 	//assigned by the team's game
 	opposition;
@@ -38,6 +42,8 @@ class Team
 		
 		this.points = 0;
 		this.numKingSeers = 0;
+		
+		this.rooksInDefaultSquaresByStartingWingChar = {};
 	}
 	
 	addActivePiece(piece)
@@ -54,6 +60,20 @@ class Team
 		if(piece instanceof King)
 		{
 			this.king = piece;
+		}
+		else if(piece instanceof Rook)
+		{
+			const backRank = (this instanceof WhiteTeam)? 0 : NUM_RANKS-1;
+			const defaultQueensideRookSquare = Square.make(backRank, 0);
+			const defaultKingsideRookSquare = Square.make(backRank, NUM_FILES-1);
+			if(piece.square==defaultQueensideRookSquare)
+			{
+				this.rooksInDefaultSquaresByStartingWingChar[Queen.typeChar] = piece;
+			}
+			else if(piece.square==defaultKingsideRookSquare)
+			{
+				this.rooksInDefaultSquaresByStartingWingChar[King.typeChar] = piece;
+			}
 		}
 	}
 	

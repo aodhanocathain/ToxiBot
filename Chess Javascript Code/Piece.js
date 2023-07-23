@@ -124,6 +124,11 @@ class Piece
 		this.team.activatePiece(this);
 	}
 	
+	isActive()
+	{
+		return this.team.activePieces[this.id] == this;
+	}
+	
 	deactivate()
 	{
 		this.team.deactivatePiece(this);
