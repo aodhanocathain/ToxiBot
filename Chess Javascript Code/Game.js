@@ -476,16 +476,7 @@ class Game
 		const moves = [];
 		
 		this.movingTeam.activePieces.forEach((piece)=>{
-			//get destination squares of current piece
-			const currentSquare = piece.square;
-			const reachableSquares = piece.reachableSquares.get();
-			reachableSquares.forEach((reachableSquare)=>{
-				//only allow moves that do not capture pieces from the same team
-				if(this.pieces[reachableSquare]?.team != piece.team)
-				{
-					moves.push(new PlainMove(this, currentSquare, reachableSquare));
-				}
-			})
+			piece.addMovesToArray(moves);
 		});
 		return moves;
 	}

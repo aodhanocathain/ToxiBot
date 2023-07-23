@@ -1,6 +1,7 @@
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
 const {BitVector} = require("./BitVector.js");
+const {PlainMove} = require("./Move.js");
 
 const Canvas = require("canvas");
 
@@ -95,6 +96,8 @@ class Piece
 	reachableSquares;
 	reachableBits;
 	
+	capturableBits;
+	
 	image;
 	
 	//set by the piece's team
@@ -110,6 +113,8 @@ class Piece
 		this.kingSeer = new Manager(0);
 		this.reachableSquares = new Manager([]);
 		this.reachableBits = new Manager(new BitVector());
+		
+		this.capturableBits = this.reachableBits;
 		
 		this.image = Canvas.loadImage(imageFileName(this.team.constructor.name, this.constructor.name));
 	}
@@ -137,7 +142,7 @@ class Piece
 	{
 		//reflect the change in whether this piece sees the king in its team
 		const oldKingSeer = this.kingSeer.get();
-		this.kingSeer.update(this.reachableBits.get().interact(BitVector.READ, this.team.opposition.king.square));
+		this.kingSeer.update(this.capturableBits.get().interact(BitVector.READ, this.team.opposition.king.square));
 		const currentKingSeer = this.kingSeer.get();
 		this.team.numKingSeers += currentKingSeer - oldKingSeer;
 	}
@@ -157,6 +162,17 @@ class Piece
 		this.kingSeer.revert();
 		const currentKingSeer = this.kingSeer.get();
 		this.team.numKingSeers += currentKingSeer - oldKingSeer;
+	}
+	
+	addMovesToArray(array)
+	{
+		this.reachableSquares.get().forEach((reachableSquare)=>{
+			//only allow moves that do not capture pieces from the same team
+			if(this.game.pieces[reachableSquare]?.team != this.team)
+			{
+				array.push(new PlainMove(this.game, this.square, reachableSquare));
+			}
+		});
 	}
 	
 	toString()
