@@ -30,6 +30,7 @@ class Move
 		information about the square the piece moves from, to uniquely identify the moving piece.
 		*/
 		
+		///*
 		//See what squares the piece could have come from at the new square
 		const movingPiece = this.game.pieces[this.before];
 		const targetPiece = this.game.pieces[this.after];
@@ -70,6 +71,8 @@ class Move
 		this.game.undoMove();
 		
 		return `${movingPiece.constructor.typeChar}${beforeDetails}${capture}${Square.fullString(this.after)}${checkStatus}`;
+		//*/
+		//return `${Square.fullString(this.before)}${Square.fullString(this.after)}`;
 	}
 }
 

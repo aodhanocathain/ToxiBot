@@ -3,7 +3,7 @@ const {Piece, PatternPiece, DirectionPiece, PieceClassesByTypeChar, King, Queen}
 
 const {asciiDistance} = require("./Helpers.js");
 const {NUM_RANKS, NUM_FILES, MIN_FILE} = require("./Constants.js");
-const {PlainMove} = require("./Move.js");
+const {PlainMove, CastleMove} = require("./Move.js");
 const {BitVector} = require("./BitVector.js");
 const {Square} = require("./Square.js");
 const {Manager} = require("./Manager.js");
@@ -177,8 +177,6 @@ class Game
 		//for not enough reward, so I am willing to allow impossible fullmove clocks
 		if((this.fullMove <= 0) || isNaN(this.fullMove))
 		{
-			console.log(this.fullMove);
-			console.log(typeof this.fullMove);
 			throw "invalid fullmove clock in FEN string";
 		}
 		
@@ -261,72 +259,83 @@ class Game
 	
 	makeMove(move)
 	{
-		if(move instanceof PlainMove)
+		const movingPiece = this.pieces[move.before];
+		const targetPiece = this.pieces[move.after];
+			
+		//move the moving piece
+		movingPiece.square = move.after;
+		//capture the target piece
+		targetPiece?.deactivate();
+		//manipulate the game position
+		this.pieces[move.after] = movingPiece;
+		this.squaresOccupiedBitVector.interact(BitVector.SET, move.after);
+		this.pieces[move.before] = null;
+		this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.before);
+			
+		this.firstMove.update(movingPiece.moved==false);
+		movingPiece.moved = true;
+		
+		if(move instanceof CastleMove)
 		{
-			const movingPiece = this.pieces[move.before];
-			const targetPiece = this.pieces[move.after];
+			const rook = this.pieces[move.rookBefore];
+			rook.square = move.rookAfter;
+			this.pieces[move.rookAfter] = rook;
+			this.squaresOccupiedBitVector.interact(BitVector.SET, move.rookAfter);
+			this.pieces[move.rookBefore] = null;
+			this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.rookBefore);
+				
+			this.firstMove.update(rook.moved==false);
+			rook.moved = true;
+		}
+		
+		this.castleRights.update(
+			this.castleRights.get().filter((teamedChar)=>{
+				const teamClass = Team.classOfTeamedChar(teamedChar);
+				const wingChar = Piece.typeCharOfTeamedChar(teamedChar);
+				const rook = this.teamsByName[teamClass.name].rooksInDefaultSquaresByStartingWingChar[wingChar];
+				if(movingPiece.team instanceof teamClass)	//could only change by the rook or king moving
+				{
+					return (rook.moved==false) && (rook.team.king.moved==false);
+				}
+				else	//could only change by being the rook being captured
+				{
+					return rook.isActive();
+				}
+			})
+		);
 			
-			//move the moving piece
-			movingPiece.square = move.after;
-			//capture the target piece
-			targetPiece?.deactivate();
-			//manipulate the game position
-			this.pieces[move.after] = movingPiece;
-			this.squaresOccupiedBitVector.interact(BitVector.SET, move.after);
-			this.pieces[move.before] = null;
-			this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.before);
-			
-			this.firstMove.update(movingPiece.moved==false);
-			movingPiece.moved = true;
-			
-			this.castleRights.update(
-				this.castleRights.get().filter((teamedChar)=>{
-					const teamClass = Team.classOfTeamedChar(teamedChar);
-					const wingChar = Piece.typeCharOfTeamedChar(teamedChar);
-					const rook = this.teamsByName[teamClass.name].rooksInDefaultSquaresByStartingWingChar[wingChar];
-					if(movingPiece.team instanceof teamClass)	//could only change by the rook or king moving
-					{
-						return (rook.moved==false) && (rook.team.king.moved==false);
-					}
-					else	//could only change by being the rook being captured
-					{
-						return rook.isActive();
-					}
-				})
-			);
-			
-			this.enPassantable.update("-");
-			this.movingPiece.update(movingPiece);
-			this.targetPiece.update(targetPiece);
-			
-			//selectively update pieces whose ranges could have been altered by the move
-			//i.e. direction pieces that saw the move squares change
-			//all pieces still have to update whether they can see the enemy king
-			[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
-				team.activePieces.forEach((piece)=>{
-					if(piece instanceof DirectionPiece)
-					{
-						const reachableBits = piece.reachableBits.get();
-						if
-						(
-							reachableBits.interact(BitVector.READ, move.before) ||
-							reachableBits.interact(BitVector.READ, move.after)
-						)
-						{
-							piece.updateReachableSquaresAndBitsAndKingSeer();
-						}
-					}
-					else if(piece==movingPiece)
+		this.enPassantable.update("-");
+		this.movingPiece.update(movingPiece);
+		this.targetPiece.update(targetPiece);
+		
+		//selectively update pieces whose ranges could have been altered by the move
+		//i.e. direction pieces that saw the move squares change
+		//all pieces still have to update whether they can see the enemy king
+		
+		[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
+			team.activePieces.forEach((piece)=>{
+				if(piece instanceof DirectionPiece)
+				{
+					const reachableBits = piece.reachableBits.get();
+					if
+					(
+						reachableBits.interact(BitVector.READ, move.before) ||
+						reachableBits.interact(BitVector.READ, move.after)
+					)
 					{
 						piece.updateReachableSquaresAndBitsAndKingSeer();
 					}
-					else
-					{
-						piece.updateKingSeer();
-					}
-				});
+				}
+				else if((piece==movingPiece) || (piece==this.pieces[move.rookAfter]))
+				{
+					piece.updateReachableSquaresAndBitsAndKingSeer();
+				}
+				else
+				{
+					piece.updateKingSeer();
+				}
 			});
-		}
+		});
 		
 		this.playedMoves.push(move);
 		this.progressMoveCounters();
@@ -336,61 +345,71 @@ class Game
 	undoMove()
 	{
 		const move = this.playedMoves.pop();
-		if(move instanceof PlainMove)
+		const movingPiece = this.movingPiece.get();
+		const targetPiece = this.targetPiece.get();
+		
+		//move the moving piece back where it came from
+		movingPiece.square = move.before;
+		
+		//revoke the capture of the target piece
+		//NOT BEFORE REVERTING, do later
+		//because the target piece may be reverted in error (could not have updated in makeMove)
+		//targetPiece?.activate();
+		
+		if(move instanceof CastleMove)
 		{
-			const movingPiece = this.movingPiece.get();
-			const targetPiece = this.targetPiece.get();
-			
-			//move the moving piece back where it came from
-			movingPiece.square = move.before;
-			
-			//revoke the capture of the target piece
-			//NOT BEFORE REVERTING, do later
-			//because the target piece may be reverted in error (could not have updated in makeMove)
-			//targetPiece?.activate();
-			
-			//manipulate the game position
-			this.pieces[move.before] = movingPiece;
-			this.squaresOccupiedBitVector.interact(BitVector.SET, move.before);
-			this.pieces[move.after] = targetPiece;
-			if(!targetPiece){this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.after);}
-			
-			//revert the game state
-			this.castleRights.revert();
-			this.enPassantable.revert();
-			this.movingPiece.revert();
-			this.targetPiece.revert();
-			movingPiece.moved = (this.firstMove.get() == false);
+			const rook = this.pieces[move.rookAfter];
+			rook.square = move.rookBefore;
+			this.pieces[move.rookBefore] = rook;
+			this.squaresOccupiedBitVector.interact(BitVector.SET, move.rookBefore);
+			this.pieces[move.rookAfter] = null;
+			this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.rookAfter);
+				
+			rook.moved = (this.firstMove.get() == false);
 			this.firstMove.revert();
-			
-			[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
-				team.activePieces.forEach((piece)=>{
-					if(piece instanceof DirectionPiece)
-					{
-						const reachableBits = piece.reachableBits.get();
-						if
-						(
-							reachableBits.interact(BitVector.READ, move.before) ||
-							reachableBits.interact(BitVector.READ, move.after)
-						)
-						{
-							piece.revertReachableSquaresAndBitsAndKingSeer();
-						}
-					}
-					else if(piece==movingPiece)
+		}
+		
+		//manipulate the game position
+		this.pieces[move.before] = movingPiece;
+		this.squaresOccupiedBitVector.interact(BitVector.SET, move.before);
+		this.pieces[move.after] = targetPiece;
+		if(!targetPiece){this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.after);}			
+		
+		//revert the game state
+		this.castleRights.revert();
+		this.enPassantable.revert();
+		this.movingPiece.revert();
+		this.targetPiece.revert();
+		movingPiece.moved = (this.firstMove.get() == false);
+		this.firstMove.revert();
+		
+		[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
+			team.activePieces.forEach((piece)=>{
+				if(piece instanceof DirectionPiece)
+				{
+					const reachableBits = piece.reachableBits.get();
+					if
+					(
+						reachableBits.interact(BitVector.READ, move.before) ||
+						reachableBits.interact(BitVector.READ, move.after)
+					)
 					{
 						piece.revertReachableSquaresAndBitsAndKingSeer();
 					}
-					else
-					{
-						piece.revertKingSeer();
-					}
-				});
+				}
+				else if((piece==movingPiece) || (piece==this.pieces[move.rookBefore]))
+				{
+					piece.revertReachableSquaresAndBitsAndKingSeer();
+				}
+				else
+				{
+					piece.revertKingSeer();
+				}
 			});
-						
-			//NOW revoke the capture of the target piece
-			targetPiece?.activate();
-		}
+		});
+					
+		//NOW revoke the capture of the target piece
+		targetPiece?.activate();
 		
 		this.regressMoveCounters();
 		this.changeTurns();

@@ -233,7 +233,7 @@ class King extends PatternPiece
 	addMovesToArray(array)
 	{
 		this.addPlainMovesToArray(array);
-		//implement castle moves here
+		//king must not have moved
 		if(this.moved == false)
 		{
 			const backRank = this.team.constructor.BACK_RANK;
@@ -242,12 +242,13 @@ class King extends PatternPiece
 			const kingRook = this.team.rooksInDefaultSquaresByStartingWingChar[King.typeChar];
 			const queenRook = this.team.rooksInDefaultSquaresByStartingWingChar[Queen.typeChar];
 			
+			//rook must not have moved
 			if((kingRook?.moved == false) && kingRook?.isActive())
 			{
 				let noPiecesBetween = true;
 				for(let i=NUM_FILES-2; i>kingFile; i--)
 				{
-					noPiecesBetween = (!(this.game.squaresOccupiedBitVector.read(Square.make(backRank, i)))) && noPiecesBetween;
+					noPiecesBetween = (!(this.game.squaresOccupiedBitVector.interact(BitVector.READ, Square.make(backRank, i)))) && noPiecesBetween;
 				}
 				//must not be any pieces between king and rook
 				if(noPiecesBetween)
@@ -258,20 +259,21 @@ class King extends PatternPiece
 						//can't castle through check
 						const passingSquare = Square.make(backRank, 5);
 						if(!(this.team.opposition.activePieces.some((piece)=>{
-							return piece.reachableBits.get().read(passingSquare);
+							return piece.reachableBits.get().interact(BitVector.READ, passingSquare);
 						})))
 						{
-							array.push(new CastleMove(this.game, this.square, Square.make(backRank, 6), kingRook.square, Square.make(backRank,6)));
+							array.push(new CastleMove(this.game, this.square, Square.make(backRank, 6), kingRook.square, Square.make(backRank,5)));
 						}
 					}
 				}
 			}
+			//rook must not have moved
 			if((queenRook?.moved == false) && queenRook?.isActive())
 			{
 				let noPiecesBetween = true;
 				for(let i=1; i<kingFile; i++)
 				{
-					noPiecesBetween = (!(this.game.squaresOccupiedBitVector.read(Square.make(backRank, i)))) && noPiecesBetween;
+					noPiecesBetween = (!(this.game.squaresOccupiedBitVector.interact(BitVector.READ, Square.make(backRank, i)))) && noPiecesBetween;
 				}
 				//must not be any pieces between king and rook
 				if(noPiecesBetween)
@@ -282,7 +284,7 @@ class King extends PatternPiece
 						//can't castle through check
 						const passingSquare = Square.make(backRank, 3);
 						if(!(this.team.opposition.activePieces.some((piece)=>{
-							return piece.reachableBits.get().read(passingSquare);
+							return piece.reachableBits.get().interact(BitVector.READ, passingSquare);
 						})))
 						{
 							array.push(new CastleMove(this.game, this.square, Square.make(backRank, 2), kingRook.square, Square.make(backRank,3)));
