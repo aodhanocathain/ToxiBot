@@ -16,6 +16,7 @@ class Team
 		return TEAM_CLASSES.find((teamClass)=>{return teamClass.charConverter(teamedChar)==teamedChar;});
 	}
 	static MOVE_COLOUR;
+	static BACK_RANK;
 	
 	game;
 	
@@ -153,6 +154,7 @@ const WhiteTeam = class extends Team
 	}
 	static name = "white";
 	static MOVE_COLOUR = "#ffff80";
+	static BACK_RANK = 0;
 	
 	scorePreferredToScore(newScore, oldScore)
 	{
@@ -169,6 +171,7 @@ const BlackTeam = class extends Team
 	}
 	static name = "black";
 	static MOVE_COLOUR = "#80ffff";
+	static BACK_RANK = NUM_RANKS-1;
 	
 	scorePreferredToScore(newScore, oldScore)
 	{

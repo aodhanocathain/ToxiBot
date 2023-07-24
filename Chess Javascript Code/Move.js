@@ -75,8 +75,35 @@ class Move
 
 class PlainMove extends Move
 {
+	
+}
+
+class CastleMove extends Move
+{
+	rookBefore;
+	rookAfter;
+	
+	constructor(game, kingBefore, kingAfter, rookBefore, rookAfter)
+	{
+		super(game, kingBefore, kingAfter);
+		this.rookBefore = rookBefore;
+		this.rookAfter = rookAfter;
+	}
+	
+	toString()
+	{
+		if(Square.file(this.before) > Square.file(this.after))
+		{
+			return "O-O-O";
+		}
+		else
+		{
+			return "O-O";
+		}
+	}
 }
 
 module.exports = {
-	PlainMove:PlainMove
+	PlainMove:PlainMove,
+	CastleMove:CastleMove
 }

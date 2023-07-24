@@ -1,7 +1,9 @@
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
 const {BitVector} = require("./BitVector.js");
-const {PlainMove} = require("./Move.js");
+const {PlainMove, CastleMove} = require("./Move.js");
+
+const {NUM_RANKS, NUM_FILES} = require("./Constants.js");
 
 const Canvas = require("canvas");
 
@@ -232,6 +234,63 @@ class King extends PatternPiece
 	{
 		this.addPlainMovesToArray(array);
 		//implement castle moves here
+		if(this.moved == false)
+		{
+			const backRank = this.team.constructor.BACK_RANK;
+			const kingFile = Square.file(this.square);
+			
+			const kingRook = this.team.rooksInDefaultSquaresByStartingWingChar[King.typeChar];
+			const queenRook = this.team.rooksInDefaultSquaresByStartingWingChar[Queen.typeChar];
+			
+			if((kingRook?.moved == false) && kingRook?.isActive())
+			{
+				let noPiecesBetween = true;
+				for(let i=NUM_FILES-2; i>kingFile; i--)
+				{
+					noPiecesBetween = (!(this.game.squaresOccupiedBitVector.read(Square.make(backRank, i)))) && noPiecesBetween;
+				}
+				//must not be any pieces between king and rook
+				if(noPiecesBetween)
+				{
+					//can't castle to get out of check
+					if(this.team.opposition.numKingSeers==0)
+					{
+						//can't castle through check
+						const passingSquare = Square.make(backRank, 5);
+						if(!(this.team.opposition.activePieces.some((piece)=>{
+							return piece.reachableBits.get().read(passingSquare);
+						})))
+						{
+							array.push(new CastleMove(this.game, this.square, Square.make(backRank, 6), kingRook.square, Square.make(backRank,6)));
+						}
+					}
+				}
+			}
+			if((queenRook?.moved == false) && queenRook?.isActive())
+			{
+				let noPiecesBetween = true;
+				for(let i=1; i<kingFile; i++)
+				{
+					noPiecesBetween = (!(this.game.squaresOccupiedBitVector.read(Square.make(backRank, i)))) && noPiecesBetween;
+				}
+				//must not be any pieces between king and rook
+				if(noPiecesBetween)
+				{
+					//can't castle to get out of check
+					if(this.team.opposition.numKingSeers==0)
+					{
+						//can't castle through check
+						const passingSquare = Square.make(backRank, 3);
+						if(!(this.team.opposition.activePieces.some((piece)=>{
+							return piece.reachableBits.get().read(passingSquare);
+						})))
+						{
+							array.push(new CastleMove(this.game, this.square, Square.make(backRank, 2), kingRook.square, Square.make(backRank,3)));
+						}
+					}
+				}
+			}
+		}
 	}
 }
 
