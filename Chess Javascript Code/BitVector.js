@@ -1,5 +1,3 @@
-const {generateMask} = require("./Helpers.js");
-
 //store bits using an array of integers, assuming 32 bit integers in javascript
 //index a bit as [which integer][which bit in the integer]
 //e.g. bit 0 is [0][0]
@@ -7,8 +5,6 @@ const {generateMask} = require("./Helpers.js");
 //bit 33 is [1][1]
 
 const WORD_WIDTH = 32;	//assuming 32-bit integers in javascript
-const BIT_INDEX_WIDTH = Math.ceil(Math.log2(WORD_WIDTH));
-const BIT_INDEX_MASK = generateMask(BIT_INDEX_WIDTH);
 class BitVector
 {
 	static INTERACTION_NAMES = ["set","clear","read"];
@@ -25,8 +21,8 @@ class BitVector
 	
 	interact(interactionIndex, index)
 	{
-		const wordIndex = index >> BIT_INDEX_WIDTH;
-		const bitIndex = index & BIT_INDEX_MASK;
+		const wordIndex = Math.floor(index / WORD_WIDTH);
+		const bitIndex = index % WORD_WIDTH;
 		const funcName = this.constructor.INTERACTION_NAMES[interactionIndex];
 		return this[funcName](wordIndex, bitIndex);
 	}
