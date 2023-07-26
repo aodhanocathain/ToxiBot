@@ -15,12 +15,9 @@ const EMPTY_FEN_FIELD = "-";
 class Game
 {	
 	static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
-	//static DEFAULT_FEN_STRING = "k7/8/K7/Q7/8/8/8/8 w KQkq - 0 1";
-	//static DEFAULT_FEN_STRING = "k7/8/K7/3Q4/8/8/8/8 b KQkq - 0 1";
-	//static DEFAULT_FEN_STRING = "3k4/5Q2/K7/8/8/8/8/8 b - - 0 1";
-	//static DEFAULT_FEN_STRING = "1nbk1bnr/8/8/8/8/5N1B/8/1rB1K2R w K - 0 4";
-	//static DEFAULT_FEN_STRING = "1nbk1bnr/8/8/8/8/5N1B/8/1rB1K2R w Q - 0 4";
-	//static DEFAULT_FEN_STRING = "r3k2r/8/7b/8/8/8/8/1NBK1RBN b KQkq - 0 4";
+	//static DEFAULT_FEN_STRING = "k7/8/K7/Q7/8/8/8/8 w KQkq - 0 1";	//checkmate test
+	//static DEFAULT_FEN_STRING = "3k4/5Q2/K7/8/8/8/8/8 b - - 0 1";	//checkmate in 2 test
+	//static DEFAULT_FEN_STRING = "b6K/4qq2/8/8/8/8/Q7/7k w KQkq - 0 1";	//stalemate test (queen sac)
 	
 	pieces;	//indexed by a square on the board
 	squaresOccupiedBitVector;	//BitVector indicating whether a square is occupied with the bit at the square's index
