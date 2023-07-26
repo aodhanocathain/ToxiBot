@@ -1,22 +1,29 @@
-const {Piece, PatternPiece, DirectionPiece, PieceClassesByTypeChar, King, Queen, Rook} = require("./Piece.js");
+const {King, Queen, Rook} = require("./Piece.js");
 const {Square} = require("./Square.js");
-
+const {Manager} = require("./Manager.js");
 const {NUM_FILES, NUM_RANKS} = require("./Constants.js");
 
 class Team
 {
 	static char;
+	static name;
+	static MOVE_COLOUR;
+	static BACK_RANK;
+	
+	//assigned manually near the end of this file, after team class declarations
+	static STARTING_KING_SQUARE;
+	static STARTING_ROOK_SQUARES_BY_WINGCHAR;
+	static CASTLE_KING_SQUARES_BY_WINGCHAR;
+	static CASTLE_ROOK_SQUARES_BY_WINGCHAR;
+	
 	static charConverter(char)
 	{
-		throw "subclasses of Team must implement charConverter";
+		throw "charConverter called but not implemented";
 	}
-	static name;
 	static classOfTeamedChar(teamedChar)
 	{
 		return TEAM_CLASSES.find((teamClass)=>{return teamClass.charConverter(teamedChar)==teamedChar;});
 	}
-	static MOVE_COLOUR;
-	static BACK_RANK;
 	
 	game;
 	
@@ -28,7 +35,7 @@ class Team
 	numKingSeers;
 	
 	king;
-	rooksInDefaultSquaresByStartingWingChar;
+	rooksInStartSquaresByWingChar;
 	
 	//assigned by the team's game
 	opposition;
@@ -44,7 +51,7 @@ class Team
 		this.points = 0;
 		this.numKingSeers = 0;
 		
-		this.rooksInDefaultSquaresByStartingWingChar = {};
+		this.rooksInStartSquaresByWingChar = {};
 	}
 	
 	addActivePiece(piece)
@@ -53,6 +60,7 @@ class Team
 		this.activatePiece(piece);
 	}
 	
+	//called only at the start of a game
 	registerPiece(piece)
 	{
 		piece.id = this.nextId++;
@@ -61,19 +69,36 @@ class Team
 		if(piece instanceof King)
 		{
 			this.king = piece;
+			if(piece.square==this.constructor.STARTING_KING_SQUARE)
+			{
+				//assume the king did not move yet
+				piece.canCastle = new Manager(true);
+				//the game castling rights are used to verify this anyway
+			}
+			else
+			{
+				piece.canCastle = new Manager(false);
+			}
 		}
 		else if(piece instanceof Rook)
 		{
-			const backRank = (this instanceof WhiteTeam)? 0 : NUM_RANKS-1;
-			const defaultQueensideRookSquare = Square.make(backRank, 0);
-			const defaultKingsideRookSquare = Square.make(backRank, NUM_FILES-1);
-			if(piece.square==defaultQueensideRookSquare)
+			if(piece.square==this.constructor.STARTING_ROOK_SQUARES_BY_WINGCHAR[Queen.typeChar])
 			{
-				this.rooksInDefaultSquaresByStartingWingChar[Queen.typeChar] = piece;
+				this.rooksInStartSquaresByWingChar[Queen.typeChar] = piece;
+				//assume it is the original rook and that it never moved
+				piece.canCastle = new Manager(true);
+				//the game castling rights are used to verify this anyway
 			}
-			else if(piece.square==defaultKingsideRookSquare)
+			else if(piece.square==this.constructor.STARTING_ROOK_SQUARES_BY_WINGCHAR[King.typeChar])
 			{
-				this.rooksInDefaultSquaresByStartingWingChar[King.typeChar] = piece;
+				this.rooksInStartSquaresByWingChar[King.typeChar] = piece;
+				//assume it is the original rook and that it never moved
+				piece.canCastle = new Manager(true);
+				//the game castling rights are used to verify this anyway
+			}
+			else
+			{
+				piece.canCastle = new Manager(false);
 			}
 		}
 	}
@@ -97,49 +122,50 @@ class Team
 	init()
 	{
 		this.activePieces.forEach((piece)=>{
-			piece.updateReachableSquaresAndBitsAndKingSeer();
+			piece.updateKnowledge();
 		});
 	}
 	
 	scorePreferredToScore(newScore, oldScore)
 	{
-		throw "subclasses of Team must implement scorePreferredToScore";
+		throw "scorePreferredToScore called but not implemented";
 	}
 	
 	evalPreferredToEval(newEval, oldEval)
 	{
 		//work out if what happens in newEval is better than what happened in oldEval
+		if(!newEval){return false;}
+		if(!oldEval){return true;}
 		
-		//any even number of halfmoves ago, the same team was moving
-		const iGiveCheckmate = (newEval?.checkmate_in_halfmoves % 2) == 0;
-		const iGaveCheckmate = (oldEval?.checkmate_in_halfmoves % 2) == 0;
+		//any even number of halfmoves ago, this team was moving
+		const iGiveCheckmate = (newEval.checkmate_in_halfmoves % 2) == 0;
+		const iGaveCheckmate = (oldEval.checkmate_in_halfmoves % 2) == 0;
 		
 		//any odd number of halfmoves ago, the other team was moving
-		const iTakeCheckmate = (newEval?.checkmate_in_halfmoves % 2) == 1;
-		const iTookCheckmate = (oldEval?.checkmate_in_halfmoves % 2) == 1;
+		const iGetCheckmated = (newEval.checkmate_in_halfmoves % 2) == 1;
+		const iGotCheckmated = (oldEval.checkmate_in_halfmoves % 2) == 1;
 		
-		const giveMateInHalfmoves = newEval?.checkmate_in_halfmoves;
-		const gaveMateInHalfMoves = oldEval?.checkmate_in_halfmoves;
+		const giveMateInHalfmoves = newEval.checkmate_in_halfmoves;
+		const gaveMateInHalfMoves = oldEval.checkmate_in_halfmoves;
 		
-		if(iTookCheckmate)	//due to be checkmated in old continuation
+		if(iGotCheckmated)	//due to be checkmated in old continuation
 		{
 			//better continuations escape or delay the checkmate
-			return (newEval && !iTakeCheckmate) ||	//escape checkmate
-			(iTakeCheckmate && (giveMateInHalfmoves > gaveMateInHalfMoves));	//delay checkmate
+			return (!iGetCheckmated) ||	//escape checkmate
+			(giveMateInHalfmoves > gaveMateInHalfMoves);	//delay checkmate
 		}
 		else	//not due to be checkmated in old continuation
 		{
 			if(iGaveCheckmate)	//already due to give checkmate in old continuation
 			{
 				//better continuations give checkmate sooner
-				return (iGiveCheckmate) && (giveMateInHalfmoves < gaveMateInHalfMoves);
+				return iGiveCheckmate && (giveMateInHalfmoves < gaveMateInHalfMoves);
 			}
 			else	//not due to give checkmate in old continuation
 			{
-				//better continuations find checkmate or beat old score, or exist if old does not exist
-				return (iGiveCheckmate) ||	//checkmate
-				this.scorePreferredToScore(newEval?.score, oldEval?.score) ||	//better score
-				(newEval && !oldEval);	//if old does not exist in the first place
+				//better continuations find checkmate or beat old score
+				return iGiveCheckmate ||	//checkmate
+				this.scorePreferredToScore(newEval.score, oldEval.score);	//better score
 			}
 		}
 	}
@@ -148,13 +174,14 @@ class Team
 const WhiteTeam = class extends Team
 {
 	static char = "w";
+	static name = "white";
+	static MOVE_COLOUR = "#ffff80";
+	static BACK_RANK = 0;
+	
 	static charConverter(char)
 	{
 		return char.toUpperCase();
 	}
-	static name = "white";
-	static MOVE_COLOUR = "#ffff80";
-	static BACK_RANK = 0;
 	
 	scorePreferredToScore(newScore, oldScore)
 	{
@@ -165,13 +192,14 @@ const WhiteTeam = class extends Team
 const BlackTeam = class extends Team
 {
 	static char = "b";
+	static name = "black";
+	static MOVE_COLOUR = "#80ffff";
+	static BACK_RANK = NUM_RANKS-1;
+	
 	static charConverter(char)
 	{
 		return char.toLowerCase();
 	}
-	static name = "black";
-	static MOVE_COLOUR = "#80ffff";
-	static BACK_RANK = NUM_RANKS-1;
 	
 	scorePreferredToScore(newScore, oldScore)
 	{
@@ -180,6 +208,30 @@ const BlackTeam = class extends Team
 }
 
 const TEAM_CLASSES = [WhiteTeam, BlackTeam];
+
+TEAM_CLASSES.forEach((teamClass)=>{
+	//king starts on the e-file
+	teamClass.STARTING_KING_SQUARE = Square.make(teamClass.BACK_RANK, 4);
+	teamClass.STARTING_ROOK_SQUARES_BY_WINGCHAR = {
+		//king rook starts on the h-file
+		[King.typeChar]: Square.make(teamClass.BACK_RANK, NUM_FILES-1),
+		//queen rook starts on the a-file
+		[Queen.typeChar]: Square.make(teamClass.BACK_RANK, 0)
+	};
+	
+	//king goes 2 spaces towards the edge
+	teamClass.CASTLE_KING_SQUARES_BY_WINGCHAR = {
+		[King.typeChar]: Square.make(teamClass.BACK_RANK, Square.file(teamClass.STARTING_KING_SQUARE)+2),
+		[Queen.typeChar]: Square.make(teamClass.BACK_RANK, Square.file(teamClass.STARTING_KING_SQUARE)-2)
+	};
+	//rook goes 1 space closer to the center than the king
+	teamClass.CASTLE_ROOK_SQUARES_BY_WINGCHAR = {
+		[King.typeChar]: 
+		Square.make(teamClass.BACK_RANK, Square.file(teamClass.CASTLE_KING_SQUARES_BY_WINGCHAR[King.typeChar])-1),
+		[Queen.typeChar]: 
+		Square.make(teamClass.BACK_RANK, Square.file(teamClass.CASTLE_KING_SQUARES_BY_WINGCHAR[Queen.typeChar])+1),
+	};
+});
 
 module.exports = {
 	Team:Team,

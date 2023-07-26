@@ -1,3 +1,7 @@
 Standard chess rules, terminology and notation in general.
 Taken for granted that chess rules, terminology or notation are never to change.
 No expected application in variants such as Fischer Random, more than 2 players, etc.
+
+Non-standard terms:
+I use the word "domain" in the code to refer to anywhere on the board that a piece is
+able to move to in the current game position from its current square.

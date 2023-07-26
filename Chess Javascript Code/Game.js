@@ -1,23 +1,16 @@
 const {Team, WhiteTeam, BlackTeam, TEAM_CLASSES} = require("./Team.js");
-const {Piece, PatternPiece, DirectionPiece, PieceClassesByTypeChar, King, Queen} = require("./Piece.js");
-
-const {asciiDistance} = require("./Helpers.js");
-const {NUM_RANKS, NUM_FILES, MIN_FILE} = require("./Constants.js");
+const {Piece, BlockablePiece, King, Queen, Rook, PieceClassesByTypeChar} = require("./Piece.js");
+//const {asciiDistance} = require("./Helpers.js");
+//const {NUM_RANKS, NUM_FILES, MIN_FILE} = require("./Constants.js");
+const {NUM_RANKS, NUM_FILES} = require("./Constants.js");
 const {PlainMove, CastleMove} = require("./Move.js");
 const {BitVector} = require("./BitVector.js");
 const {Square} = require("./Square.js");
 const {Manager} = require("./Manager.js");
-
 const Canvas = require("canvas");
 
 const DEFAULT_ANALYSIS_DEPTH = 3;
-
 const EMPTY_FEN_FIELD = "-";
-
-const STARTING_KING_SQUARES_BY_TEAM_NAME = {
-	[WhiteTeam.name] : Square.make(0,4),
-	[BlackTeam.name] : Square.make(NUM_RANKS-1,4),
-};
 
 class Game
 {	
@@ -25,9 +18,12 @@ class Game
 	//static DEFAULT_FEN_STRING = "k7/8/K7/Q7/8/8/8/8 w KQkq - 0 1";
 	//static DEFAULT_FEN_STRING = "k7/8/K7/3Q4/8/8/8/8 b KQkq - 0 1";
 	//static DEFAULT_FEN_STRING = "3k4/5Q2/K7/8/8/8/8/8 b - - 0 1";
+	//static DEFAULT_FEN_STRING = "1nbk1bnr/8/8/8/8/5N1B/8/1rB1K2R w K - 0 4";
+	//static DEFAULT_FEN_STRING = "1nbk1bnr/8/8/8/8/5N1B/8/1rB1K2R w Q - 0 4";
+	//static DEFAULT_FEN_STRING = "r3k2r/8/7b/8/8/8/8/1NBK1RBN b KQkq - 0 4";
 	
 	pieces;	//indexed by a square on the board
-	squaresOccupiedBitVector;	//indicates whether a square is occupied by a piece
+	squaresOccupiedBitVector;	//BitVector indicating whether a square is occupied with the bit at the square's index
 	
 	teamsByName;
 	movingTeam;
@@ -40,7 +36,6 @@ class Game
 	enPassantable;
 	movingPiece;
 	targetPiece;
-	firstMove;
 	
 	static validFENString(FENString)
 	{
@@ -94,7 +89,7 @@ class Game
 					const team = this.teamsByName[teamClass.name];
 					
 					const square = Square.make(rank,file);
-					const piece = new pieceClass(this,team,square,false);	
+					const piece = new pieceClass(this,team,square);
 					
 					//current square is occupied
 					this.pieces[square] = piece;
@@ -119,7 +114,7 @@ class Game
 		{
 			this.movingTeam = this.teamsByName[WhiteTeam.name];
 		}
-		else if(FENparts[2]==BlackTeam.char)
+		else if(FENparts[1]==BlackTeam.char)
 		{
 			this.movingTeam = this.teamsByName[BlackTeam.name];
 		}
@@ -143,17 +138,18 @@ class Game
 			return accumulator;
 		},{});
 		//only accept the castle rights characters if the corresponding pieces are in their starting squares
+		//(if they are not in their starting squares, they have moved and could not be able to castle)
 		this.castleRights = new Manager(
 			FENparts[2]==EMPTY_FEN_FIELD? [] : 
 			castleRightsCharacters.filter((teamedChar)=>{
 				const wingChar = Piece.typeCharOfTeamedChar(teamedChar);
 				const teamClass = Team.classOfTeamedChar(teamedChar);
 				const team = this.teamsByName[teamClass.name];
-				const startingKingSquare = STARTING_KING_SQUARES_BY_TEAM_NAME[teamClass.name];
-				return (team.rooksInDefaultSquaresByStartingWingChar[wingChar]) && (team.king.square==startingKingSquare);
+				return (team.king.canCastle.get()) && (team.rooksInStartSquaresByWingChar[wingChar]?.canCastle.get());
 			})
 		);
-
+		
+		/*
 		//determine the possible en passant capture from the 4th part of the FEN string
 		if(FENparts[3] != EMPTY_FEN_FIELD)
 		{
@@ -164,6 +160,8 @@ class Game
 			}
 		}
 		this.enPassantable = new Manager(FENparts[3]);
+		*/
+		this.enPassantable = new Manager(EMPTY_FEN_FIELD);
 		
 		
 		//determine the halfmove and fullmove clocks from the 5th and 6th parts of the FEN string respectively
@@ -173,7 +171,7 @@ class Game
 			throw "invalid halfmove clock in FEN string";
 		}
 		this.fullMove = parseInt(FENparts[5]);
-		//programming a calculation of the fullmove clock's upper bound in a given position would take WAY too long,
+		//calculating the fullmove clock's upper bound in a given position would be WAY too difficult
 		//for not enough reward, so I am willing to allow impossible fullmove clocks
 		if((this.fullMove <= 0) || isNaN(this.fullMove))
 		{
@@ -182,7 +180,6 @@ class Game
 		
 		this.movingPiece = new Manager();
 		this.targetPiece = new Manager();
-		this.firstMove = new Manager();
 		
 		this.playedMoves = [];
 	}
@@ -272,8 +269,10 @@ class Game
 		this.pieces[move.before] = null;
 		this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.before);
 			
-		this.firstMove.update(movingPiece.moved==false);
-		movingPiece.moved = true;
+		if(movingPiece instanceof King || movingPiece instanceof Rook)
+		{
+			movingPiece.canCastle.update(false);
+		}
 		
 		if(move instanceof CastleMove)
 		{
@@ -283,28 +282,25 @@ class Game
 			this.squaresOccupiedBitVector.interact(BitVector.SET, move.rookAfter);
 			this.pieces[move.rookBefore] = null;
 			this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.rookBefore);
-				
-			this.firstMove.update(rook.moved==false);
-			rook.moved = true;
+			
+			rook.canCastle.update(false);
 		}
 		
 		this.castleRights.update(
 			this.castleRights.get().filter((teamedChar)=>{
-				const teamClass = Team.classOfTeamedChar(teamedChar);
 				const wingChar = Piece.typeCharOfTeamedChar(teamedChar);
-				const rook = this.teamsByName[teamClass.name].rooksInDefaultSquaresByStartingWingChar[wingChar];
-				if(movingPiece.team instanceof teamClass)	//could only change by the rook or king moving
-				{
-					return (rook.moved==false) && (rook.team.king.moved==false);
-				}
-				else	//could only change by being the rook being captured
-				{
-					return rook.isActive();
-				}
+				
+				const teamClass = Team.classOfTeamedChar(teamedChar);
+				const team = this.teamsByName[teamClass.name];
+				
+				const king = team.king;
+				const rook = team.rooksInStartSquaresByWingChar[wingChar];
+				
+				return (king.canCastle.get()) && (rook?.isActive()) && (rook.canCastle.get());
 			})
 		);
 			
-		this.enPassantable.update("-");
+		//this.enPassantable.update("-");
 		this.movingPiece.update(movingPiece);
 		this.targetPiece.update(targetPiece);
 		
@@ -314,21 +310,21 @@ class Game
 		
 		[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
 			team.activePieces.forEach((piece)=>{
-				if(piece instanceof DirectionPiece)
+				if(piece instanceof BlockablePiece)
 				{
-					const reachableBits = piece.reachableBits.get();
+					const watchingBits = piece.watchingBits.get();
 					if
 					(
-						reachableBits.interact(BitVector.READ, move.before) ||
-						reachableBits.interact(BitVector.READ, move.after)
+						watchingBits.interact(BitVector.READ, move.before) ||
+						watchingBits.interact(BitVector.READ, move.after)
 					)
 					{
-						piece.updateReachableSquaresAndBitsAndKingSeer();
+						piece.updateKnowledge();
 					}
 				}
 				else if((piece==movingPiece) || (piece==this.pieces[move.rookAfter]))
 				{
-					piece.updateReachableSquaresAndBitsAndKingSeer();
+					piece.updateKnowledge();
 				}
 				else
 				{
@@ -351,8 +347,7 @@ class Game
 		//move the moving piece back where it came from
 		movingPiece.square = move.before;
 		
-		//revoke the capture of the target piece
-		//NOT BEFORE REVERTING, do later
+		//revoke the capture of the target piece AFTER reverting knowledge
 		//because the target piece may be reverted in error (could not have updated in makeMove)
 		//targetPiece?.activate();
 		
@@ -364,9 +359,8 @@ class Game
 			this.squaresOccupiedBitVector.interact(BitVector.SET, move.rookBefore);
 			this.pieces[move.rookAfter] = null;
 			this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.rookAfter);
-				
-			rook.moved = (this.firstMove.get() == false);
-			this.firstMove.revert();
+			
+			rook.canCastle.revert();
 		}
 		
 		//manipulate the game position
@@ -377,29 +371,28 @@ class Game
 		
 		//revert the game state
 		this.castleRights.revert();
-		this.enPassantable.revert();
+		//this.enPassantable.revert();
 		this.movingPiece.revert();
 		this.targetPiece.revert();
-		movingPiece.moved = (this.firstMove.get() == false);
-		this.firstMove.revert();
 		
+		//selectively revert pieces the pieces that were updated in makeMove		
 		[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
 			team.activePieces.forEach((piece)=>{
-				if(piece instanceof DirectionPiece)
+				if(piece instanceof BlockablePiece)
 				{
-					const reachableBits = piece.reachableBits.get();
+					const watchingBits = piece.watchingBits.get();
 					if
 					(
-						reachableBits.interact(BitVector.READ, move.before) ||
-						reachableBits.interact(BitVector.READ, move.after)
+						watchingBits.interact(BitVector.READ, move.before) ||
+						watchingBits.interact(BitVector.READ, move.after)
 					)
 					{
-						piece.revertReachableSquaresAndBitsAndKingSeer();
+						piece.revertKnowledge();
 					}
 				}
 				else if((piece==movingPiece) || (piece==this.pieces[move.rookBefore]))
 				{
-					piece.revertReachableSquaresAndBitsAndKingSeer();
+					piece.revertKnowledge();
 				}
 				else
 				{
@@ -465,15 +458,14 @@ class Game
 	moveHistoryString()
 	{
 		//turn a list of moves into something like "1. whitemove blackmove 2.whitemove blackmove ..."
-		//REQUIRES that move strings are generated in advance
-		return this.playedMoves.reduce((accumulator, moveWithString, index)=>{
+		return this.playedMoves.reduce((accumulator, move, index)=>{
 			//give the full move counter at the start of each full move
 			if(index%2==0)
 			{
 				const fullMoveCounter = (index+2)/2;
 				accumulator = accumulator.concat(`${fullMoveCounter>1?"\t":""}${fullMoveCounter}.`);
 			}
-			return accumulator.concat(` ${moveWithString.string}`);
+			return accumulator.concat(` ${move.toString()}`);
 		},"");
 	}
 	
@@ -486,6 +478,7 @@ class Game
 			{
 				accumulator = accumulator.concat("\t");
 			}
+			move.takeStringSnapshot();
 			accumulator = accumulator.concat(move.toString());
 			this.makeMove(move);
 			return accumulator;
@@ -504,12 +497,13 @@ class Game
 		{
 			const teamToGiveMate = ((evaluation.checkmate_in_halfmoves % 2) == 0) ?
 			this.movingTeam : this.movingTeam.opposition;
-			const sign = teamToGiveMate instanceof WhiteTeam? "+" : "+";
+			//minus signs show up in negative numbers but positive signs dont show up in positive numbers
+			const sign = teamToGiveMate instanceof WhiteTeam? "+" : "";	//add a plus sign if necessary
 			return `${sign}M${Math.floor((evaluation.checkmate_in_halfmoves+1)/2)}`;
 		}
 		else
 		{
-			return `${evaluation.score>0? "+":""}${evaluation.score}`;
+			return `${evaluation.score>=0? "+":"-"}${evaluation.score}`;
 		}
 	}
 	

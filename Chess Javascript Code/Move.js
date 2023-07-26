@@ -16,63 +16,15 @@ class Move
 		this.after = after;
 	}
 	
-	//The same move can generate different strings depending on the game position
-	//Can use this method to capture the string at a specific moment
+	//store the string, which varies with the game position, at a specific moment in the game
 	takeStringSnapshot()
 	{
-		this.string = this.toString();
+		this.string = this.game.pieces[this.before].constructor.makeMoveString(this);
 	}
 	
 	toString()
 	{
-		/*
-		If many pieces of the same type can move to the same square, must also include
-		information about the square the piece moves from, to uniquely identify the moving piece.
-		*/
-		
-		///*
-		//See what squares the piece could have come from at the new square
-		const movingPiece = this.game.pieces[this.before];
-		const targetPiece = this.game.pieces[this.after];
-		
-		let otherOrigins = movingPiece.constructor.findReachableSquaresAndBitsFromSquareInGame(this.after,this.game)[0]
-		.filter((otherOrigin)=>{
-			const otherPiece = this.game.pieces[otherOrigin];
-			//ignore the square the moving piece came from
-			if(movingPiece==otherPiece){return false;}
-			//piece teams must match
-			if(movingPiece.team!=otherPiece?.team){return false;}
-			//piece types must match
-			if(movingPiece.constructor!=otherPiece?.constructor){return false;}
-			
-			return true;
-		})
-		
-		const sameOriginFiles = otherOrigins.filter((square)=>{return Square.file(this.before)==Square.file(square);});
-		const sameOriginRanks = otherOrigins.filter((square)=>{return Square.rank(this.before)==Square.rank(square);});
-		
-		const beforeDetails = 
-		(otherOrigins.length==0)?	//piece is the only possible candidate for the move, needs no clarification
-		"":
-		(sameOriginFiles.length==0)?	//need to uniquely identify piece by its file
-		Square.fileString(this.before) :
-		(sameOriginRanks.length==0)?	//need to uniquely identify piece by its rank
-		Square.rankString(this.before) :
-		//must fully specify the square the piece starts on
-		Square.fullString(this.before);
-		
-		const capture = targetPiece? "x" : "";
-		
-		this.game.makeMove(this);
-		const checkStatus = 
-		this.game.isCheckmate()? "#":
-		this.game.kingChecked()? "+":
-		"";
-		this.game.undoMove();
-		
-		return `${movingPiece.constructor.typeChar}${beforeDetails}${capture}${Square.fullString(this.after)}${checkStatus}`;
-		//*/
-		//return `${Square.fullString(this.before)}${Square.fullString(this.after)}`;
+		return this.string ?? `${Square.fullString(this.before)}->${Square.fullString(this.after)}`;
 	}
 }
 

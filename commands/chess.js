@@ -92,7 +92,7 @@ class DiscordGame
 		this.availableMoves = this.chessGame.calculateLegals();
 		this.availableStrings = this.availableMoves.map((move)=>{
 			move.takeStringSnapshot();
-			return move.string;
+			return move.toString();
 		});
 		const availableMovesString = this.availableStrings.join("\t");
 		
