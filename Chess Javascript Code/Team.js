@@ -10,11 +10,14 @@ class Team
 	static MOVE_COLOUR;
 	static BACK_RANK;
 	
+	static PAWN_START_RANK;
+	static PAWN_RANK_INCREMENT;
+	
 	//assigned manually near the end of this file, after team class declarations
 	static STARTING_KING_SQUARE;
 	static STARTING_ROOK_SQUARES_BY_WINGCHAR;
 	static CASTLE_KING_SQUARES_BY_WINGCHAR;
-	static CASTLE_ROOK_SQUARES_BY_WINGCHAR;
+	static CASTLE_ROOK_SQUARES_BY_WINGCHAR
 	
 	static charConverter(char)
 	{
@@ -178,6 +181,9 @@ const WhiteTeam = class extends Team
 	static MOVE_COLOUR = "#ffff80";
 	static BACK_RANK = 0;
 	
+	static PAWN_START_RANK = this.BACK_RANK+1;
+	static PAWN_RANK_INCREMENT = 1;
+	
 	static charConverter(char)
 	{
 		return char.toUpperCase();
@@ -195,6 +201,9 @@ const BlackTeam = class extends Team
 	static name = "black";
 	static MOVE_COLOUR = "#80ffff";
 	static BACK_RANK = NUM_RANKS-1;
+	
+	static PAWN_START_RANK = this.BACK_RANK-1;
+	static PAWN_RANK_INCREMENT = -1;
 	
 	static charConverter(char)
 	{

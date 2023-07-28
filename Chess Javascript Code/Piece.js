@@ -398,6 +398,161 @@ class Queen extends RangedPiece
 //implement later
 class Pawn extends BlockablePiece
 {
+	static typeChar = "P";
+	static name = "pawn";
+	static points = 1;
+	
+	static LONG_MOVE_MULTIPLIER = 2;
+	
+	static attackingDomainFromSquareInGameForTeam(square, game, team)
+	{
+		const squares = [];
+		const bits = new BitVector();
+		
+		const rank = Square.rank(square);
+		const file = Square.file(square);
+		const lessFile = file-1;
+		const moreFile = file+1;
+		const nextRank = rank+team.constructor.PAWN_RANK_INCREMENT;
+		
+		if(Square.validRankAndFile(nextRank,lessFile))
+		{
+			const captureSquare = Square.make(nextRank, lessFile);
+			squares.push(captureSquare);
+			bits.set(captureSquare);
+		}
+		if(Square.validRankAndFile(nextRank,moreFile))
+		{
+			const captureSquare = Square.make(nextRank, moreFile);
+			squares.push(captureSquare);
+			bits.set(captureSquare);
+		}
+		return {
+			squares: squares,
+			bits: bits
+		};
+	}
+	
+	static nonAttackingDomainFromSquareInGameForTeam(square, game, team)
+	{
+		const squares = [];
+		const bits = new BitVector();
+		
+		const rank = Square.rank(square);
+		const file = Square.file(square);
+		
+		const nextRank = rank+team.constructor.PAWN_RANK_INCREMENT;
+		
+		if(Square.validRankAndFile(nextRank, file))
+		{
+			const nextSquare = Square.make(nextRank, file);
+			if(!(game.pieces[nextSquare]))
+			{
+				squares.push(nextSquare);
+				bits.set(nextSquare);
+				if(rank==team.constructor.PAWN_START_RANK)
+				{
+					const nextNextRank = rank+(this.LONG_MOVE_MULTIPLIER*team.constructor.PAWN_RANK_INCREMENT);
+					const nextNextSquare = Square.make(nextNextRank, file);
+					if(!(game.pieces[nextNextSquare]))
+					{
+						squares.push(nextNextSquare);
+						bits.set(nextNextSquare);
+					}
+				}
+			}
+		}
+		
+		return {
+			squares: squares,
+			bits: bits
+		};
+	}
+	
+	static makeMoveString(move)
+	{
+		const game = move.game;		
+		
+		//if there is a capture, include current file and capture character
+		const beforeDetails = (game.pieces[move.after])? `${Square.fileString(move.before)}x` : "";
+		//the above will NOT work for en passant
+		
+		game.makeMove(move);
+		const checkStatus = 
+		game.isCheckmate()? "#":
+		game.kingChecked()? "+":
+		"";
+		game.undoMove();
+		
+		return `${beforeDetails}${Square.fullString(move.after)}${checkStatus}`;
+	}
+	
+	nonAttackingSquares;
+	nonAttackingBits;
+	
+	constructor(game, team, square)
+	{
+		super(game, team, square);
+		this.nonAttackingSquares = new Manager([]);
+		this.nonAttackingBits = new Manager(new BitVector());
+		
+		this.watchingBits = this.nonAttackingBits;
+	}
+	
+	addAttackingMovesToArray(array)
+	{
+		this.attackingSquares.get().forEach((attackingSquare)=>{
+			//only allow moves that capture a piece, from the enemy team
+			if(this.game.pieces[attackingSquare])
+			{
+				if(this.game.pieces[attackingSquare].team != this.team)
+				{
+					array.push(new PlainMove(this.game, this.square, attackingSquare));
+				}
+			}
+		});
+	}
+	
+	addNonAttackingMovesToArray(array)
+	{
+		this.nonAttackingSquares.get().forEach((nonAttackingSquare)=>{
+			//only allow moves to empty squares
+			if(!(this.game.pieces[nonAttackingSquare]))
+			{
+				array.push(new PlainMove(this.game, this.square, nonAttackingSquare));
+			}
+		});
+	}
+	
+	addMovesToArray(array)
+	{
+		this.addAttackingMovesToArray(array);
+		this.addNonAttackingMovesToArray(array);
+	}
+	
+	updateKnowledge()
+	{
+		const attackingDomain = this.constructor.attackingDomainFromSquareInGameForTeam(this.square, this.game, this.team);
+		this.attackingSquares.update(attackingDomain.squares);
+		this.attackingBits.update(attackingDomain.bits);
+		
+		const nonAttackingDomain = this.constructor.nonAttackingDomainFromSquareInGameForTeam(this.square, this.game, this.team);
+		this.nonAttackingSquares.update(nonAttackingDomain.squares);
+		this.nonAttackingBits.update(nonAttackingDomain.bits);
+		
+		this.updateKingSeer();
+	}
+	
+	revertKnowledge()
+	{
+		this.attackingSquares.revert();
+		this.attackingBits.revert();
+		
+		this.nonAttackingSquares.revert();
+		this.nonAttackingBits.revert();
+		
+		this.revertKingSeer();
+	}
 }
 
 const PieceClasses = [
@@ -405,7 +560,8 @@ const PieceClasses = [
 	Queen,
 	Rook,
 	Bishop,
-	Knight
+	Knight,
+	Pawn
 ];
 
 //match piece type characters to classes
@@ -425,6 +581,7 @@ module.exports = {
 	Rook:Rook,
 	Bishop:Bishop,
 	Knight:Knight,
+	Pawn,
 	
 	PieceClassesByTypeChar: PieceClassesByTypeChar,
 }

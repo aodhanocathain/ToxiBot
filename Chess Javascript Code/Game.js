@@ -14,7 +14,9 @@ const EMPTY_FEN_FIELD = "-";
 
 class Game
 {	
-	static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
+	//static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
+	static DEFAULT_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+		
 	//static DEFAULT_FEN_STRING = "k7/8/K7/Q7/8/8/8/8 w KQkq - 0 1";	//checkmate test
 	//static DEFAULT_FEN_STRING = "3k4/5Q2/K7/8/8/8/8/8 b - - 0 1";	//checkmate in 2 test
 	//static DEFAULT_FEN_STRING = "b6K/4qq2/8/8/8/8/Q7/7k w KQkq - 0 1";	//stalemate test (queen sac)
@@ -307,7 +309,11 @@ class Game
 		
 		[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
 			team.activePieces.forEach((piece)=>{
-				if(piece instanceof BlockablePiece)
+				if((piece==movingPiece) || (piece==this.pieces[move.rookAfter]))
+				{
+					piece.updateKnowledge();
+				}
+				else if(piece instanceof BlockablePiece)
 				{
 					const watchingBits = piece.watchingBits.get();
 					if
@@ -318,10 +324,6 @@ class Game
 					{
 						piece.updateKnowledge();
 					}
-				}
-				else if((piece==movingPiece) || (piece==this.pieces[move.rookAfter]))
-				{
-					piece.updateKnowledge();
 				}
 				else
 				{
@@ -375,7 +377,11 @@ class Game
 		//selectively revert pieces the pieces that were updated in makeMove		
 		[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
 			team.activePieces.forEach((piece)=>{
-				if(piece instanceof BlockablePiece)
+				if((piece==movingPiece) || (piece==this.pieces[move.rookBefore]))
+				{
+					piece.revertKnowledge();
+				}
+				else if(piece instanceof BlockablePiece)
 				{
 					const watchingBits = piece.watchingBits.get();
 					if
@@ -386,10 +392,6 @@ class Game
 					{
 						piece.revertKnowledge();
 					}
-				}
-				else if((piece==movingPiece) || (piece==this.pieces[move.rookBefore]))
-				{
-					piece.revertKnowledge();
 				}
 				else
 				{
@@ -490,17 +492,19 @@ class Game
 	
 	scoreString(evaluation)
 	{
+		//minus signs show up in negative numbers but positive signs dont show up in positive numbers
+		//either branch here adds a plus sign if necessary to their string
 		if("checkmate_in_halfmoves" in evaluation)
 		{
 			const teamToGiveMate = ((evaluation.checkmate_in_halfmoves % 2) == 0) ?
 			this.movingTeam : this.movingTeam.opposition;
-			//minus signs show up in negative numbers but positive signs dont show up in positive numbers
-			const sign = teamToGiveMate instanceof WhiteTeam? "+" : "";	//add a plus sign if necessary
+			const sign = teamToGiveMate instanceof WhiteTeam? "+" : "";
 			return `${sign}M${Math.floor((evaluation.checkmate_in_halfmoves+1)/2)}`;
 		}
 		else
 		{
-			return `${evaluation.score>=0? "+":"-"}${evaluation.score}`;
+			const sign = (evaluation.score>=0)? "+" : ""
+			return `${sign}${evaluation.score}`;
 		}
 	}
 	
