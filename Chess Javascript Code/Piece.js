@@ -402,7 +402,7 @@ class Pawn extends BlockablePiece
 	static name = "pawn";
 	static points = 1;
 	
-	static LONG_MOVE_MULTIPLIER = 2;
+	static LONG_MOVE_RANK_INCREMENT_MULTIPLIER = 2;
 	
 	static attackingDomainFromSquareInGameForTeam(square, game, team)
 	{
@@ -452,7 +452,7 @@ class Pawn extends BlockablePiece
 				bits.set(nextSquare);
 				if(rank==team.constructor.PAWN_START_RANK)
 				{
-					const nextNextRank = rank+(this.LONG_MOVE_MULTIPLIER*team.constructor.PAWN_RANK_INCREMENT);
+					const nextNextRank = rank+(this.LONG_MOVE_RANK_INCREMENT_MULTIPLIER*team.constructor.PAWN_RANK_INCREMENT);
 					const nextNextSquare = Square.make(nextNextRank, file);
 					if(!(game.pieces[nextNextSquare]))
 					{

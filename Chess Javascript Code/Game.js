@@ -1,8 +1,7 @@
 const {Team, WhiteTeam, BlackTeam, TEAM_CLASSES} = require("./Team.js");
-const {Piece, BlockablePiece, King, Queen, Rook, PieceClassesByTypeChar} = require("./Piece.js");
-//const {asciiDistance} = require("./Helpers.js");
-//const {NUM_RANKS, NUM_FILES, MIN_FILE} = require("./Constants.js");
-const {NUM_RANKS, NUM_FILES} = require("./Constants.js");
+const {Piece, BlockablePiece, King, Queen, Rook, Pawn, PieceClassesByTypeChar} = require("./Piece.js");
+const {asciiOffset} = require("./Helpers.js");
+const {NUM_RANKS, NUM_FILES, MIN_FILE} = require("./Constants.js");
 const {PlainMove, CastleMove} = require("./Move.js");
 const {BitVector} = require("./BitVector.js");
 const {Square} = require("./Square.js");
@@ -14,8 +13,8 @@ const EMPTY_FEN_FIELD = "-";
 
 class Game
 {	
-	//static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
 	static DEFAULT_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+	//static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";	//pawnless game
 		
 	//static DEFAULT_FEN_STRING = "k7/8/K7/Q7/8/8/8/8 w KQkq - 0 1";	//checkmate test
 	//static DEFAULT_FEN_STRING = "3k4/5Q2/K7/8/8/8/8/8 b - - 0 1";	//checkmate in 2 test
@@ -148,7 +147,6 @@ class Game
 			})
 		);
 		
-		/*
 		//determine the possible en passant capture from the 4th part of the FEN string
 		if(FENparts[3] != EMPTY_FEN_FIELD)
 		{
@@ -159,8 +157,6 @@ class Game
 			}
 		}
 		this.enPassantable = new Manager(FENparts[3]);
-		*/
-		this.enPassantable = new Manager(EMPTY_FEN_FIELD);
 		
 		
 		//determine the halfmove and fullmove clocks from the 5th and 6th parts of the FEN string respectively
@@ -299,7 +295,20 @@ class Game
 			})
 		);
 			
-		//this.enPassantable.update("-");
+		if(movingPiece instanceof Pawn)
+		{
+			const beforeRank = Square.rank(move.before);
+			const afterRank = Square.rank(move.after);
+			const distance = afterRank-beforeRank;
+			if((distance/Pawn.LONG_MOVE_RANK_INCREMENT_MULTIPLIER)==movingPiece.team.constructor.PAWN_RANK_INCREMENT)
+			{
+				this.enPassantable.update(asciiOffset(MIN_FILE, Square.file(move.after)));	//could have used move.before too
+			}
+		}
+		else
+		{
+			this.enPassantable.update("-");
+		}
 		this.movingPiece.update(movingPiece);
 		this.targetPiece.update(targetPiece);
 		
@@ -370,7 +379,7 @@ class Game
 		
 		//revert the game state
 		this.castleRights.revert();
-		//this.enPassantable.revert();
+		this.enPassantable.revert();
 		this.movingPiece.revert();
 		this.targetPiece.revert();
 		
