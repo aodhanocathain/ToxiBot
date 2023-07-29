@@ -102,6 +102,8 @@ class DiscordGame
 		const bestLineString = this.chessGame.lineString(evaluation.reverseLine?.slice().reverse() ?? []);
 		const statusString = 
 		this.chessGame.isCheckmate()? `${this.chessGame.movingTeam.opposition.constructor.name} wins` :
+		this.chessGame.isDrawByRepetition()? "draw by repetition" :
+		this.chessGame.isDrawByMoveRule()? "draw by move clock" :
 		this.chessGame.isStalemate()? "draw by stalemate" :
 		this.chessGame.scoreString(evaluation);
 		

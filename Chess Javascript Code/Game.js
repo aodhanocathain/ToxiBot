@@ -9,14 +9,16 @@ const {Manager} = require("./Manager.js");
 const Canvas = require("canvas");
 
 const DEFAULT_ANALYSIS_DEPTH = 3;
+const DRAW_AFTER_NO_PROGRESS_HALFMOVES = 50*(TEAM_CLASSES.length);
+const DRAW_BY_REPETITIONS = 3;
 const EMPTY_FEN_FIELD = "-";
 
 class Game
 {	
-	//static DEFAULT_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";	//default game
+	static DEFAULT_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";	//default game
 	//static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";	//pawnless game
 	
-	static DEFAULT_FEN_STRING = "4k3/6P1/8/8/8/8/1p6/4K3 w KQkq - 0 1";	//promotion test
+	//static DEFAULT_FEN_STRING = "4k3/6P1/8/8/8/8/1p6/4K3 w KQkq - 0 1";	//promotion test
 	
 	//static DEFAULT_FEN_STRING = "rnbqkbnr/ppp2ppp/4p3/3pP3/8/8/PPPP1PPP/RNBQKBNR w - d 0 3";	//en passant test
 	//static DEFAULT_FEN_STRING = "4k3/8/4p3/3pP3/8/8/8/4K3 w - d 0 3";	//en passant test
@@ -27,6 +29,8 @@ class Game
 	
 	pieces;	//indexed by a square on the board
 	squaresOccupiedBitVector;	//BitVector indicating whether a square is occupied with the bit at the square's index
+	
+	positionFrequenciesByBoardString;
 	
 	teamsByName;
 	movingTeam;
@@ -39,7 +43,7 @@ class Game
 	enPassantable;
 	movingPiece;
 	targetPiece;
-	
+		
 	static validFENString(FENString)
 	{
 		//FEN string validity is checked in the Game constructor already
@@ -165,8 +169,8 @@ class Game
 		
 		
 		//determine the halfmove and fullmove clocks from the 5th and 6th parts of the FEN string respectively
-		this.halfMove = parseInt(FENparts[4]);
-		if((this.halfMove < 0) || (this.halfMove > 1) || isNaN(this.halfMove))
+		this.halfMove = new Manager(parseInt(FENparts[4]));
+		if((this.halfMove.get() < 0) || (this.halfMove.get() > DRAW_AFTER_NO_PROGRESS_HALFMOVES) || isNaN(this.halfMove.get()))
 		{
 			throw "invalid halfmove clock in FEN string";
 		}
@@ -180,6 +184,8 @@ class Game
 		
 		this.movingPiece = new Manager();
 		this.targetPiece = new Manager();
+		
+		this.positionFrequenciesByBoardString = {};
 		
 		this.playedMoves = [];
 	}
@@ -201,10 +207,22 @@ class Game
 		//by definition
 		return (this.calculateLegals().length == 0) && !(this.kingChecked());
 	}
+	
+	isDrawByRepetition()
+	{
+		return this.positionFrequenciesByBoardString[this.boardString()]==DRAW_BY_REPETITIONS;
+	}
+	
+	isDrawByMoveRule()
+	{
+		return this.halfMove.get()==DRAW_AFTER_NO_PROGRESS_HALFMOVES;
+	}
 
 	evaluate(depth = DEFAULT_ANALYSIS_DEPTH)
 	{
 		if(this.movingTeam.numKingSeers>0){return;}
+		if(this.isDrawByRepetition()){return {score:0};}
+		if(this.isDrawByMoveRule()){return {score:0};}
 		if(depth==0){
 			return {
 				score: this.teamsByName[WhiteTeam.name].points - this.teamsByName[BlackTeam.name].points
@@ -365,12 +383,26 @@ class Game
 		}
 		
 		this.playedMoves.push(move);
-		this.progressMoveCounters();
+		
+		const nextHalfMove = ((movingPiece instanceof Pawn) || targetPiece)? 0 : this.halfMove.get()+1;
+		this.halfMove.update(nextHalfMove);
 		this.changeTurns();
+		if(this.movingTeam==this.teamsByName[WhiteTeam.name]){this.fullMove++;}
+		const boardString = this.boardString();
+		if(boardString in this.positionFrequenciesByBoardString)
+		{
+			this.positionFrequenciesByBoardString[boardString]++;
+		}
+		else
+		{
+			this.positionFrequenciesByBoardString[boardString] = 1;
+		}
 	}
 	
 	undoMove()
 	{
+		this.positionFrequenciesByBoardString[this.boardString()]--;
+		
 		const move = this.playedMoves.pop();
 		const movingPiece = this.movingPiece.get();
 		const targetPiece = this.targetPiece.get();
@@ -451,7 +483,8 @@ class Game
 		//NOW revoke the capture of the target piece
 		targetPiece?.activate();
 		
-		this.regressMoveCounters();
+		this.halfMove.revert();
+		if(this.movingTeam==this.teamsByName[WhiteTeam.name]){this.fullMove--;}
 		this.changeTurns();
 	}
 	
@@ -468,6 +501,8 @@ class Game
 	calculateLegals()
 	{
 		//moves are illegal if they leave the team's king vulnerable to capture
+		if(this.isDrawByMoveRule()){return [];}
+		if(this.isDrawByRepetition()){return [];}
 		return this.calculateMoves().filter((move)=>{
 			this.makeMove(move);
 			const condition = !(this.kingCapturable());
@@ -484,22 +519,6 @@ class Game
 	kingChecked()
 	{
 		return this.movingTeam.opposition.numKingSeers > 0;
-	}
-	
-	regressMoveCounters()
-	{
-		//if(this.halfMove==0){this.fullMove--;} halfMove=0 when undoing a white move, i.e. going back to the previous full turn
-		this.fullMove -= 1-this.halfMove;
-		
-		this.halfMove = (this.halfMove + 1) % 2;
-	}
-	
-	progressMoveCounters()
-	{
-		//if(this.halfMove==1){this.fullMove++;} halfMove=1 when black has just moved, meaning a full turn has complete
-		this.fullMove += this.halfMove;
-		
-		this.halfMove = (this.halfMove + 1) % 2;
 	}
 	
 	moveHistoryString()
@@ -556,10 +575,9 @@ class Game
 		}
 	}
 	
-	toString()	//specifically to a FEN string
-	{
-		//game stores ranks in ascending order, must reverse a copy for descending order in FEN string
-		let descendingRankStrings = [];
+	boardString()
+	{		
+		const descendingRankStrings = [];
 		for(let rank=NUM_RANKS-1; rank>=0; rank--)
 		{
 			let rankString = ``;
@@ -590,10 +608,15 @@ class Game
 			}
 			descendingRankStrings.push(rankString);
 		}
-		const boardString = descendingRankStrings.join("/");
+		return descendingRankStrings.join("/");
+	}
+	
+	toString()	//specifically to a FEN string
+	{
+		const boardString = this.boardString();
 		let castleRightsString = this.castleRights.get().join("");
 		if(castleRightsString==""){castleRightsString="-";}
-		return [boardString, this.movingTeam.constructor.char, castleRightsString, this.enPassantable.get(), this.halfMove, this.fullMove].join(" ");
+		return [boardString, this.movingTeam.constructor.char, castleRightsString, this.enPassantable.get(), this.halfMove.get(), this.fullMove].join(" ");
 	}
 	
 	toPNGBuffer()
