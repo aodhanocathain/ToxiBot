@@ -319,7 +319,13 @@ class Game
 				const king = team.king;
 				const rook = team.rooksInStartSquaresByWingChar[wingChar];
 				
+				if(!((king.canCastle.get()) && (rook?.isActive()) && (rook.canCastle.get())))
+				{
+					//console.log(`${wingChar}`);
+					//console.log(`${king.canCastle.get()} && ${rook?.isActive()} && ${rook.canCastle.get()}`);
+				}
 				return (king.canCastle.get()) && (rook?.isActive()) && (rook.canCastle.get());
+				//return true;
 			})
 		);
 			
@@ -365,6 +371,10 @@ class Game
 					)
 					{
 						piece.updateKnowledge();
+					}
+					else if(piece instanceof Pawn)
+					{
+						piece.updateKingSeer();
 					}
 				}
 				else
@@ -420,6 +430,11 @@ class Game
 		//because the target piece may be reverted in error (could not have updated in makeMove)
 		//targetPiece?.activate();
 		
+		if(movingPiece instanceof King || movingPiece instanceof Rook)
+		{
+			movingPiece.canCastle?.revert();
+		}
+		
 		if(move instanceof CastleMove)
 		{
 			const rook = this.pieces[move.rookAfter];
@@ -471,6 +486,10 @@ class Game
 					)
 					{
 						piece.revertKnowledge();
+					}
+					else if(piece instanceof Pawn)
+					{
+						piece.revertKingSeer();
 					}
 				}
 				else
