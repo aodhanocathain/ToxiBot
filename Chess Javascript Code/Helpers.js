@@ -7,7 +7,7 @@ module.exports = {
 	asciiDistance(distantCharacter, baseCharacter)
 	//how much greater the ascii code of *distantCharacter* is than the ascii code of *baseCharacter*
 	{
-		return String.fromCharCode(distantCharacter.charAt(0)) - String.fromCharCode(baseCharacter.charAt(0));
+		return distantCharacter.charCodeAt(0) - baseCharacter.charCodeAt(0);
 	},
 	
 	generateMask(length)

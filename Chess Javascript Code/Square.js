@@ -9,9 +9,19 @@ class Square
 		return (rank*NUM_FILES) + file;
 	}
 	
+	static validRank(rank)
+	{
+		return (0 <= rank) && (rank < NUM_RANKS);
+	}
+	
+	static validFile(file)
+	{
+		return (0 <= file) && (file < NUM_FILES);
+	}
+	
 	static validRankAndFile(rank,file)
 	{
-		return (0 <= rank) && (rank < NUM_RANKS) && (0 <= file) && (file < NUM_FILES);
+		return this.validRank(rank) && this.validFile(file);
 	}
 	
 	static rank(square)

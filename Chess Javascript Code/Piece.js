@@ -1,8 +1,9 @@
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
 const {BitVector} = require("./BitVector.js");
-const {PlainMove, CastleMove} = require("./Move.js");
-const {imageFileName} = require("./Helpers.js");
+const {PlainMove, CastleMove, EnPassantMove} = require("./Move.js");
+const {imageFileName, asciiDistance} = require("./Helpers.js");
+const {MIN_FILE} = require("./Constants.js");
 const Canvas = require("canvas");
 
 class Piece
@@ -419,13 +420,13 @@ class Pawn extends BlockablePiece
 		{
 			const captureSquare = Square.make(nextRank, lessFile);
 			squares.push(captureSquare);
-			bits.set(captureSquare);
+			bits.interact(BitVector.SET, captureSquare);
 		}
 		if(Square.validRankAndFile(nextRank,moreFile))
 		{
 			const captureSquare = Square.make(nextRank, moreFile);
 			squares.push(captureSquare);
-			bits.set(captureSquare);
+			bits.interact(BitVector.SET, captureSquare);
 		}
 		return {
 			squares: squares,
@@ -437,6 +438,7 @@ class Pawn extends BlockablePiece
 	{
 		const squares = [];
 		const bits = new BitVector();
+		const watch = new BitVector();
 		
 		const rank = Square.rank(square);
 		const file = Square.file(square);
@@ -446,18 +448,20 @@ class Pawn extends BlockablePiece
 		if(Square.validRankAndFile(nextRank, file))
 		{
 			const nextSquare = Square.make(nextRank, file);
+			watch.interact(BitVector.SET, nextSquare);
 			if(!(game.pieces[nextSquare]))
 			{
 				squares.push(nextSquare);
-				bits.set(nextSquare);
+				bits.interact(BitVector.SET, nextSquare);
 				if(rank==team.constructor.PAWN_START_RANK)
 				{
 					const nextNextRank = rank+(this.LONG_MOVE_RANK_INCREMENT_MULTIPLIER*team.constructor.PAWN_RANK_INCREMENT);
 					const nextNextSquare = Square.make(nextNextRank, file);
+					watch.interact(BitVector.SET, nextNextSquare);
 					if(!(game.pieces[nextNextSquare]))
 					{
 						squares.push(nextNextSquare);
-						bits.set(nextNextSquare);
+						bits.interact(BitVector.SET, nextNextSquare);
 					}
 				}
 			}
@@ -465,7 +469,8 @@ class Pawn extends BlockablePiece
 		
 		return {
 			squares: squares,
-			bits: bits
+			bits: bits,
+			watch: watch
 		};
 	}
 	
@@ -474,7 +479,7 @@ class Pawn extends BlockablePiece
 		const game = move.game;		
 		
 		//if there is a capture, include current file and capture character
-		const beforeDetails = (game.pieces[move.after])? `${Square.fileString(move.before)}x` : "";
+		const beforeDetails = (game.pieces[move.after] || game.pieces[move.captureSquare])? `${Square.fileString(move.before)}x` : "";
 		//the above will NOT work for en passant
 		
 		game.makeMove(move);
@@ -496,18 +501,35 @@ class Pawn extends BlockablePiece
 		this.nonAttackingSquares = new Manager([]);
 		this.nonAttackingBits = new Manager(new BitVector());
 		
-		this.watchingBits = this.nonAttackingBits;
+		this.watchingBits = new Manager(new BitVector());
 	}
 	
 	addAttackingMovesToArray(array)
 	{
 		this.attackingSquares.get().forEach((attackingSquare)=>{
 			//only allow moves that capture a piece, from the enemy team
-			if(this.game.pieces[attackingSquare])
+			if(this.game.pieces[attackingSquare])	//direct capture (enemy piece is on the attacking square)
 			{
 				if(this.game.pieces[attackingSquare].team != this.team)
 				{
 					array.push(new PlainMove(this.game, this.square, attackingSquare));
+				}
+			}
+			else	//could still be en passant capture (enemy piece is not on target square)
+			{
+				const enPassantFile = asciiDistance(this.game.enPassantable.get(), MIN_FILE);
+				//if enPassantFile is adjacent to current file
+				if(enPassantFile==Square.file(attackingSquare))
+				{
+					//if current rank is opponent long move rank
+					const opponentLongMoveRank = 
+					this.team.opposition.constructor.PAWN_START_RANK +
+					(Pawn.LONG_MOVE_RANK_INCREMENT_MULTIPLIER*this.team.opposition.constructor.PAWN_RANK_INCREMENT);
+					if(Square.rank(this.square)==opponentLongMoveRank)
+					{
+						const enPassantSquare = Square.make(opponentLongMoveRank,enPassantFile);
+						array.push(new EnPassantMove(this.game, this.square, attackingSquare, enPassantSquare));
+					}
 				}
 			}
 		});
@@ -540,6 +562,8 @@ class Pawn extends BlockablePiece
 		this.nonAttackingSquares.update(nonAttackingDomain.squares);
 		this.nonAttackingBits.update(nonAttackingDomain.bits);
 		
+		this.watchingBits.update(nonAttackingDomain.watch);
+		
 		this.updateKingSeer();
 	}
 	
@@ -550,6 +574,8 @@ class Pawn extends BlockablePiece
 		
 		this.nonAttackingSquares.revert();
 		this.nonAttackingBits.revert();
+		
+		this.watchingBits.revert();
 		
 		this.revertKingSeer();
 	}
@@ -581,7 +607,7 @@ module.exports = {
 	Rook:Rook,
 	Bishop:Bishop,
 	Knight:Knight,
-	Pawn,
+	Pawn:Pawn,
 	
 	PieceClassesByTypeChar: PieceClassesByTypeChar,
 }

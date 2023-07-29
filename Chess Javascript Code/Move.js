@@ -58,7 +58,18 @@ class CastleMove extends Move
 	}
 }
 
+class EnPassantMove extends Move
+{
+	captureSquare;
+	constructor(game, moveBefore, moveAfter, captureSquare)
+	{
+		super(game, moveBefore, moveAfter);
+		this.captureSquare = captureSquare;
+	}
+}
+
 module.exports = {
 	PlainMove:PlainMove,
-	CastleMove:CastleMove
+	CastleMove:CastleMove,
+	EnPassantMove:EnPassantMove
 }
