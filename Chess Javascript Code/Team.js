@@ -122,6 +122,18 @@ class Team
 		this.numKingSeers -= piece.kingSeer.get();
 	}
 	
+	swapOldPieceForNewPiece(oldPiece, newPiece)
+	{
+		newPiece.id = oldPiece.id;
+		this.activePieces[oldPiece.id] = newPiece;
+		this.points -= oldPiece.constructor.points;
+		this.points += newPiece.constructor.points;
+		this.numKingSeers -= oldPiece.kingSeer.get();
+		
+		//piece updates team king seers in updateKnowledge
+		//this.numKingSeers += newPiece.kingSeer.get();
+	}
+	
 	init()
 	{
 		this.activePieces.forEach((piece)=>{

@@ -68,8 +68,19 @@ class EnPassantMove extends Move
 	}
 }
 
+class PromotionMove extends Move
+{
+	promotionClass;
+	constructor(game, before, after, promotionClass)
+	{
+		super(game, before, after);
+		this.promotionClass = promotionClass;
+	}
+}
+
 module.exports = {
 	PlainMove:PlainMove,
 	CastleMove:CastleMove,
-	EnPassantMove:EnPassantMove
+	EnPassantMove:EnPassantMove,
+	PromotionMove:PromotionMove
 }

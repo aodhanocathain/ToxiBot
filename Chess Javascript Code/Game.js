@@ -2,7 +2,7 @@ const {Team, WhiteTeam, BlackTeam, TEAM_CLASSES} = require("./Team.js");
 const {Piece, BlockablePiece, King, Queen, Rook, Pawn, PieceClassesByTypeChar} = require("./Piece.js");
 const {asciiOffset, asciiDistance} = require("./Helpers.js");
 const {NUM_RANKS, NUM_FILES, MIN_FILE} = require("./Constants.js");
-const {PlainMove, CastleMove, EnPassantMove} = require("./Move.js");
+const {PlainMove, CastleMove, EnPassantMove, PromotionMove} = require("./Move.js");
 const {BitVector} = require("./BitVector.js");
 const {Square} = require("./Square.js");
 const {Manager} = require("./Manager.js");
@@ -13,8 +13,10 @@ const EMPTY_FEN_FIELD = "-";
 
 class Game
 {	
-	static DEFAULT_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";	//default game
+	//static DEFAULT_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";	//default game
 	//static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";	//pawnless game
+	
+	static DEFAULT_FEN_STRING = "4k3/6P1/8/8/8/8/1p6/4K3 w KQkq - 0 1";	//promotion test
 	
 	//static DEFAULT_FEN_STRING = "rnbqkbnr/ppp2ppp/4p3/3pP3/8/8/PPPP1PPP/RNBQKBNR w - d 0 3";	//en passant test
 	//static DEFAULT_FEN_STRING = "4k3/8/4p3/3pP3/8/8/8/4K3 w - d 0 3";	//en passant test
@@ -254,14 +256,14 @@ class Game
 	
 	makeMove(move)
 	{
-		const movingPiece = this.pieces[move.before];
+		let movingPiece = this.pieces[move.before];
 		const targetPiece = this.pieces[ (move instanceof EnPassantMove)? move.captureSquare : move.after ];
-			
+		
 		//move the moving piece
 		movingPiece.square = move.after;
 		//capture the target piece
 		targetPiece?.deactivate();
-		//manipulate the game position
+		//manipulate the game position		
 		this.pieces[move.after] = movingPiece;
 		this.squaresOccupiedBitVector.interact(BitVector.SET, move.after);
 		this.pieces[move.before] = null;
@@ -274,7 +276,7 @@ class Game
 			
 		if(movingPiece instanceof King || movingPiece instanceof Rook)
 		{
-			movingPiece.canCastle.update(false);
+			movingPiece.canCastle?.update(false);
 		}
 		
 		if(move instanceof CastleMove)
@@ -321,6 +323,7 @@ class Game
 		{
 			this.enPassantable.update("-");
 		}
+		
 		this.movingPiece.update(movingPiece);
 		this.targetPiece.update(targetPiece);
 		
@@ -353,6 +356,14 @@ class Game
 			});
 		});
 		
+		if(move instanceof PromotionMove)
+		{
+			const promotedPiece = new (move.promotionClass)(movingPiece.game, movingPiece.team, movingPiece.square);
+			promotedPiece.updateKnowledge();
+			movingPiece.team.swapOldPieceForNewPiece(movingPiece, promotedPiece);
+			this.pieces[move.after] = promotedPiece;
+		}
+		
 		this.playedMoves.push(move);
 		this.progressMoveCounters();
 		this.changeTurns();
@@ -363,6 +374,12 @@ class Game
 		const move = this.playedMoves.pop();
 		const movingPiece = this.movingPiece.get();
 		const targetPiece = this.targetPiece.get();
+		
+		if(move instanceof PromotionMove)
+		{
+			const promotedPiece = movingPiece.team.activePieces[movingPiece.id];
+			movingPiece.team.swapOldPieceForNewPiece(promotedPiece, movingPiece);
+		}
 		
 		//move the moving piece back where it came from
 		movingPiece.square = move.before;

@@ -1,7 +1,7 @@
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
 const {BitVector} = require("./BitVector.js");
-const {PlainMove, CastleMove, EnPassantMove} = require("./Move.js");
+const {PlainMove, CastleMove, EnPassantMove, PromotionMove} = require("./Move.js");
 const {imageFileName, asciiDistance} = require("./Helpers.js");
 const {MIN_FILE} = require("./Constants.js");
 const Canvas = require("canvas");
@@ -489,7 +489,9 @@ class Pawn extends BlockablePiece
 		"";
 		game.undoMove();
 		
-		return `${beforeDetails}${Square.fullString(move.after)}${checkStatus}`;
+		const promotionString = (move instanceof PromotionMove)? `=${move.promotionClass.typeChar}`:"";
+		
+		return `${beforeDetails}${Square.fullString(move.after)}${promotionString}${checkStatus}`;
 	}
 	
 	nonAttackingSquares;
@@ -512,7 +514,17 @@ class Pawn extends BlockablePiece
 			{
 				if(this.game.pieces[attackingSquare].team != this.team)
 				{
-					array.push(new PlainMove(this.game, this.square, attackingSquare));
+					if(Square.rank(attackingSquare)==this.team.opposition.constructor.BACK_RANK)
+					{
+						array.push(new PromotionMove(this.game, this.square, attackingSquare, Queen));
+						array.push(new PromotionMove(this.game, this.square, attackingSquare, Rook));
+						array.push(new PromotionMove(this.game, this.square, attackingSquare, Bishop));
+						array.push(new PromotionMove(this.game, this.square, attackingSquare, Knight));
+					}
+					else
+					{
+						array.push(new PlainMove(this.game, this.square, attackingSquare));
+					}
 				}
 			}
 			else	//could still be en passant capture (enemy piece is not on target square)
@@ -541,7 +553,17 @@ class Pawn extends BlockablePiece
 			//only allow moves to empty squares
 			if(!(this.game.pieces[nonAttackingSquare]))
 			{
-				array.push(new PlainMove(this.game, this.square, nonAttackingSquare));
+				if(Square.rank(nonAttackingSquare)==this.team.opposition.constructor.BACK_RANK)
+				{
+					array.push(new PromotionMove(this.game, this.square, nonAttackingSquare, Queen));
+					array.push(new PromotionMove(this.game, this.square, nonAttackingSquare, Rook));
+					array.push(new PromotionMove(this.game, this.square, nonAttackingSquare, Bishop));
+					array.push(new PromotionMove(this.game, this.square, nonAttackingSquare, Knight));
+				}
+				else
+				{
+					array.push(new PlainMove(this.game, this.square, nonAttackingSquare));
+				}
 			}
 		});
 	}
