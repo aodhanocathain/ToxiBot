@@ -97,7 +97,8 @@ class DiscordGame
 		const availableMovesString = this.availableStrings.join("\t");
 		
 		//get the best line in string form
-		const evaluation = this.chessGame.evaluate();
+		//const evaluation = this.chessGame.evaluate();
+		const evaluation = this.chessGame.fancyEvaluate();
 		
 		const bestLineString = this.chessGame.lineString(evaluation.reverseLine?.slice().reverse() ?? []);
 		const statusString = 
@@ -227,176 +228,176 @@ module.exports = {
 	.addSubcommand(moveundoSubcommand),
 	
 	execute: (interaction) => {
-		const playerId = interaction.user.id;
-		const player = playersById[playerId] = playersById[playerId] || new Player(interaction.user.username);
-		
-		const subcommand = interaction.options.getSubcommand();
-		if(subcommand == "gamecreate")
-		{
-			//begin by checking whether the command is allowed
-			
-			//do not overwrite player's existing game
-			if(player.discordGame)
+		return interaction.deferReply().then(()=>{
+			const playerId = interaction.user.id;
+			const player = playersById[playerId] = playersById[playerId] || new Player(interaction.user.username);
+			const subcommand = interaction.options.getSubcommand();
+			if(subcommand == "gamecreate")
 			{
-				return interaction.reply("You already have a game");
-			}
-			const playagainst = interaction.options.getUser("playagainst");
-			//do not overwrite opponent's existing game
-			if(playersById[playagainst?.id]?.discordGame)
-			{
-				return interaction.reply(`${playagainst.username} already has a game`);
-			}
-			//do not challenge bots (including ToxiBot)
-			if(playagainst?.bot)
-			{
-				return interaction.reply("Challenging bot accounts is forbidden");
-			}
-			//do not challenge oneself
-			if(playagainst?.id==playerId)
-			{
-				return interaction.reply("Challenging yourself is forbidden");
-			}
-			
-			let playas = interaction.options.getString("playas");
-			if(playas)	//can be wrong only if the user specified one at all
-			{
-				if(!(TEAM_CLASSES.find((teamClass)=>{return teamClass.name==playas})))
-				{
-					return interaction.reply("Invalid team chosen");
-				}
-			}
-			else
-			{
-				playas = TEAM_CLASSES[Math.floor(Math.random()*TEAM_CLASSES.length)].name;
-			}
-			
-			let fen = interaction.options.getString("fen");
-			if(fen)	//can be wrong only if the user specified one at all
-			{
-				if(!(Game.validFENString(fen)))
-				{
-					return interaction.reply("Invalid FEN string supplied");
-				}
-			}
-			else
-			{
-				fen = Game.DEFAULT_FEN_STRING;
-			}
-			
-			//command is valid and feasible
-			
-			//set up the user and their game
-			const discordGame = new DiscordGame(fen);
-			discordGame.interaction = interaction;
-			discordGame.IdsByTeamName[playas] = playerId;
-			
-			player.discordGame = discordGame;
-			player.team = discordGame.chessGame.teamsByName[playas];
-			
-			//set up the user's opposition
-			const opponentPlayAs = TEAM_CLASSES.find((teamClass)=>{return teamClass.name!=playas}).name;
-			if(playagainst)	//a real player
-			{			
-				const opponent = playersById[playagainst.id] = playersById[playagainst.id] || new Player(playagainst.username);
-				discordGame.IdsByTeamName[opponentPlayAs] = playagainst.id;
+				//begin by checking whether the command is allowed
 				
-				opponent.discordGame = discordGame;
-				opponent.team = discordGame.chessGame.teamsByName[opponentPlayAs];
+				//do not overwrite player's existing game
+				if(player.discordGame)
+				{
+					return interaction.editReply("You already have a game");
+				}
+				const playagainst = interaction.options.getUser("playagainst");
+				//do not overwrite opponent's existing game
+				if(playersById[playagainst?.id]?.discordGame)
+				{
+					return interaction.editReply(`${playagainst.username} already has a game`);
+				}
+				//do not challenge bots (including ToxiBot)
+				if(playagainst?.bot)
+				{
+					return interaction.editReply("Challenging bot accounts is forbidden");
+				}
+				//do not challenge oneself
+				if(playagainst?.id==playerId)
+				{
+					return interaction.editReply("Challenging yourself is forbidden");
+				}
 				
-				discordGame.botTeam = null;
+				let playas = interaction.options.getString("playas");
+				if(playas)	//can be wrong only if the user specified one at all
+				{
+					if(!(TEAM_CLASSES.find((teamClass)=>{return teamClass.name==playas})))
+					{
+						return interaction.editReply("Invalid team chosen");
+					}
+				}
+				else
+				{
+					playas = TEAM_CLASSES[Math.floor(Math.random()*TEAM_CLASSES.length)].name;
+				}
+				
+				let fen = interaction.options.getString("fen");
+				if(fen)	//can be wrong only if the user specified one at all
+				{
+					if(!(Game.validFENString(fen)))
+					{
+						return interaction.editReply("Invalid FEN string supplied");
+					}
+				}
+				else
+				{
+					fen = Game.DEFAULT_FEN_STRING;
+				}
+				
+				//command is valid and feasible
+				
+				//set up the user and their game
+				const discordGame = new DiscordGame(fen);
+				discordGame.interaction = interaction;
+				discordGame.IdsByTeamName[playas] = playerId;
+				
+				player.discordGame = discordGame;
+				player.team = discordGame.chessGame.teamsByName[playas];
+				
+				//set up the user's opposition
+				const opponentPlayAs = TEAM_CLASSES.find((teamClass)=>{return teamClass.name!=playas}).name;
+				if(playagainst)	//a real player
+				{			
+					const opponent = playersById[playagainst.id] = playersById[playagainst.id] || new Player(playagainst.username);
+					discordGame.IdsByTeamName[opponentPlayAs] = playagainst.id;
+					
+					opponent.discordGame = discordGame;
+					opponent.team = discordGame.chessGame.teamsByName[opponentPlayAs];
+					
+					discordGame.botTeam = null;
+				}
+				else	//the bot
+				{
+					discordGame.botTeam = discordGame.chessGame.teamsByName[opponentPlayAs];
+				}
+				
+				discordGame.buildDisplayMessage()
+				.then((displayMessage)=>{
+					interaction.editReply(displayMessage);
+					setTimeout(()=>{discordGame.advanceGameIfBotTurnAndEditInteraction();}, 3000);
+				})
+				
+				return doNotReplyWithOK;
 			}
-			else	//the bot
+			else if(subcommand == "gameend")
 			{
-				discordGame.botTeam = discordGame.chessGame.teamsByName[opponentPlayAs];
+				if(!(player.discordGame))
+				{
+					return interaction.editReply("You have no game to end");
+				}
+				
+				player.discordGame.end();
+				
+				return;
 			}
-			
-			discordGame.buildDisplayMessage()
-			.then((displayMessage)=>{
-				interaction.reply(displayMessage);
-				setTimeout(()=>{discordGame.advanceGameIfBotTurnAndEditInteraction();}, 3000);
-			})
-			
-			return doNotReplyWithOK;
-		}
-		else if(subcommand == "gameend")
-		{
-			if(!(player.discordGame))
+			else if(subcommand == "gamebump")
 			{
-				return interaction.reply("You have no game to end");
+				//show the game again in a new message and delete the old message
+				if(!(player.discordGame))
+				{
+					return interaction.editReply("You have no game to post again");
+				}
+				
+				//delete old
+				player.discordGame.interaction.deleteReply();
+				
+				//show new
+				player.discordGame.interaction = interaction;
+				player.discordGame.buildDisplayMessage()
+				.then((message)=>{interaction.editReply(message);});
+				
+				return doNotReplyWithOK;
 			}
-			
-			player.discordGame.end();
-			
-			return;
-		}
-		else if(subcommand == "gamebump")
-		{
-			//show the game again in a new message and delete the old message
-			if(!(player.discordGame))
+			else if(subcommand == "movemake")
 			{
-				return interaction.reply("You have no game to post again");
+				if(!(player.discordGame))
+				{
+					return interaction.editReply("You have no game in which to make a move");
+				}
+				
+				if(player.team != player.discordGame.chessGame.movingTeam)
+				{
+					return interaction.editReply("It is not your turn in the game");
+				}
+				
+				if(player.discordGame.chessGame.isCheckmate() || player.discordGame.chessGame.isStalemate())
+				{
+					return interaction.editReply("Your game is already over");
+				}
+				
+				//if the choice string is not in the strings generated by the program then it is not available
+				const moveChoiceString = interaction.options.getString("move");
+				const moveIndex = player.discordGame.availableStrings.indexOf(moveChoiceString);
+				if(moveIndex<0){return interaction.editReply("The move supplied is invalid");}
+				
+				interaction.deleteReply();
+				
+				const moveChoice = player.discordGame.availableMoves[moveIndex];
+				player.discordGame.makeMoveAndEditInteraction(moveChoice);
+				setTimeout(()=>{player.discordGame.advanceGameIfBotTurnAndEditInteraction();}, 3000);
+				
+				return doNotReplyWithOK;
 			}
-			
-			//delete old
-			player.discordGame.interaction.deleteReply();
-			
-			//show new
-			player.discordGame.interaction = interaction;
-			player.discordGame.buildDisplayMessage()
-			.then((message)=>{interaction.reply(message);});
-			
-			return doNotReplyWithOK;
-		}
-		else if(subcommand == "movemake")
-		{			
-			if(!(player.discordGame))
+			else if(subcommand == "moveundo")
 			{
-				return interaction.reply("You have no game in which to make a move");
+				if(!(player.discordGame))
+				{
+					return interaction.editReply("You have no game in which to undo a move");
+				}
+				if(player.discordGame.chessGame.playedMoves.length==0)
+				{
+					return interaction.editReply("Your game has no move to undo");
+				}
+				
+				return interaction.deferReply().then(()=>{
+					interaction.deleteReply();
+				
+					player.discordGame.undoMoveAndEditInteraction();
+				
+					return doNotReplyWithOK;
+				});
 			}
-			
-			if(player.team != player.discordGame.chessGame.movingTeam)
-			{
-				return interaction.reply("It is not your turn in the game");
-			}
-			
-			if(player.discordGame.chessGame.isCheckmate() || player.discordGame.chessGame.isStalemate())
-			{
-				return interaction.reply("Your game is already over");
-			}
-			
-			//if the choice string is not in the strings generated by the program then it is not available
-			const moveChoiceString = interaction.options.getString("move");
-			const moveIndex = player.discordGame.availableStrings.indexOf(moveChoiceString);
-			if(moveIndex<0){return interaction.reply("The move supplied is invalid");}
-			
-			interaction.deferReply();
-			interaction.deleteReply();
-			
-			const moveChoice = player.discordGame.availableMoves[moveIndex]
-			
-			player.discordGame.makeMoveAndEditInteraction(moveChoice);
-			setTimeout(()=>{player.discordGame.advanceGameIfBotTurnAndEditInteraction();}, 3000);
-			
-			return doNotReplyWithOK;
-		}
-		else if(subcommand == "moveundo")
-		{
-			if(!(player.discordGame))
-			{
-				return interaction.reply("You have no game in which to undo a move");
-			}
-			if(player.discordGame.chessGame.playedMoves.length==0)
-			{
-				return interaction.reply("Your game has no move to undo");
-			}
-			
-			interaction.deferReply();
-			interaction.deleteReply();
-			
-			player.discordGame.undoMoveAndEditInteraction();
-			
-			return doNotReplyWithOK;
-		}
+		});
 	},
 	exiter: (client)=>{}
 };

@@ -8,7 +8,8 @@ const {Square} = require("./Square.js");
 const {Manager} = require("./Manager.js");
 const Canvas = require("canvas");
 
-const DEFAULT_ANALYSIS_DEPTH = 3;
+const DEFAULT_ANALYSIS_DEPTH = 2;
+const FANCY_ANALYSIS_DEPTH = 3;
 const DRAW_AFTER_NO_PROGRESS_HALFMOVES = 50*(TEAM_CLASSES.length);
 const DRAW_BY_REPETITIONS = 3;
 const EMPTY_FEN_FIELD = "-";
@@ -217,6 +218,95 @@ class Game
 	{
 		return this.halfMove.get()==DRAW_AFTER_NO_PROGRESS_HALFMOVES;
 	}
+	
+	immediatePositionScore()
+	{
+		//return {score: this.calculateMoves().length / this.movingTeam.points};
+		//return {score: this.teamsByName[WhiteTeam.name].points - this.teamsByName[BlackTeam.name].points};
+		const moves = [];
+		
+		this.movingTeam.activePieces.forEach((piece)=>{
+			piece.addMovesToArray(moves);
+		});
+		return {score: (this.teamsByName[WhiteTeam.name].activePieces.reduce((accumulator, piece)=>{
+			piece.addMovesToArray(accumulator);
+			return accumulator;
+		}, []).length / this.teamsByName[WhiteTeam.name].points) -	(this.teamsByName[BlackTeam.name].activePieces.reduce((accumulator, piece)=>{
+			piece.addMovesToArray(accumulator);
+			return accumulator;
+		}, []).length / this.teamsByName[BlackTeam.name].points)};
+	}
+
+	fancyEvaluate(depth = FANCY_ANALYSIS_DEPTH)
+	{
+		if(this.movingTeam.numKingSeers>0){return;}
+		if(this.isDrawByRepetition()){return {score:0};}
+		if(this.isDrawByMoveRule()){return {score:0};}
+		if(depth==0){
+			return this.evaluate();
+		}
+		
+		const legals = this.calculateLegals();
+		const evaluationsOrderedByPreference = [];
+		const legalIndicesOrderedByPreference = [];
+		for(let i=0; i<legals.length; i++)
+		{
+			const legal = legals[i];
+			
+			this.makeMove(legal);
+			const evaluation = this.evaluate(DEFAULT_ANALYSIS_DEPTH-1);
+			this.undoMove();
+			
+			//insert evaluation into order at correct position
+			let index=0;
+			while(this.movingTeam.evalPreferredToEval(evaluationsOrderedByPreference[index],evaluation))
+			{
+				index++;
+			}
+			evaluationsOrderedByPreference.splice(index,0,evaluation);
+			legalIndicesOrderedByPreference.splice(index,0,i);
+		}
+		
+		let bestEval;
+		let bestLegal;
+		for(let i=0; i<Math.pow(evaluationsOrderedByPreference.length,1/3); i++)
+		{
+			const legal = legals[legalIndicesOrderedByPreference[i]];
+			if(!legal){break;}
+			this.makeMove(legal);
+			const deeperEvaluation = this.fancyEvaluate(depth-1);
+			this.undoMove();
+			
+			if(this.movingTeam.evalPreferredToEval(deeperEvaluation, bestEval))
+			{
+				bestEval = deeperEvaluation;
+				bestLegal = legal;
+			}
+		}
+		
+		if(!bestEval)
+		{
+			//No VALID continuation found, i.e. can't make a move without leaving king vulnerable.
+			//This means the current position is either checkmate or stalemate against movingTeam
+			return (this.movingTeam.opposition.numKingSeers>0)?
+			{
+				checkmate_in_halfmoves: 0
+			}:
+			{
+				score: 0
+			};
+		}
+		
+		const reverseLine = bestEval.reverseLine ?? [];
+		reverseLine.push(bestLegal);
+		
+		const checkmate = "checkmate_in_halfmoves" in bestEval;
+		return {
+			[checkmate? "checkmate_in_halfmoves" : "score"]: checkmate? bestEval.checkmate_in_halfmoves+1 : bestEval.score,
+			bestMove: bestLegal,
+			reverseLine: reverseLine
+		};
+	}
 
 	evaluate(depth = DEFAULT_ANALYSIS_DEPTH)
 	{
@@ -224,9 +314,12 @@ class Game
 		if(this.isDrawByRepetition()){return {score:0};}
 		if(this.isDrawByMoveRule()){return {score:0};}
 		if(depth==0){
+			return this.immediatePositionScore();
+			/*
 			return {
 				score: this.teamsByName[WhiteTeam.name].points - this.teamsByName[BlackTeam.name].points
 			}
+			*/
 		}
 		const continuations = this.calculateMoves();
 		
@@ -590,7 +683,7 @@ class Game
 		else
 		{
 			const sign = (evaluation.score>=0)? "+" : ""
-			return `${sign}${evaluation.score}`;
+			return `${sign}${evaluation.score.toPrecision(3)}`;
 		}
 	}
 	
