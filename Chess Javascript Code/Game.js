@@ -8,16 +8,66 @@ const {Square} = require("./Square.js");
 const {Manager} = require("./Manager.js");
 const Canvas = require("canvas");
 
-const DEFAULT_ANALYSIS_DEPTH = 2;
+const DEFAULT_ANALYSIS_DEPTH = 3;
 const FANCY_ANALYSIS_DEPTH = 3;
+
 const DRAW_AFTER_NO_PROGRESS_HALFMOVES = 50*(TEAM_CLASSES.length);
 const DRAW_BY_REPETITIONS = 3;
+
 const EMPTY_FEN_FIELD = "-";
+
+function mergeSortEvaluations(evaluations, start, end, team)
+{	
+	const range = end-start;
+	if(range==1){return;}
+	
+	const leftStart = start;
+	const leftEnd = start + Math.floor(range/2);
+	const rightStart = leftEnd;
+	const rightEnd = end;
+	
+	mergeSortEvaluations(evaluations, leftStart, leftEnd, team);
+	mergeSortEvaluations(evaluations, rightStart, rightEnd, team);
+	
+	let leftIndex = leftStart;
+	let rightIndex = rightStart;
+	let sortedIndex = 0;
+	
+	const sortedSub = Array(range);
+	while((leftIndex<leftEnd) && (rightIndex<rightEnd))
+	{
+		if(team.evalPreferredToEval(evaluations[leftIndex],evaluations[rightIndex]))
+		{
+			sortedSub[sortedIndex++] = evaluations[leftIndex++];
+		}
+		else
+		{
+			sortedSub[sortedIndex++] = evaluations[rightIndex++];
+		}
+	}
+	
+	while(leftIndex<leftEnd)
+	{
+		sortedSub[sortedIndex++] = evaluations[leftIndex++];
+	}
+	
+	while(rightIndex<rightEnd)
+	{
+		sortedSub[sortedIndex++] = evaluations[rightIndex++];
+	}
+	
+	for(let i=0; i<sortedSub.length; i++)
+	{
+		evaluations[start + i] = sortedSub[i];
+	}
+}
 
 class Game
 {	
 	static DEFAULT_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";	//default game
 	//static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";	//pawnless game
+	
+	//static DEFAULT_FEN_STRING = "8/4Br2/8/8/8/8/p1P5/k1Kb4 w - - 0 1";	//win the rook in 9ish halfmoves
 	
 	//static DEFAULT_FEN_STRING = "4k3/6P1/8/8/8/8/1p6/4K3 w KQkq - 0 1";	//promotion test
 	
@@ -44,6 +94,10 @@ class Game
 	enPassantable;
 	movingPiece;
 	targetPiece;
+	
+	//booleans that dictate whether to output progress during computation
+	fancyEvalProgress;
+	evalProgress;
 		
 	static validFENString(FENString)
 	{
@@ -189,6 +243,9 @@ class Game
 		this.positionFrequenciesByBoardString = {};
 		
 		this.playedMoves = [];
+		
+		this.fancyEvalProgress = false;
+		this.evalProgress = false;
 	}
 	
 	changeTurns()
@@ -219,68 +276,80 @@ class Game
 		return this.halfMove.get()==DRAW_AFTER_NO_PROGRESS_HALFMOVES;
 	}
 	
-	immediatePositionScore()
+	immediatePositionEvaluation()
 	{
-		//return {score: this.calculateMoves().length / this.movingTeam.points};
-		//return {score: this.teamsByName[WhiteTeam.name].points - this.teamsByName[BlackTeam.name].points};
-		const moves = [];
-		
-		this.movingTeam.activePieces.forEach((piece)=>{
-			piece.addMovesToArray(moves);
-		});
-		return {score: (this.teamsByName[WhiteTeam.name].activePieces.reduce((accumulator, piece)=>{
-			piece.addMovesToArray(accumulator);
-			return accumulator;
-		}, []).length / this.teamsByName[WhiteTeam.name].points) -	(this.teamsByName[BlackTeam.name].activePieces.reduce((accumulator, piece)=>{
-			piece.addMovesToArray(accumulator);
-			return accumulator;
-		}, []).length / this.teamsByName[BlackTeam.name].points)};
+		return {
+			score: this.teamsByName[WhiteTeam.name].points - this.teamsByName[BlackTeam.name].points
+		};
 	}
 
 	fancyEvaluate(depth = FANCY_ANALYSIS_DEPTH)
 	{
+		/*
+		Generally, some good continuations are easy to spot early.
+		fancyEvaluate uses the regular evaluate function to rate each available move,
+		then it selects some of the best to expand the search further.
+		The idea is that this would direct a greater proportion of the
+		search time into worthwhile continuations.
+		*/
 		if(this.movingTeam.numKingSeers>0){return;}
 		if(this.isDrawByRepetition()){return {score:0};}
 		if(this.isDrawByMoveRule()){return {score:0};}
 		if(depth==0){
-			return this.evaluate();
+			return this.immediatePositionEvaluation();
 		}
 		
-		const legals = this.calculateLegals();
-		const evaluationsOrderedByPreference = [];
-		const legalIndicesOrderedByPreference = [];
-		for(let i=0; i<legals.length; i++)
+		const moves = this.calculateMoves();
+		
+		const copyEvalProgress = this.evalProgress;
+		this.evalProgress = false;	//do not output from repeated calls to evaluate at its max depth
+		
+		const evaluations = [];
+		
+		//evaluate available continuations and order them by the moving team's preference
+		for(let i=0; i<moves.length; i++)
 		{
-			const legal = legals[i];
-			
-			this.makeMove(legal);
-			const evaluation = this.evaluate(DEFAULT_ANALYSIS_DEPTH-1);
-			this.undoMove();
-			
-			//insert evaluation into order at correct position
-			let index=0;
-			while(this.movingTeam.evalPreferredToEval(evaluationsOrderedByPreference[index],evaluation))
+			if(this.fancyEvalProgress && (depth==FANCY_ANALYSIS_DEPTH))
 			{
-				index++;
+				console.log(`fancyEvaluate 1st pass: ${i}/${moves.length}`);
 			}
-			evaluationsOrderedByPreference.splice(index,0,evaluation);
-			legalIndicesOrderedByPreference.splice(index,0,i);
+			const move = moves[i];
+			
+			this.makeMove(move);
+			//const evaluation = this.evaluate(DEFAULT_ANALYSIS_DEPTH-1);
+			const evaluation = this.evaluate(1);
+			evaluation.move = move;
+			this.undoMove();
+			evaluations[i] = evaluation;
 		}
+		
+		mergeSortEvaluations(evaluations, 0, evaluations.length, this.movingTeam);
+		
+		this.evalProgress = copyEvalProgress;
 		
 		let bestEval;
-		let bestLegal;
-		for(let i=0; i<Math.pow(evaluationsOrderedByPreference.length,1/3); i++)
+		let bestMove;
+		
+		//only expand the few best continuations
+		//const numBestEvaluations = Math.pow(evaluations.length,1/3);	//cube root of total number
+		const numBestEvaluations = 4;
+		
+		for(let i=0; i<numBestEvaluations; i++)
 		{
-			const legal = legals[legalIndicesOrderedByPreference[i]];
-			if(!legal){break;}
-			this.makeMove(legal);
+			if(this.fancyEvalProgress && (depth==FANCY_ANALYSIS_DEPTH))
+			{
+				console.log(`fancyEvaluate 2nd pass: ${i}/${numBestEvaluations}`);
+			}
+			const move = evaluations[i].move;
+			if(!move){break;}
+			this.makeMove(move);
 			const deeperEvaluation = this.fancyEvaluate(depth-1);
 			this.undoMove();
 			
 			if(this.movingTeam.evalPreferredToEval(deeperEvaluation, bestEval))
 			{
 				bestEval = deeperEvaluation;
-				bestLegal = legal;
+				bestMove = move;
 			}
 		}
 		
@@ -298,12 +367,12 @@ class Game
 		}
 		
 		const reverseLine = bestEval.reverseLine ?? [];
-		reverseLine.push(bestLegal);
+		reverseLine.push(bestMove);
 		
 		const checkmate = "checkmate_in_halfmoves" in bestEval;
 		return {
 			[checkmate? "checkmate_in_halfmoves" : "score"]: checkmate? bestEval.checkmate_in_halfmoves+1 : bestEval.score,
-			bestMove: bestLegal,
+			bestMove: bestMove,
 			reverseLine: reverseLine
 		};
 	}
@@ -314,12 +383,7 @@ class Game
 		if(this.isDrawByRepetition()){return {score:0};}
 		if(this.isDrawByMoveRule()){return {score:0};}
 		if(depth==0){
-			return this.immediatePositionScore();
-			/*
-			return {
-				score: this.teamsByName[WhiteTeam.name].points - this.teamsByName[BlackTeam.name].points
-			}
-			*/
+			return this.immediatePositionEvaluation();
 		}
 		const continuations = this.calculateMoves();
 		
@@ -329,7 +393,10 @@ class Game
 		//check for better continuations
 		for(let i=0; i<continuations.length; i++)
 		{
-			//if(depth==DEFAULT_ANALYSIS_DEPTH){console.log(`${i}/${continuations.length}`)}
+			if(this.evalProgress && (depth==DEFAULT_ANALYSIS_DEPTH))
+			{
+				console.log(`evaluate: ${i}/${continuations.length}`);
+			}
 			const newContinuation = continuations[i];
 			this.makeMove(newContinuation);
 			const newEval = this.evaluate(depth-1);

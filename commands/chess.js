@@ -97,8 +97,8 @@ class DiscordGame
 		const availableMovesString = this.availableStrings.join("\t");
 		
 		//get the best line in string form
-		//const evaluation = this.chessGame.evaluate();
-		const evaluation = this.chessGame.fancyEvaluate();
+		const evaluation = this.chessGame.evaluate();
+		//const evaluation = this.chessGame.fancyEvaluate();
 		
 		const bestLineString = this.chessGame.lineString(evaluation.reverseLine?.slice().reverse() ?? []);
 		const statusString = 
