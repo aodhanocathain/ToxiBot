@@ -287,7 +287,7 @@ class Game
 	{
 		/*
 		Generally, some good continuations are easy to spot early.
-		fancyEvaluate uses the regular evaluate function to rate each available move,
+		fancyEvaluate uses a shortsighted regular evaluate function to rate each available move,
 		then it selects some of the best to expand the search further.
 		The idea is that this would direct a greater proportion of the
 		search time into worthwhile continuations.
@@ -680,8 +680,6 @@ class Game
 	calculateLegals()
 	{
 		//moves are illegal if they leave the team's king vulnerable to capture
-		if(this.isDrawByMoveRule()){return [];}
-		if(this.isDrawByRepetition()){return [];}
 		return this.calculateMoves().filter((move)=>{
 			this.makeMove(move);
 			const condition = !(this.kingCapturable());

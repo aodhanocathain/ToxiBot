@@ -325,7 +325,10 @@ module.exports = {
 				{
 					return interaction.editReply("You have no game to end");
 				}
-				
+				else
+				{
+					interaction.deleteReply();
+				}
 				player.discordGame.end();
 				
 				return;
@@ -360,7 +363,12 @@ module.exports = {
 					return interaction.editReply("It is not your turn in the game");
 				}
 				
-				if(player.discordGame.chessGame.isCheckmate() || player.discordGame.chessGame.isStalemate())
+				if(
+				player.discordGame.chessGame.isCheckmate() ||
+				player.discordGame.chessGame.isStalemate() ||
+				player.discordGame.chessGame.isDrawByMoveRule() ||
+				player.discordGame.chessGame.isDrawByRepetition()
+				)
 				{
 					return interaction.editReply("Your game is already over");
 				}
