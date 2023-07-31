@@ -79,7 +79,6 @@ class Game
 	//static DEFAULT_FEN_STRING = "b6K/4qq2/8/8/8/8/Q7/7k w KQkq - 0 1";	//stalemate test (queen sac)
 	
 	pieces;	//indexed by a square on the board
-	squaresOccupiedBitVector;	//BitVector indicating whether a square is occupied with the bit at the square's index
 	
 	positionFrequenciesByBoardString;
 	
@@ -114,9 +113,7 @@ class Game
 	}
 	
 	constructor(FENString)
-	{
-		this.squaresOccupiedBitVector = new BitVector();
-		
+	{		
 		this.teamsByName = {
 			[WhiteTeam.name]: new WhiteTeam(this),
 			[BlackTeam.name]: new BlackTeam(this),
@@ -155,7 +152,6 @@ class Game
 					
 					//current square is occupied
 					this.pieces[square] = piece;
-					this.squaresOccupiedBitVector.interact(BitVector.SET, square);
 					
 					team.addActivePiece(piece);
 					
@@ -443,13 +439,10 @@ class Game
 		targetPiece?.deactivate();
 		//manipulate the game position		
 		this.pieces[move.after] = movingPiece;
-		this.squaresOccupiedBitVector.interact(BitVector.SET, move.after);
 		this.pieces[move.before] = null;
-		this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.before);
 		if(move instanceof EnPassantMove)
 		{
 			this.pieces[move.captureSquare] = null;
-			this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.captureSquare);
 		}
 			
 		if(movingPiece instanceof King || movingPiece instanceof Rook)
@@ -462,9 +455,7 @@ class Game
 			const rook = this.pieces[move.rookBefore];
 			rook.square = move.rookAfter;
 			this.pieces[move.rookAfter] = rook;
-			this.squaresOccupiedBitVector.interact(BitVector.SET, move.rookAfter);
 			this.pieces[move.rookBefore] = null;
-			this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.rookBefore);
 			
 			rook.canCastle.update(false);
 		}
@@ -600,27 +591,21 @@ class Game
 			const rook = this.pieces[move.rookAfter];
 			rook.square = move.rookBefore;
 			this.pieces[move.rookBefore] = rook;
-			this.squaresOccupiedBitVector.interact(BitVector.SET, move.rookBefore);
 			this.pieces[move.rookAfter] = null;
-			this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.rookAfter);
 			
 			rook.canCastle.revert();
 		}
 		
 		//manipulate the game position
 		this.pieces[move.before] = movingPiece;
-		this.squaresOccupiedBitVector.interact(BitVector.SET, move.before);
 		if(move instanceof EnPassantMove)
 		{
 			this.pieces[move.captureSquare] = targetPiece;
 			this.pieces[move.after] = null;
-			this.squaresOccupiedBitVector.interact(BitVector.SET, move.captureSquare);
-			this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.after);
 		}
 		else
 		{
 			this.pieces[move.after] = targetPiece;
-			if(!targetPiece){this.squaresOccupiedBitVector.interact(BitVector.CLEAR, move.after);}			
 		}
 		
 		//revert the game state

@@ -179,8 +179,6 @@ class RangedPiece extends BlockablePiece
 		const squaresArray = [];
 		const squaresBits = new BitVector();
 		
-		const squaresOccupiedBitVector = game.squaresOccupiedBitVector;
-		
 		const rank = Square.rank(square);
 		const file = Square.file(square);
 		
@@ -200,7 +198,7 @@ class RangedPiece extends BlockablePiece
 				squaresArray.push(newSquare);
 				squaresBits.interact(BitVector.SET, newSquare);
 				
-				blocked = squaresOccupiedBitVector.interact(BitVector.READ, newSquare);
+				blocked = game.pieces[newSquare]
 				newRank += rankOffset;
 				newFile += fileOffset;
 			}
@@ -300,7 +298,7 @@ class King extends PatternPiece
 							for(let i=startFile+1; i<endFile; i++)
 							{
 								const square = Square.make(this.team.constructor.BACK_RANK, i);
-								noPiecesBetween = noPiecesBetween && !(this.game.squaresOccupiedBitVector.interact(BitVector.READ, square));
+								noPiecesBetween = noPiecesBetween && !(this.game.pieces[square]);
 							}
 							
 							if(noPiecesBetween)
