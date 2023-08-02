@@ -8,7 +8,7 @@ const {Square} = require("./Square.js");
 const {Manager} = require("./Manager.js");
 const Canvas = require("canvas");
 
-const DEFAULT_ANALYSIS_DEPTH = 3;
+const DEFAULT_ANALYSIS_DEPTH = 5;
 const FANCY_ANALYSIS_DEPTH = 3;
 
 const DRAW_AFTER_NO_PROGRESS_HALFMOVES = 50*(TEAM_CLASSES.length);
@@ -64,8 +64,13 @@ function mergeSortEvaluations(evaluations, start, end, team)
 
 class Game
 {	
-	static DEFAULT_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";	//default game
-	//static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";	//pawnless game
+	//static DEFAULT_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";	//default game
+	
+	//static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";	//king,knight,bishop,rook,queen game
+	//static DEFAULT_FEN_STRING = "rnb1kbnr/8/8/8/8/8/8/RNB1KBNR w KQkq - 0 1";	//king,knight,bishop,rook game
+	//static DEFAULT_FEN_STRING = "1nb1kbn1/8/8/8/8/8/8/1NB1KBN1 w KQkq - 0 1";	//king,knight,bishop game
+	//static DEFAULT_FEN_STRING = "1n2k1n1/8/8/8/8/8/8/1N2K1N1 w KQkq - 0 1";	//king,knight game
+	//static DEFAULT_FEN_STRING = "4k3/8/8/8/8/8/8/4K3 w KQkq - 0 1";	//king game
 	
 	//static DEFAULT_FEN_STRING = "8/4Br2/8/8/8/8/p1P5/k1Kb4 w - - 0 1";	//win the rook in 9ish halfmoves
 	
@@ -74,8 +79,8 @@ class Game
 	//static DEFAULT_FEN_STRING = "rnbqkbnr/ppp2ppp/4p3/3pP3/8/8/PPPP1PPP/RNBQKBNR w - d 0 3";	//en passant test
 	//static DEFAULT_FEN_STRING = "4k3/8/4p3/3pP3/8/8/8/4K3 w - d 0 3";	//en passant test
 		
-	//static DEFAULT_FEN_STRING = "k7/8/K7/Q7/8/8/8/8 w KQkq - 0 1";	//checkmate test
-	//static DEFAULT_FEN_STRING = "3k4/5Q2/K7/8/8/8/8/8 b - - 0 1";	//checkmate in 2 test
+	//static DEFAULT_FEN_STRING = "k7/8/K7/Q7/8/8/8/8 w KQkq - 0 1";	//white gives checkmate in 1 test (evaluate at 1)
+	static DEFAULT_FEN_STRING = "3k4/5Q2/K7/8/8/8/8/8 b - - 0 1";	//white gives checkmate in 2 test (evaluate at 5)
 	//static DEFAULT_FEN_STRING = "b6K/4qq2/8/8/8/8/Q7/7k w KQkq - 0 1";	//stalemate test (queen sac)
 	
 	pieces;	//indexed by a square on the board
@@ -430,34 +435,27 @@ class Game
 	
 	makeMove(move)
 	{
-		let movingPiece = this.pieces[move.before];
-		const targetPiece = this.pieces[ (move instanceof EnPassantMove)? move.captureSquare : move.after ];
-		
-		//move the moving piece
-		movingPiece.square = move.after;
-		//capture the target piece
+		const targetPiece = this.pieces[move.targetSquare];
 		targetPiece?.deactivate();
-		//manipulate the game position		
-		this.pieces[move.after] = movingPiece;
-		this.pieces[move.before] = null;
-		if(move instanceof EnPassantMove)
-		{
-			this.pieces[move.captureSquare] = null;
-		}
-			
-		if(movingPiece instanceof King || movingPiece instanceof Rook)
-		{
-			movingPiece.canCastle?.update(false);
-		}
+		this.pieces[move.targetSquare] = null;
 		
-		if(move instanceof CastleMove)
+		const movingPiece = this.pieces[move.mainBefore];
+		movingPiece.square = move.mainAfter;
+		this.pieces[move.mainAfter] = movingPiece;
+		movingPiece.canCastle?.update(false);
+		
+		this.pieces[move.mainBefore] = null;
+		
+		const otherPiece = move.otherPiece;
+		(otherPiece??{}).square = move.otherAfter;
+		this.pieces[move.otherAfter] = otherPiece;
+		otherPiece?.canCastle?.update(false);
+		
+		this.pieces[move.otherBefore] = null;
+		
+		if(move instanceof PromotionMove)
 		{
-			const rook = this.pieces[move.rookBefore];
-			rook.square = move.rookAfter;
-			this.pieces[move.rookAfter] = rook;
-			this.pieces[move.rookBefore] = null;
-			
-			rook.canCastle.update(false);
+			movingPiece.team.swapOldPieceForNewPiece(movingPiece, otherPiece);
 		}
 		
 		this.castleRights.update(
@@ -482,12 +480,12 @@ class Game
 			
 		if(movingPiece instanceof Pawn)
 		{
-			const beforeRank = Square.rank(move.before);
-			const afterRank = Square.rank(move.after);
+			const beforeRank = Square.rank(move.mainBefore);
+			const afterRank = Square.rank(move.mainAfter);
 			const distance = afterRank-beforeRank;
 			if((distance/Pawn.LONG_MOVE_RANK_INCREMENT_MULTIPLIER)==movingPiece.team.constructor.PAWN_RANK_INCREMENT)
 			{
-				this.enPassantable.update(asciiOffset(MIN_FILE, Square.file(move.after)));	//could have used move.before too
+				this.enPassantable.update(asciiOffset(MIN_FILE, Square.file(move.mainAfter)));	//could have used move.before too
 			}
 			else
 			{
@@ -508,7 +506,7 @@ class Game
 		
 		[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
 			team.activePieces.forEach((piece)=>{
-				if((piece==movingPiece) || (piece==this.pieces[move.rookAfter]))
+				if((piece==movingPiece) || (piece==otherPiece))
 				{
 					piece.updateKnowledge();
 				}
@@ -517,8 +515,8 @@ class Game
 					const watchingBits = piece.watchingBits.get();
 					if
 					(
-						watchingBits.interact(BitVector.READ, move.before) ||
-						watchingBits.interact(BitVector.READ, move.after)
+						watchingBits.interact(BitVector.READ, move.mainBefore) ||
+						watchingBits.interact(BitVector.READ, move.mainAfter)
 					)
 					{
 						piece.updateKnowledge();
@@ -534,14 +532,6 @@ class Game
 				}
 			});
 		});
-		
-		if(move instanceof PromotionMove)
-		{
-			const promotedPiece = new (move.promotionClass)(movingPiece.game, movingPiece.team, movingPiece.square);
-			promotedPiece.updateKnowledge();
-			movingPiece.team.swapOldPieceForNewPiece(movingPiece, promotedPiece);
-			this.pieces[move.after] = promotedPiece;
-		}
 		
 		this.playedMoves.push(move);
 		
@@ -563,61 +553,19 @@ class Game
 	undoMove()
 	{
 		this.positionFrequenciesByBoardString[this.boardString()]--;
+		if(this.movingTeam==this.teamsByName[WhiteTeam.name]){this.fullMove--;}
+		this.changeTurns();
+		this.halfMove.revert();
 		
 		const move = this.playedMoves.pop();
-		const movingPiece = this.movingPiece.get();
-		const targetPiece = this.targetPiece.get();
 		
-		if(move instanceof PromotionMove)
-		{
-			const promotedPiece = movingPiece.team.activePieces[movingPiece.id];
-			movingPiece.team.swapOldPieceForNewPiece(promotedPiece, movingPiece);
-		}
+		const movingPiece = this.movingPiece.pop();
+		const targetPiece = this.targetPiece.pop();
+		const otherPiece = move.otherPiece;
 		
-		//move the moving piece back where it came from
-		movingPiece.square = move.before;
-		
-		//revoke the capture of the target piece AFTER reverting knowledge
-		//because the target piece may be reverted in error (could not have updated in makeMove)
-		//targetPiece?.activate();
-		
-		if(movingPiece instanceof King || movingPiece instanceof Rook)
-		{
-			movingPiece.canCastle?.revert();
-		}
-		
-		if(move instanceof CastleMove)
-		{
-			const rook = this.pieces[move.rookAfter];
-			rook.square = move.rookBefore;
-			this.pieces[move.rookBefore] = rook;
-			this.pieces[move.rookAfter] = null;
-			
-			rook.canCastle.revert();
-		}
-		
-		//manipulate the game position
-		this.pieces[move.before] = movingPiece;
-		if(move instanceof EnPassantMove)
-		{
-			this.pieces[move.captureSquare] = targetPiece;
-			this.pieces[move.after] = null;
-		}
-		else
-		{
-			this.pieces[move.after] = targetPiece;
-		}
-		
-		//revert the game state
-		this.castleRights.revert();
-		this.enPassantable.revert();
-		this.movingPiece.revert();
-		this.targetPiece.revert();
-		
-		//selectively revert pieces the pieces that were updated in makeMove		
 		[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
 			team.activePieces.forEach((piece)=>{
-				if((piece==movingPiece) || (piece==this.pieces[move.rookBefore]))
+				if((piece==movingPiece) || (piece==otherPiece))
 				{
 					piece.revertKnowledge();
 				}
@@ -626,8 +574,8 @@ class Game
 					const watchingBits = piece.watchingBits.get();
 					if
 					(
-						watchingBits.interact(BitVector.READ, move.before) ||
-						watchingBits.interact(BitVector.READ, move.after)
+						watchingBits.interact(BitVector.READ, move.mainBefore) ||
+						watchingBits.interact(BitVector.READ, move.mainAfter)
 					)
 					{
 						piece.revertKnowledge();
@@ -643,13 +591,29 @@ class Game
 				}
 			});
 		});
-					
-		//NOW revoke the capture of the target piece
-		targetPiece?.activate();
 		
-		this.halfMove.revert();
-		if(this.movingTeam==this.teamsByName[WhiteTeam.name]){this.fullMove--;}
-		this.changeTurns();
+		this.enPassantable.revert();
+		this.castleRights.revert();
+		
+		if(move instanceof PromotionMove)
+		{
+			movingPiece.team.swapOldPieceForNewPiece(otherPiece, movingPiece);
+		}
+		
+		this.pieces[move.otherBefore] = otherPiece;
+		
+		otherPiece?.canCastle?.revert();
+		this.pieces[move.otherAfter] = null;
+		(otherPiece??{}).square = move.otherBefore;
+		
+		this.pieces[move.mainBefore] = movingPiece;
+		
+		movingPiece.canCastle?.revert();
+		this.pieces[move.mainAfter] = null;
+		movingPiece.square = move.mainBefore;
+		
+		this.pieces[move.targetSquare] = targetPiece;
+		targetPiece?.activate();
 	}
 	
 	calculateMoves()
@@ -816,10 +780,10 @@ class Game
 				//colour the square
 				const defaultColour = (((realRank+realFile)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
 				
-				const fillColour = ((square == lastMove.before) || (square == lastMove.after))?
+				const fillColour = ((square == lastMove.mainBefore) || (square == lastMove.mainAfter))?
 				(this.movingTeam.opposition.constructor.MOVE_COLOUR) : defaultColour;
 				
-				const borderColour = ((square == lastLastMove.before) || (square == lastLastMove.after))?
+				const borderColour = ((square == lastLastMove.mainBefore) || (square == lastLastMove.mainAfter))?
 				(this.movingTeam.constructor.MOVE_COLOUR) : fillColour;
 				
 				const BORDER_WIDTH = 3;

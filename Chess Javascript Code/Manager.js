@@ -22,6 +22,13 @@ class Manager
 		this.item = this.cache.pop();
 	}
 	
+	pop()
+	{
+		const item = this.item;
+		this.revert();
+		return item;
+	}
+	
 	get()
 	{
 		return this.item;

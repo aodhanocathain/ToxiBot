@@ -26,9 +26,9 @@ class Piece
 	{
 		const game = move.game;
 		//See what squares this type of piece could have come from to reach the new square
-		const movingPiece = game.pieces[move.before]		
+		const movingPiece = game.pieces[move.mainBefore]		
 		let otherOrigins =
-		this.attackingDomainFromSquareInGame(move.after,game).squares.filter((otherOrigin)=>{
+		this.attackingDomainFromSquareInGame(move.mainAfter,game).squares.filter((otherOrigin)=>{
 			const otherPiece = game.pieces[otherOrigin];
 			//ignore the square the moving piece came from
 			if(movingPiece==otherPiece){return false;}
@@ -40,20 +40,20 @@ class Piece
 			return true;
 		})
 		
-		const sameOriginFiles = otherOrigins.filter((square)=>{return Square.file(move.before)==Square.file(square);});
-		const sameOriginRanks = otherOrigins.filter((square)=>{return Square.rank(move.before)==Square.rank(square);});
+		const sameOriginFiles = otherOrigins.filter((square)=>{return Square.file(move.mainBefore)==Square.file(square);});
+		const sameOriginRanks = otherOrigins.filter((square)=>{return Square.rank(move.mainBefore)==Square.rank(square);});
 		
 		const beforeDetails = 
 		(otherOrigins.length==0)?	//piece is the only possible candidate for the move, needs no clarification
 		"":
 		(sameOriginFiles.length==0)?	//need to uniquely identify piece by its file
-		Square.fileString(move.before) :
+		Square.fileString(move.mainBefore) :
 		(sameOriginRanks.length==0)?	//need to uniquely identify piece by its rank
-		Square.rankString(move.before) :
+		Square.rankString(move.mainBefore) :
 		//must fully specify the square the piece starts on
-		Square.fullString(move.before);
+		Square.fullString(move.mainBefore);
 		
-		const capture = game.pieces[move.after]? "x" : "";
+		const capture = game.pieces[move.mainAfter]? "x" : "";
 		
 		game.makeMove(move);
 		const checkStatus = 
@@ -62,7 +62,7 @@ class Piece
 		"";
 		game.undoMove();
 		
-		return `${movingPiece.constructor.typeChar}${beforeDetails}${capture}${Square.fullString(move.after)}${checkStatus}`;
+		return `${movingPiece.constructor.typeChar}${beforeDetails}${capture}${Square.fullString(move.mainAfter)}${checkStatus}`;
 	}
 	
 	game;
@@ -477,7 +477,7 @@ class Pawn extends BlockablePiece
 		const game = move.game;		
 		
 		//if there is a capture, include current file and capture character
-		const beforeDetails = (game.pieces[move.after] || game.pieces[move.captureSquare])? `${Square.fileString(move.before)}x` : "";
+		const beforeDetails = (game.pieces[move.mainAfter] || game.pieces[move.captureSquare])? `${Square.fileString(move.mainBefore)}x` : "";
 		//the above will NOT work for en passant
 		
 		game.makeMove(move);
@@ -489,7 +489,7 @@ class Pawn extends BlockablePiece
 		
 		const promotionString = (move instanceof PromotionMove)? `=${move.promotionClass.typeChar}`:"";
 		
-		return `${beforeDetails}${Square.fullString(move.after)}${promotionString}${checkStatus}`;
+		return `${beforeDetails}${Square.fullString(move.mainAfter)}${promotionString}${checkStatus}`;
 	}
 	
 	nonAttackingSquares;
@@ -514,10 +514,10 @@ class Pawn extends BlockablePiece
 				{
 					if(Square.rank(attackingSquare)==this.team.opposition.constructor.BACK_RANK)
 					{
-						array.push(new PromotionMove(this.game, this.square, attackingSquare, Queen));
-						array.push(new PromotionMove(this.game, this.square, attackingSquare, Rook));
-						array.push(new PromotionMove(this.game, this.square, attackingSquare, Bishop));
-						array.push(new PromotionMove(this.game, this.square, attackingSquare, Knight));
+						array.push(new PromotionMove(this.game, this.square, attackingSquare, new Queen(this.game, this.team, this.square)));
+						array.push(new PromotionMove(this.game, this.square, attackingSquare, new Rook(this.game, this.team, this.square)));
+						array.push(new PromotionMove(this.game, this.square, attackingSquare, new Bishop(this.game, this.team, this.square)));
+						array.push(new PromotionMove(this.game, this.square, attackingSquare, new Knight(this.game, this.team, this.square)));
 					}
 					else
 					{
@@ -553,10 +553,10 @@ class Pawn extends BlockablePiece
 			{
 				if(Square.rank(nonAttackingSquare)==this.team.opposition.constructor.BACK_RANK)
 				{
-					array.push(new PromotionMove(this.game, this.square, nonAttackingSquare, Queen));
-					array.push(new PromotionMove(this.game, this.square, nonAttackingSquare, Rook));
-					array.push(new PromotionMove(this.game, this.square, nonAttackingSquare, Bishop));
-					array.push(new PromotionMove(this.game, this.square, nonAttackingSquare, Knight));
+					array.push(new PromotionMove(this.game, this.square, nonAttackingSquare, new Queen(this.game, this.team, this.square)));
+					array.push(new PromotionMove(this.game, this.square, nonAttackingSquare, new Rook(this.game, this.team, this.square)));
+					array.push(new PromotionMove(this.game, this.square, nonAttackingSquare, new Bishop(this.game, this.team, this.square)));
+					array.push(new PromotionMove(this.game, this.square, nonAttackingSquare, new Knight(this.game, this.team, this.square)));
 				}
 				else
 				{
