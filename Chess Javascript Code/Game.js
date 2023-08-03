@@ -64,7 +64,10 @@ function mergeSortEvaluations(evaluations, start, end, team)
 
 class Game
 {	
-	//static DEFAULT_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";	//default game
+	static DEFAULT_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";	//default game
+	
+	//test string for crashing the fast strat, king,pawn, 1 knight game
+	//static DEFAULT_FEN_STRING = "4k1n1/pppppppp/8/8/8/8/PPPPPPPP/4K3 w KQkq - 0 1";
 	
 	//static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";	//king,knight,bishop,rook,queen game
 	//static DEFAULT_FEN_STRING = "rnb1kbnr/8/8/8/8/8/8/RNB1KBNR w KQkq - 0 1";	//king,knight,bishop,rook game
@@ -80,7 +83,7 @@ class Game
 	//static DEFAULT_FEN_STRING = "4k3/8/4p3/3pP3/8/8/8/4K3 w - d 0 3";	//en passant test
 		
 	//static DEFAULT_FEN_STRING = "k7/8/K7/Q7/8/8/8/8 w KQkq - 0 1";	//white gives checkmate in 1 test (evaluate at 1)
-	static DEFAULT_FEN_STRING = "3k4/5Q2/K7/8/8/8/8/8 b - - 0 1";	//white gives checkmate in 2 test (evaluate at 5)
+	//static DEFAULT_FEN_STRING = "3k4/5Q2/K7/8/8/8/8/8 b - - 0 1";	//white gives checkmate in 2 test (evaluate at 5)
 	//static DEFAULT_FEN_STRING = "b6K/4qq2/8/8/8/8/Q7/7k w KQkq - 0 1";	//stalemate test (queen sac)
 	
 	pieces;	//indexed by a square on the board
@@ -381,11 +384,11 @@ class Game
 	evaluate(depth = DEFAULT_ANALYSIS_DEPTH)
 	{
 		if(this.movingTeam.numKingSeers>0){return;}
-		if(this.isDrawByRepetition()){return {score:0};}
-		if(this.isDrawByMoveRule()){return {score:0};}
 		if(depth==0){
 			return this.immediatePositionEvaluation();
 		}
+		if(this.isDrawByRepetition()){return {score:0};}
+		if(this.isDrawByMoveRule()){return {score:0};}
 		const continuations = this.calculateMoves();
 		
 		let bestContinuation;
