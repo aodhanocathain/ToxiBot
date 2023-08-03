@@ -102,6 +102,9 @@ class Game
 	movingPiece;
 	targetPiece;
 	
+	fullUpdatedPieces;
+	partUpdatedPieces;
+	
 	//booleans that dictate whether to output progress during computation
 	fancyEvalProgress;
 	evalProgress;
@@ -247,6 +250,8 @@ class Game
 		this.positionFrequenciesByBoardString = {};
 		
 		this.playedMoves = [];
+		this.fullUpdatedPieces = new Manager();
+		this.partUpdatedPieces = new Manager();
 		
 		this.fancyEvalProgress = false;
 		this.evalProgress = false;
@@ -461,25 +466,22 @@ class Game
 			movingPiece.team.swapOldPieceForNewPiece(movingPiece, otherPiece);
 		}
 		
-		this.castleRights.update(
-			this.castleRights.get().filter((teamedChar)=>{
-				const wingChar = Piece.typeCharOfTeamedChar(teamedChar);
-				
-				const teamClass = Team.classOfTeamedChar(teamedChar);
-				const team = this.teamsByName[teamClass.name];
-				
-				const king = team.king;
-				const rook = team.rooksInStartSquaresByWingChar[wingChar];
-				
-				if(!((king.canCastle.get()) && (rook?.isActive()) && (rook.canCastle.get())))
-				{
-					//console.log(`${wingChar}`);
-					//console.log(`${king.canCastle.get()} && ${rook?.isActive()} && ${rook.canCastle.get()}`);
-				}
-				return (king.canCastle.get()) && (rook?.isActive()) && (rook.canCastle.get());
-				//return true;
-			})
-		);
+		if((movingPiece instanceof King) || (movingPiece instanceof Rook))
+		{
+			this.castleRights.update(
+				this.castleRights.get().filter((teamedChar)=>{
+					const wingChar = Piece.typeCharOfTeamedChar(teamedChar);
+					
+					const teamClass = Team.classOfTeamedChar(teamedChar);
+					const team = this.teamsByName[teamClass.name];
+					
+					const king = team.king;
+					const rook = team.rooksInStartSquaresByWingChar[wingChar];
+					
+					return (king.canCastle.get()) && (rook?.isActive()) && (rook.canCastle.get());
+				})
+			);
+		}
 			
 		if(movingPiece instanceof Pawn)
 		{
@@ -507,11 +509,14 @@ class Game
 		//i.e. direction pieces that saw the move squares change
 		//all pieces still have to update whether they can see the enemy king
 		
+		const fullUpdatedPieces = [];
+		const partUpdatedPieces = [];
 		[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
 			team.activePieces.forEach((piece)=>{
 				if((piece==movingPiece) || (piece==otherPiece))
 				{
 					piece.updateKnowledge();
+					fullUpdatedPieces.push(piece);
 				}
 				else if(piece instanceof BlockablePiece)
 				{
@@ -523,20 +528,25 @@ class Game
 					)
 					{
 						piece.updateKnowledge();
+						fullUpdatedPieces.push(piece);
 					}
 					else if(piece instanceof Pawn)
 					{
 						piece.updateKingSeer();
+						partUpdatedPieces.push(piece);
 					}
 				}
 				else
 				{
 					piece.updateKingSeer();
+					partUpdatedPieces.push(piece);
 				}
 			});
 		});
 		
 		this.playedMoves.push(move);
+		this.fullUpdatedPieces.update(fullUpdatedPieces);
+		this.partUpdatedPieces.update(partUpdatedPieces);
 		
 		const nextHalfMove = ((movingPiece instanceof Pawn) || targetPiece)? 0 : this.halfMove.get()+1;
 		this.halfMove.update(nextHalfMove);
@@ -566,37 +576,13 @@ class Game
 		const targetPiece = this.targetPiece.pop();
 		const otherPiece = move.otherPiece;
 		
-		[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
-			team.activePieces.forEach((piece)=>{
-				if((piece==movingPiece) || (piece==otherPiece))
-				{
-					piece.revertKnowledge();
-				}
-				else if(piece instanceof BlockablePiece)
-				{
-					const watchingBits = piece.watchingBits.get();
-					if
-					(
-						watchingBits.interact(BitVector.READ, move.mainBefore) ||
-						watchingBits.interact(BitVector.READ, move.mainAfter)
-					)
-					{
-						piece.revertKnowledge();
-					}
-					else if(piece instanceof Pawn)
-					{
-						piece.revertKingSeer();
-					}
-				}
-				else
-				{
-					piece.revertKingSeer();
-				}
-			});
-		});
+		const fullUpdatedPieces = this.fullUpdatedPieces.pop();
+		fullUpdatedPieces.forEach((piece)=>{piece.revertKnowledge();});
+		const partUpdatedPieces = this.partUpdatedPieces.pop();
+		partUpdatedPieces.forEach((piece)=>{piece.revertKingSeer();});
 		
 		this.enPassantable.revert();
-		this.castleRights.revert();
+		if((movingPiece instanceof King) || (movingPiece instanceof Rook)){this.castleRights.revert();}
 		
 		if(move instanceof PromotionMove)
 		{
