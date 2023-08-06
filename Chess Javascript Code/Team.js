@@ -125,10 +125,13 @@ class Team
 	swapOldPieceForNewPiece(oldPiece, newPiece)
 	{
 		newPiece.id = oldPiece.id;
-		this.activePieces[oldPiece.id] = newPiece;
+		
 		this.points -= oldPiece.constructor.points;
-		this.points += newPiece.constructor.points;
 		this.numKingSeers -= oldPiece.kingSeer.get();
+		
+		this.activePieces[oldPiece.id] = newPiece;
+		
+		this.points += newPiece.constructor.points;
 		this.points += newPiece.kingSeer.get();
 		
 		//piece updates team king seers in updateKnowledge

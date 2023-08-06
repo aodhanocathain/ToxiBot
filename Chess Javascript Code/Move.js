@@ -29,12 +29,19 @@ class Move
 	//store the string, which varies with the game position, at a specific moment in the game
 	takeStringSnapshot()
 	{
-		this.string = this.game.pieces[this.mainBefore].constructor.makeMoveString(this);
+		const copyGame = this.game.clone();
+		this.string = copyGame.pieces[this.mainBefore].constructor.makeMoveString(this);
+		//this.string = this.game.pieces[this.mainBefore].constructor.makeMoveString(this);
 	}
 	
 	toString()
 	{
 		return this.string ?? `${Square.fullString(this.mainBefore)}->${Square.fullString(this.mainAfter)}`;
+	}
+	
+	pieceEndSquare()
+	{
+		return this.mainAfter || this.otherAfter;
 	}
 }
 
@@ -50,7 +57,7 @@ class CastleMove extends Move
 {
 	constructor(game, kingBefore, kingAfter, rookBefore, rookAfter)
 	{
-		super(game, kingBefore, kingAfter, null, game.pieces[rookBefore], rookBefore, rookAfter);
+		super(game, kingBefore, kingAfter, kingAfter, game.pieces[rookBefore], rookBefore, rookAfter);
 	}
 	
 	takeStringSnapshot()
@@ -71,7 +78,7 @@ class PromotionMove extends Move
 {
 	constructor(game, mainBefore, mainAfter, promotionPiece)
 	{
-		super(game, mainBefore, null, null, promotionPiece, null, mainAfter)
+		super(game, mainBefore, mainAfter, mainAfter, promotionPiece, mainBefore, mainAfter)
 	}
 }
 

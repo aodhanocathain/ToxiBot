@@ -8,7 +8,7 @@ const {Square} = require("./Square.js");
 const {Manager} = require("./Manager.js");
 const Canvas = require("canvas");
 
-const DEFAULT_ANALYSIS_DEPTH = 5;
+const DEFAULT_ANALYSIS_DEPTH = 3;
 const FANCY_ANALYSIS_DEPTH = 3;
 
 const DRAW_AFTER_NO_PROGRESS_HALFMOVES = 50*(TEAM_CLASSES.length);
@@ -66,9 +66,6 @@ class Game
 {	
 	static DEFAULT_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";	//default game
 	
-	//test string for crashing the fast strat, king,pawn, 1 knight game
-	//static DEFAULT_FEN_STRING = "4k1n1/pppppppp/8/8/8/8/PPPPPPPP/4K3 w KQkq - 0 1";
-	
 	//static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";	//king,knight,bishop,rook,queen game
 	//static DEFAULT_FEN_STRING = "rnb1kbnr/8/8/8/8/8/8/RNB1KBNR w KQkq - 0 1";	//king,knight,bishop,rook game
 	//static DEFAULT_FEN_STRING = "1nb1kbn1/8/8/8/8/8/8/1NB1KBN1 w KQkq - 0 1";	//king,knight,bishop game
@@ -78,6 +75,7 @@ class Game
 	//static DEFAULT_FEN_STRING = "8/4Br2/8/8/8/8/p1P5/k1Kb4 w - - 0 1";	//win the rook in 9ish halfmoves
 	
 	//static DEFAULT_FEN_STRING = "4k3/6P1/8/8/8/8/1p6/4K3 w KQkq - 0 1";	//promotion test
+	//static DEFAULT_FEN_STRING = "4k3/6P1/8/8/8/8/1p6/B3K3 b KQkq - 0 1";	//capture with promotion test
 	
 	//static DEFAULT_FEN_STRING = "rnbqkbnr/ppp2ppp/4p3/3pP3/8/8/PPPP1PPP/RNBQKBNR w - d 0 3";	//en passant test
 	//static DEFAULT_FEN_STRING = "4k3/8/4p3/3pP3/8/8/8/4K3 w - d 0 3";	//en passant test
@@ -175,8 +173,6 @@ class Game
 			})
 			if(file!=NUM_FILES){throw "invalid number of files in FEN string";}
 		})
-		this.teamsByName[WhiteTeam.name].init();
-		this.teamsByName[BlackTeam.name].init();
 		
 		//determine the moving team from the 2nd part of the FEN string
 		if(FENparts[1]==WhiteTeam.char)
@@ -244,6 +240,9 @@ class Game
 			throw "invalid fullmove clock in FEN string";
 		}
 		
+		this.teamsByName[WhiteTeam.name].init();
+		this.teamsByName[BlackTeam.name].init();
+		
 		this.movingPiece = new Manager();
 		this.targetPiece = new Manager();
 		
@@ -255,6 +254,11 @@ class Game
 		
 		this.fancyEvalProgress = false;
 		this.evalProgress = false;
+	}
+	
+	clone()
+	{
+		return new Game(this.toString());
 	}
 	
 	changeTurns()
@@ -400,6 +404,48 @@ class Game
 		let bestEval;
 		
 		//check for better continuations
+		for(const [basicMoves,specialMoves] of continuations)
+		{
+			if(basicMoves?.length>0)
+			{
+				const newContinuation = basicMoves[0];
+				this.makeMove(newContinuation);
+				const newEval = this.evaluate(depth-1);
+				//not undoing move, must use movingTeam.opposition
+				if(this.movingTeam.opposition.evalPreferredToEval(newEval,bestEval))
+				{
+					bestContinuation = newContinuation;
+					bestEval = newEval;
+				}
+				for(let i=1; i<basicMoves.length; i++)
+				{
+					const newContinuation = basicMoves[i];
+					this.switchMoveBySamePiece(newContinuation);
+					const newEval = this.evaluate(depth-1);
+					if(this.movingTeam.opposition.evalPreferredToEval(newEval,bestEval))
+					{
+						bestContinuation = newContinuation;
+						bestEval = newEval;
+					}
+				}
+				this.undoMove();
+			}
+			///*
+			for(let i=0; i<specialMoves?.length; i++)
+			{
+				const newContinuation = specialMoves[i];
+				this.makeMove(newContinuation);
+				const newEval = this.evaluate(depth-1);
+				this.undoMove();
+				if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
+				{
+					bestContinuation = newContinuation;
+					bestEval = newEval;
+				}
+			}
+			//*/
+		}
+		/*
 		for(let i=0; i<continuations.length; i++)
 		{
 			if(this.evalProgress && (depth==DEFAULT_ANALYSIS_DEPTH))
@@ -416,6 +462,7 @@ class Game
 				bestEval = newEval;
 			}
 		}
+		*/
 		
 		if(!bestEval)
 		{
@@ -439,6 +486,91 @@ class Game
 			bestMove: bestContinuation,
 			reverseLine: reverseLine
 		};
+	}
+	
+	switchMoveBySamePiece(move)
+	{
+		this.positionFrequenciesByBoardString[this.boardString()]--;
+		
+		const lastMove = this.playedMoves.pop();
+		const movingPiece = this.movingPiece.get();
+		const lastTargetPiece = this.targetPiece.pop();
+		
+		//this.pieces[lastMove.mainBefore] = movingPiece;
+		
+		//movingPiece.canCastle?.revert();
+		//movingPiece.square = lastMove.mainBefore;
+		
+		this.fullUpdatedPieces.pop().forEach((piece)=>{piece.revertKnowledge();});
+		this.partUpdatedPieces.pop().forEach((piece)=>{piece.revertKingSeer();});
+		movingPiece.revertKnowledge();
+		lastMove.otherPiece?.revertKnowledge();		
+		
+		this.pieces[lastMove.targetSquare] = lastTargetPiece;
+		lastTargetPiece?.activate();
+		
+		const newTargetPiece = this.pieces[move.targetSquare];
+		this.pieces[move.targetSquare] = null;
+		newTargetPiece?.deactivate();
+		
+		movingPiece.square = move.mainAfter;
+		this.pieces[move.mainAfter] = movingPiece;
+		
+		this.targetPiece.update(newTargetPiece);
+		
+		const fullUpdatedPieces = [];
+		const partUpdatedPieces = [];
+		//[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
+		movingPiece.updateKnowledge();
+		move.otherPiece?.updateKnowledge();
+		[this.movingTeam].forEach((team)=>{
+			team.activePieces.forEach((piece)=>{
+				if(piece==movingPiece)
+				{
+					piece.updateKnowledge();
+					fullUpdatedPieces.push(piece);
+				}
+				//else if(piece instanceof BlockablePiece)
+				else
+				{
+					const watchingBits = piece.watchingBits.get();
+					if
+					(
+						watchingBits.interact(BitVector.READ, move.mainBefore) ||
+						watchingBits.interact(BitVector.READ, move.mainAfter)
+					)
+					{
+						piece.updateKnowledge();
+						fullUpdatedPieces.push(piece);
+					}
+					else if(piece instanceof Pawn)
+					{
+						piece.updateKingSeer();
+						partUpdatedPieces.push(piece);
+					}
+				}
+				/*
+				else
+				{
+					piece.updateKingSeer();
+					partUpdatedPieces.push(piece);
+				}
+				*/
+			});
+		});
+		this.playedMoves.push(move);
+		this.fullUpdatedPieces.update(fullUpdatedPieces);
+		this.partUpdatedPieces.update(partUpdatedPieces);
+		
+		const newBoardString = this.boardString();
+		if(newBoardString in this.positionFrequenciesByBoardString)
+		{
+			this.positionFrequenciesByBoardString[newBoardString]++;
+		}
+		else
+		{
+			this.positionFrequenciesByBoardString[newBoardString] = 1;
+		}
 	}
 	
 	makeMove(move)
@@ -511,14 +643,18 @@ class Game
 		
 		const fullUpdatedPieces = [];
 		const partUpdatedPieces = [];
-		[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
+		movingPiece.updateKnowledge();
+		otherPiece?.updateKnowledge();
+		//[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
+		[this.movingTeam.opposition].forEach((team)=>{
 			team.activePieces.forEach((piece)=>{
 				if((piece==movingPiece) || (piece==otherPiece))
 				{
 					piece.updateKnowledge();
 					fullUpdatedPieces.push(piece);
 				}
-				else if(piece instanceof BlockablePiece)
+				//else if(piece instanceof BlockablePiece)
+				else
 				{
 					const watchingBits = piece.watchingBits.get();
 					if
@@ -536,11 +672,13 @@ class Game
 						partUpdatedPieces.push(piece);
 					}
 				}
+				/*
 				else
 				{
 					piece.updateKingSeer();
 					partUpdatedPieces.push(piece);
 				}
+				*/
 			});
 		});
 		
@@ -576,6 +714,8 @@ class Game
 		const targetPiece = this.targetPiece.pop();
 		const otherPiece = move.otherPiece;
 		
+		movingPiece.revertKnowledge();
+		otherPiece?.revertKnowledge();
 		const fullUpdatedPieces = this.fullUpdatedPieces.pop();
 		fullUpdatedPieces.forEach((piece)=>{piece.revertKnowledge();});
 		const partUpdatedPieces = this.partUpdatedPieces.pop();
@@ -618,7 +758,8 @@ class Game
 	calculateLegals()
 	{
 		//moves are illegal if they leave the team's king vulnerable to capture
-		return this.calculateMoves().filter((move)=>{
+		//console.log(this.calculateMoves().flat(2));
+		return this.calculateMoves().flat(2).filter((move)=>{
 			this.makeMove(move);
 			const condition = !(this.kingCapturable());
 			this.undoMove();
@@ -769,10 +910,10 @@ class Game
 				//colour the square
 				const defaultColour = (((realRank+realFile)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
 				
-				const fillColour = ((square == lastMove.mainBefore) || (square == lastMove.mainAfter))?
+				const fillColour = ((square == lastMove.mainBefore) || (square == lastMove.pieceEndSquare?.()))?
 				(this.movingTeam.opposition.constructor.MOVE_COLOUR) : defaultColour;
 				
-				const borderColour = ((square == lastLastMove.mainBefore) || (square == lastLastMove.mainAfter))?
+				const borderColour = ((square == lastLastMove.mainBefore) || (square == lastLastMove.pieceEndSquare?.()))?
 				(this.movingTeam.constructor.MOVE_COLOUR) : fillColour;
 				
 				const BORDER_WIDTH = 3;
