@@ -4,4 +4,7 @@ No expected application in variants such as Fischer Random, more than 2 players,
 
 Non-standard terms:
 I use the word "domain" in the code to refer to anywhere on the board that a piece is
-able to move to in the current game position from its current square.
+able to see in the current game position, from its current square.
+
+Use Javascript for quickly trying out new ideas, getting a coherent system off the ground
+Use C to optimize system for speed
