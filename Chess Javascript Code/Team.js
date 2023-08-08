@@ -153,40 +153,51 @@ class Team
 	evalPreferredToEval(newEval, oldEval)
 	{
 		//work out if what happens in newEval is better than what happened in oldEval
-		if(!newEval){return false;}
-		if(!oldEval){return true;}
+		
+		//if(!newEval){return false;}
+		//if(!oldEval){return true;}
 		
 		//any even number of halfmoves ago, this team was moving
-		const iGiveCheckmate = (newEval.checkmate_in_halfmoves % 2) == 0;
-		const iGaveCheckmate = (oldEval.checkmate_in_halfmoves % 2) == 0;
+		const iGiveCheckmate = (newEval?.checkmate_in_halfmoves % 2) == 0;
+		const iGaveCheckmate = (oldEval?.checkmate_in_halfmoves % 2) == 0;
 		
 		//any odd number of halfmoves ago, the other team was moving
-		const iGetCheckmated = (newEval.checkmate_in_halfmoves % 2) == 1;
-		const iGotCheckmated = (oldEval.checkmate_in_halfmoves % 2) == 1;
+		const iGetCheckmated = (newEval?.checkmate_in_halfmoves % 2) == 1;
+		const iGotCheckmated = (oldEval?.checkmate_in_halfmoves % 2) == 1;
 		
-		const giveMateInHalfmoves = newEval.checkmate_in_halfmoves;
-		const gaveMateInHalfMoves = oldEval.checkmate_in_halfmoves;
+		const giveMateInHalfMoves = newEval?.checkmate_in_halfmoves;
+		const gaveMateInHalfMoves = oldEval?.checkmate_in_halfmoves;
 		
+		/*
 		if(iGotCheckmated)	//due to be checkmated in old continuation
 		{
 			//better continuations escape or delay the checkmate
 			return (!iGetCheckmated) ||	//escape checkmate
-			(giveMateInHalfmoves > gaveMateInHalfMoves);	//delay checkmate
+			(giveMateInHalfMoves > gaveMateInHalfMoves);	//delay checkmate
 		}
 		else	//not due to be checkmated in old continuation
 		{
 			if(iGaveCheckmate)	//already due to give checkmate in old continuation
 			{
 				//better continuations give checkmate sooner
-				return iGiveCheckmate && (giveMateInHalfmoves < gaveMateInHalfMoves);
+				return iGiveCheckmate && (giveMateInHalfMoves < gaveMateInHalfMoves);
 			}
 			else	//not due to give checkmate in old continuation
 			{
 				//better continuations find checkmate or beat old score
 				return iGiveCheckmate ||	//checkmate
-				this.scorePreferredToScore(newEval.score, oldEval.score);	//better score
+				this.scorePreferredToScore(newEval?.score, oldEval?.score);	//better score
 			}
 		}
+		*/
+		return (!oldEval) ||
+		(newEval && 
+			(iGotCheckmated && ((!iGetCheckmated) || (giveMateInHalfMoves > gaveMateInHalfMoves))) ||
+			((!iGotCheckmated) && (
+				(iGaveCheckmate && (iGiveCheckmate && (giveMateInHalfMoves < gaveMateInHalfMoves))) ||
+				((!iGaveCheckmate) && (iGiveCheckmate || this.scorePreferredToScore(newEval?.score, oldEval?.score)))
+			))
+		);
 	}
 }
 
