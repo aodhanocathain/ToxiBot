@@ -4,11 +4,13 @@ class Move
 {
 	game;
 	
-	mainBefore;	//the square a piece started at mainBefore the move
-	mainAfter;	//the square the same piece ended at mainAfter the move
-	targetSquare;
+	//squares pertaining to the main piece of the move
+	mainBefore;	//the square the piece started at
+	mainAfter;	//the square the piece ended at
+	targetSquare;	//the square a capture targetted (not the same as mainAfter for en passant captures)
 	
-	otherPiece;
+	otherPiece;	//a promotion piece, or a castling rook
+	//squares pertaining to otherPiece
 	otherBefore;
 	otherAfter;
 	
@@ -30,8 +32,7 @@ class Move
 	takeStringSnapshot()
 	{
 		const copyGame = this.game.clone();
-		this.string = copyGame.pieces[this.mainBefore].constructor.makeMoveString(this);
-		//this.string = this.game.pieces[this.mainBefore].constructor.makeMoveString(this);
+		this.string = this.game.pieces[this.mainBefore].constructor.makeMoveString(this);
 	}
 	
 	toString()

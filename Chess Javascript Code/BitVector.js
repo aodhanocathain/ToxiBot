@@ -22,7 +22,7 @@ class BitVector
 	interact(interactionIndex, index)
 	{
 		const wordIndex = Math.floor(index / WORD_WIDTH);
-		const bitIndex = index % WORD_WIDTH;
+		const bitIndex = index % WORD_WIDTH;	//the bit's index within the chosen word
 		const funcName = this.constructor.INTERACTION_NAMES[interactionIndex];
 		return this[funcName](wordIndex, bitIndex);
 	}

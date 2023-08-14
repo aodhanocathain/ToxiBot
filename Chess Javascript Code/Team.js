@@ -154,9 +154,6 @@ class Team
 	{
 		//work out if what happens in newEval is better than what happened in oldEval
 		
-		//if(!newEval){return false;}
-		//if(!oldEval){return true;}
-		
 		//any even number of halfmoves ago, this team was moving
 		const iGiveCheckmate = (newEval?.checkmate_in_halfmoves % 2) == 0;
 		const iGaveCheckmate = (oldEval?.checkmate_in_halfmoves % 2) == 0;
@@ -168,28 +165,6 @@ class Team
 		const giveMateInHalfMoves = newEval?.checkmate_in_halfmoves;
 		const gaveMateInHalfMoves = oldEval?.checkmate_in_halfmoves;
 		
-		/*
-		if(iGotCheckmated)	//due to be checkmated in old continuation
-		{
-			//better continuations escape or delay the checkmate
-			return (!iGetCheckmated) ||	//escape checkmate
-			(giveMateInHalfMoves > gaveMateInHalfMoves);	//delay checkmate
-		}
-		else	//not due to be checkmated in old continuation
-		{
-			if(iGaveCheckmate)	//already due to give checkmate in old continuation
-			{
-				//better continuations give checkmate sooner
-				return iGiveCheckmate && (giveMateInHalfMoves < gaveMateInHalfMoves);
-			}
-			else	//not due to give checkmate in old continuation
-			{
-				//better continuations find checkmate or beat old score
-				return iGiveCheckmate ||	//checkmate
-				this.scorePreferredToScore(newEval?.score, oldEval?.score);	//better score
-			}
-		}
-		*/
 		return (!oldEval) ||
 		(newEval && 
 			(iGotCheckmated && ((!iGetCheckmated) || (giveMateInHalfMoves > gaveMateInHalfMoves))) ||

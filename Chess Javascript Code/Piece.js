@@ -74,6 +74,7 @@ class Piece
 	
 	attackingSquares;
 	attackingBits;	//BitVector where a bit is set if its index is a square in attackingSquares
+	watchingBits;	//BitVector where a bit is set if a change in its square requires updating the piece's knowledge
 	basicMoves;
 	
 	kingSeer;	//1 if this piece currently sees the enemy king, 0 otherwise
@@ -175,7 +176,6 @@ class Piece
 //pieces that update their knowledge when something happens in the range of squares they can see
 class BlockablePiece extends Piece
 {
-	watchingBits;	//a BitVector where the set bits are at the indices of squares that trigger the knowledge update
 }
 
 //pieces whose moves extend out as far as possible in a set of directions
@@ -221,7 +221,6 @@ class RangedPiece extends BlockablePiece
 	constructor(game, team, square)
 	{
 		super(game, team, square);
-		this.watchingBits = this.attackingBits;
 	}
 }
 
@@ -258,12 +257,9 @@ class PatternPiece extends Piece
 		};
 	}
 	
-	watchingBits;
-	
 	constructor(game, team, square)
 	{
 		super(game, team, square);
-		this.watchingBits = this.attackingBits;
 	}
 }
 
@@ -298,10 +294,8 @@ class King extends PatternPiece
 	addMovesToArray(array)
 	{
 		array.push([this.basicMoves.get(),this.castleMoves.get()]);
-		//super.addMovesToArray(array);
 	}
 	
-	///*
 	updateKnowledge()
 	{
 		super.updateKnowledge();
@@ -359,7 +353,6 @@ class King extends PatternPiece
 		}
 		this.castleMoves.update(castleMoves);
 	}
-	//*/
 	
 	revertKnowledge()
 	{
@@ -554,7 +547,6 @@ class Pawn extends BlockablePiece
 	addMovesToArray(array)
 	{
 		array.push([this.basicMoves.get(), this.specialMoves.get()]);
-		//array.push([this.basicMoves.get()]);
 	}
 	
 	updateKnowledge()
@@ -588,7 +580,6 @@ class Pawn extends BlockablePiece
 					else
 					{
 						basicMoves.push(new PlainMove(this.game, this.square, attackingSquare));
-						//specialMoves.push(new PlainMove(this.game, this.square, attackingSquare));
 					}
 				}
 			}
@@ -625,7 +616,6 @@ class Pawn extends BlockablePiece
 				else
 				{
 					basicMoves.push(new PlainMove(this.game, this.square, nonAttackingSquare));
-					//specialMoves.push(new PlainMove(this.game, this.square, nonAttackingSquare));
 				}
 			}
 		});

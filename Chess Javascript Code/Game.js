@@ -10,8 +10,9 @@ const Canvas = require("canvas");
 
 const DEFAULT_ANALYSIS_DEPTH = 3;
 const FANCY_ANALYSIS_DEPTH = 3;
+const FANCY_ANALYSIS_FORESIGHT = 1;
 
-const DRAW_AFTER_NO_PROGRESS_HALFMOVES = 50*(TEAM_CLASSES.length);
+const DRAW_AFTER_NO_PROGRESS_HALFMOVES = 100;
 const DRAW_BY_REPETITIONS = 3;
 
 const EMPTY_FEN_FIELD = "-";
@@ -64,9 +65,9 @@ function mergeSortEvaluations(evaluations, start, end, team)
 
 class Game
 {	
-	static DEFAULT_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";	//default game
+	//static DEFAULT_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";	//default game
 	
-	//static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";	//king,knight,bishop,rook,queen game
+	static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";	//king,knight,bishop,rook,queen game
 	//static DEFAULT_FEN_STRING = "rnb1kbnr/8/8/8/8/8/8/RNB1KBNR w KQkq - 0 1";	//king,knight,bishop,rook game
 	//static DEFAULT_FEN_STRING = "1nb1kbn1/8/8/8/8/8/8/1NB1KBN1 w KQkq - 0 1";	//king,knight,bishop game
 	//static DEFAULT_FEN_STRING = "1n2k1n1/8/8/8/8/8/8/1N2K1N1 w KQkq - 0 1";	//king,knight game
@@ -102,10 +103,6 @@ class Game
 	
 	fullUpdatedPieces;
 	partUpdatedPieces;
-	
-	//booleans that dictate whether to output progress during computation
-	fancyEvalProgress;
-	evalProgress;
 		
 	static validFENString(FENString)
 	{
@@ -305,54 +302,64 @@ class Game
 		The idea is that this would direct a greater proportion of the
 		search time into worthwhile continuations.
 		*/
-		if(this.movingTeam.numKingSeers>0){return;}
-		if(this.isDrawByRepetition()){return {score:0};}
-		if(this.isDrawByMoveRule()){return {score:0};}
+		if(this.kingCapturable()){return;}
 		if(depth==0){
 			return this.immediatePositionEvaluation();
 		}
+		if(this.isDrawByRepetition()){return {score:0};}
+		if(this.isDrawByMoveRule()){return {score:0};}
 		
-		const moves = this.calculateMoves();
-		
-		const copyEvalProgress = this.evalProgress;
-		this.evalProgress = false;	//do not output from repeated calls to evaluate at its max depth
-		
+		const moves = this.calculateMoves();		
 		const evaluations = [];
 		
 		//evaluate available continuations and order them by the moving team's preference
-		for(let i=0; i<moves.length; i++)
+		
+		let moveIndex=0;
+		for(const [basicMoves,specialMoves] of moves)
 		{
-			if(this.fancyEvalProgress && (depth==FANCY_ANALYSIS_DEPTH))
+			if(basicMoves?.length>0)
 			{
-				console.log(`fancyEvaluate 1st pass: ${i}/${moves.length}`);
+				let newContinuation = basicMoves[0];
+				this.makeMove(newContinuation);
+				let evaluation = this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
+				evaluation.move = newContinuation;
+				evaluations[moveIndex++] = evaluation;
+				
+				//swap basic moves
+				for(let i=1; i<basicMoves.length; i++)
+				{
+					newContinuation = basicMoves[i];
+					this.switchMoveBySamePiece(newContinuation);
+					evaluation = this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
+					evaluation.move = newContinuation;
+					evaluations[moveIndex++] = evaluation;
+				}
+				this.undoMove();
 			}
-			const move = moves[i];
 			
-			this.makeMove(move);
-			//const evaluation = this.evaluate(DEFAULT_ANALYSIS_DEPTH-1);
-			const evaluation = this.evaluate(1);
-			evaluation.move = move;
-			this.undoMove();
-			evaluations[i] = evaluation;
+			//make and take back individual special moves
+			for(let i=0; i<specialMoves?.length; i++)
+			{
+				const newContinuation = specialMoves[i];
+				this.makeMove(newContinuation);
+				const evaluation = this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
+				evaluation.move = newContinuation;
+				evaluations[moveIndex++] = evaluation;
+				this.undoMove();
+			}
 		}
 		
 		mergeSortEvaluations(evaluations, 0, evaluations.length, this.movingTeam);
-		
-		this.evalProgress = copyEvalProgress;
 		
 		let bestEval;
 		let bestMove;
 		
 		//only expand the few best continuations
-		//const numBestEvaluations = Math.pow(evaluations.length,1/3);	//cube root of total number
+		//const numBestEvaluations = Math.pow(evaluations.length,1/2);	//square root of total number
 		const numBestEvaluations = 4;
 		
 		for(let i=0; i<numBestEvaluations; i++)
 		{
-			if(this.fancyEvalProgress && (depth==FANCY_ANALYSIS_DEPTH))
-			{
-				console.log(`fancyEvaluate 2nd pass: ${i}/${numBestEvaluations}`);
-			}
 			const move = evaluations[i].move;
 			if(!move){break;}
 			this.makeMove(move);
@@ -392,7 +399,7 @@ class Game
 
 	evaluate(depth = DEFAULT_ANALYSIS_DEPTH)
 	{
-		if(this.movingTeam.numKingSeers>0){return;}
+		if(this.kingCapturable()){return;}
 		if(depth==0){
 			return this.immediatePositionEvaluation();
 		}
@@ -404,6 +411,8 @@ class Game
 		let bestEval;
 		
 		//check for better continuations
+		
+		//basic moves by the same piece are swappable, special moves are not
 		for(const [basicMoves,specialMoves] of continuations)
 		{
 			if(basicMoves?.length>0)
@@ -417,6 +426,8 @@ class Game
 					bestContinuation = newContinuation;
 					bestEval = newEval;
 				}
+				
+				//swap basic moves
 				for(let i=1; i<basicMoves.length; i++)
 				{
 					const newContinuation = basicMoves[i];
@@ -430,7 +441,8 @@ class Game
 				}
 				this.undoMove();
 			}
-			///*
+			
+			//make and take back individual special moves
 			for(let i=0; i<specialMoves?.length; i++)
 			{
 				const newContinuation = specialMoves[i];
@@ -443,26 +455,7 @@ class Game
 					bestEval = newEval;
 				}
 			}
-			//*/
 		}
-		/*
-		for(let i=0; i<continuations.length; i++)
-		{
-			if(this.evalProgress && (depth==DEFAULT_ANALYSIS_DEPTH))
-			{
-				console.log(`evaluate: ${i}/${continuations.length}`);
-			}
-			const newContinuation = continuations[i];
-			this.makeMove(newContinuation);
-			const newEval = this.evaluate(depth-1);
-			this.undoMove();
-			if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
-			{
-				bestContinuation = newContinuation;
-				bestEval = newEval;
-			}
-		}
-		*/
 		
 		if(!bestEval)
 		{
@@ -488,49 +481,19 @@ class Game
 		};
 	}
 	
-	switchMoveBySamePiece(move)
+	updateMovingPieceAndPiecesSeeingMove(movingPiece, move)
 	{
-		this.positionFrequenciesByBoardString[this.boardString()]--;
-		
-		const lastMove = this.playedMoves.pop();
-		const movingPiece = this.movingPiece.get();
-		const lastTargetPiece = this.targetPiece.pop();
-		
-		//this.pieces[lastMove.mainBefore] = movingPiece;
-		
-		//movingPiece.canCastle?.revert();
-		//movingPiece.square = lastMove.mainBefore;
-		
-		this.fullUpdatedPieces.pop().forEach((piece)=>{piece.revertKnowledge();});
-		this.partUpdatedPieces.pop().forEach((piece)=>{piece.revertKingSeer();});
-		movingPiece.revertKnowledge();
-		lastMove.otherPiece?.revertKnowledge();		
-		
-		this.pieces[lastMove.targetSquare] = lastTargetPiece;
-		lastTargetPiece?.activate();
-		
-		const newTargetPiece = this.pieces[move.targetSquare];
-		this.pieces[move.targetSquare] = null;
-		newTargetPiece?.deactivate();
-		
-		movingPiece.square = move.mainAfter;
-		this.pieces[move.mainAfter] = movingPiece;
-		
-		this.targetPiece.update(newTargetPiece);
-		
 		const fullUpdatedPieces = [];
 		const partUpdatedPieces = [];
-		//[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
-		movingPiece.updateKnowledge();
-		move.otherPiece?.updateKnowledge();
-		[this.movingTeam].forEach((team)=>{
+		
+		//update opposition first because current castle legality depends on opponent squares
+		[this.movingTeam.opposition, this.movingTeam].forEach((team)=>{
 			team.activePieces.forEach((piece)=>{
-				if(piece==movingPiece)
+				if((piece==movingPiece) || (piece==move.otherPiece))
 				{
 					piece.updateKnowledge();
 					fullUpdatedPieces.push(piece);
 				}
-				//else if(piece instanceof BlockablePiece)
 				else
 				{
 					const watchingBits = piece.watchingBits.get();
@@ -549,18 +512,39 @@ class Game
 						partUpdatedPieces.push(piece);
 					}
 				}
-				/*
-				else
-				{
-					piece.updateKingSeer();
-					partUpdatedPieces.push(piece);
-				}
-				*/
 			});
 		});
-		this.playedMoves.push(move);
+		
 		this.fullUpdatedPieces.update(fullUpdatedPieces);
 		this.partUpdatedPieces.update(partUpdatedPieces);
+	}
+	
+	switchMoveBySamePiece(move)
+	{
+		this.positionFrequenciesByBoardString[this.boardString()]--;
+		
+		const lastMove = this.playedMoves.pop();
+		const movingPiece = this.movingPiece.get();
+		const lastTargetPiece = this.targetPiece.pop();
+		
+		this.fullUpdatedPieces.pop().forEach((piece)=>{piece.revertKnowledge();});
+		this.partUpdatedPieces.pop().forEach((piece)=>{piece.revertKingSeer();});
+		
+		this.pieces[lastMove.targetSquare] = lastTargetPiece;
+		lastTargetPiece?.activate();
+		
+		const newTargetPiece = this.pieces[move.targetSquare];
+		this.pieces[move.targetSquare] = null;
+		newTargetPiece?.deactivate();
+		
+		movingPiece.square = move.mainAfter;
+		this.pieces[move.mainAfter] = movingPiece;
+		
+		this.targetPiece.update(newTargetPiece);
+		
+		this.updateMovingPieceAndPiecesSeeingMove(movingPiece, move);
+		
+		this.playedMoves.push(move);
 		
 		const newBoardString = this.boardString();
 		if(newBoardString in this.positionFrequenciesByBoardString)
@@ -637,54 +621,9 @@ class Game
 		this.movingPiece.update(movingPiece);
 		this.targetPiece.update(targetPiece);
 		
-		//selectively update pieces whose ranges could have been altered by the move
-		//i.e. direction pieces that saw the move squares change
-		//all pieces still have to update whether they can see the enemy king
-		
-		const fullUpdatedPieces = [];
-		const partUpdatedPieces = [];
-		movingPiece.updateKnowledge();
-		otherPiece?.updateKnowledge();
-		//[this.movingTeam, this.movingTeam.opposition].forEach((team)=>{
-		[this.movingTeam.opposition].forEach((team)=>{
-			team.activePieces.forEach((piece)=>{
-				if((piece==movingPiece) || (piece==otherPiece))
-				{
-					piece.updateKnowledge();
-					fullUpdatedPieces.push(piece);
-				}
-				//else if(piece instanceof BlockablePiece)
-				else
-				{
-					const watchingBits = piece.watchingBits.get();
-					if
-					(
-						watchingBits.interact(BitVector.READ, move.mainBefore) ||
-						watchingBits.interact(BitVector.READ, move.mainAfter)
-					)
-					{
-						piece.updateKnowledge();
-						fullUpdatedPieces.push(piece);
-					}
-					else if(piece instanceof Pawn)
-					{
-						piece.updateKingSeer();
-						partUpdatedPieces.push(piece);
-					}
-				}
-				/*
-				else
-				{
-					piece.updateKingSeer();
-					partUpdatedPieces.push(piece);
-				}
-				*/
-			});
-		});
+		this.updateMovingPieceAndPiecesSeeingMove(movingPiece, move);
 		
 		this.playedMoves.push(move);
-		this.fullUpdatedPieces.update(fullUpdatedPieces);
-		this.partUpdatedPieces.update(partUpdatedPieces);
 		
 		const nextHalfMove = ((movingPiece instanceof Pawn) || targetPiece)? 0 : this.halfMove.get()+1;
 		this.halfMove.update(nextHalfMove);
@@ -714,8 +653,6 @@ class Game
 		const targetPiece = this.targetPiece.pop();
 		const otherPiece = move.otherPiece;
 		
-		movingPiece.revertKnowledge();
-		otherPiece?.revertKnowledge();
 		const fullUpdatedPieces = this.fullUpdatedPieces.pop();
 		fullUpdatedPieces.forEach((piece)=>{piece.revertKnowledge();});
 		const partUpdatedPieces = this.partUpdatedPieces.pop();
@@ -758,7 +695,6 @@ class Game
 	calculateLegals()
 	{
 		//moves are illegal if they leave the team's king vulnerable to capture
-		//console.log(this.calculateMoves().flat(2));
 		return this.calculateMoves().flat(2).filter((move)=>{
 			this.makeMove(move);
 			const condition = !(this.kingCapturable());
