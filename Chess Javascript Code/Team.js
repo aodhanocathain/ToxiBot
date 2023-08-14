@@ -35,6 +35,8 @@ class Team
 	nextId;
 	
 	points;
+	kingSafety;
+	pieceQuality;
 	numKingSeers;
 	
 	king;
@@ -52,6 +54,8 @@ class Team
 		this.nextId = 0;
 		
 		this.points = 0;
+		this.kingSafety = 0;
+		this.pieceQuality = 0;
 		this.numKingSeers = 0;
 		
 		this.rooksInStartSquaresByWingChar = {};
@@ -111,6 +115,8 @@ class Team
 		this.activePieces[piece.id] = piece;
 		delete this.inactivePieces[piece.id];
 		this.points += piece.constructor.points;
+		this.pieceQuality += piece.quality.get();
+		this.kingSafety += piece.kingProximity.get();
 		this.numKingSeers += piece.kingSeer.get();
 	}
 	
@@ -119,6 +125,8 @@ class Team
 		this.inactivePieces[piece.id] = piece;
 		delete this.activePieces[piece.id];
 		this.points -= piece.constructor.points;
+		this.pieceQuality -= piece.quality.get();
+		this.kingSafety -= piece.kingProximity.get();
 		this.numKingSeers -= piece.kingSeer.get();
 	}
 	

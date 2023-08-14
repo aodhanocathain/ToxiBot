@@ -67,7 +67,7 @@ class Game
 {	
 	//static DEFAULT_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";	//default game
 	
-	static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";	//king,knight,bishop,rook,queen game
+	//static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";	//king,knight,bishop,rook,queen game
 	//static DEFAULT_FEN_STRING = "rnb1kbnr/8/8/8/8/8/8/RNB1KBNR w KQkq - 0 1";	//king,knight,bishop,rook game
 	//static DEFAULT_FEN_STRING = "1nb1kbn1/8/8/8/8/8/8/1NB1KBN1 w KQkq - 0 1";	//king,knight,bishop game
 	//static DEFAULT_FEN_STRING = "1n2k1n1/8/8/8/8/8/8/1N2K1N1 w KQkq - 0 1";	//king,knight game
@@ -83,7 +83,7 @@ class Game
 		
 	//static DEFAULT_FEN_STRING = "k7/8/K7/Q7/8/8/8/8 w KQkq - 0 1";	//white gives checkmate in 1 test (evaluate at 1)
 	//static DEFAULT_FEN_STRING = "3k4/5Q2/K7/8/8/8/8/8 b - - 0 1";	//white gives checkmate in 2 test (evaluate at 5)
-	//static DEFAULT_FEN_STRING = "b6K/4qq2/8/8/8/8/Q7/7k w KQkq - 0 1";	//stalemate test (queen sac)
+	static DEFAULT_FEN_STRING = "b6K/4qq2/8/8/8/8/Q7/7k w KQkq - 0 1";	//stalemate test (queen sac) (evaluate at 3)
 	
 	pieces;	//indexed by a square on the board
 	
@@ -103,6 +103,8 @@ class Game
 	
 	fullUpdatedPieces;
 	partUpdatedPieces;
+	
+	numPositionsAnalysed;
 		
 	static validFENString(FENString)
 	{
@@ -215,8 +217,10 @@ class Game
 		if(FENparts[3] != EMPTY_FEN_FIELD)
 		{
 			const distance = asciiDistance(FENparts[3], MIN_FILE);
-			if((distance == 0) || (distance >= NUM_FILES))
+			if((distance < 0) || (distance >= NUM_FILES))
 			{
+				console.log("en passant file:")
+				console.log(FENparts[3]);
 				throw "invalid en passant file in FEN string";
 			}
 		}
@@ -249,8 +253,7 @@ class Game
 		this.fullUpdatedPieces = new Manager();
 		this.partUpdatedPieces = new Manager();
 		
-		this.fancyEvalProgress = false;
-		this.evalProgress = false;
+		this.numPositionsAnalysed = 0;
 	}
 	
 	clone()
@@ -288,9 +291,27 @@ class Game
 	
 	immediatePositionEvaluation()
 	{
+		const whiteMaterial = this.teamsByName[WhiteTeam.name].points;
+		const blackMaterial = this.teamsByName[BlackTeam.name].points;
+		const totalMaterial = whiteMaterial + blackMaterial;
+		
+		const whitePieceQuality = this.teamsByName[WhiteTeam.name].pieceQuality;
+		const blackPieceQuality = this.teamsByName[BlackTeam.name].pieceQuality;
+		const totalPieceQuality = whitePieceQuality + blackPieceQuality;
+		
+		const whiteKingSafety = this.teamsByName[WhiteTeam.name].kingSafety;
+		const blackKingSafety = this.teamsByName[BlackTeam.name].kingSafety;
+		const totalKingSafety = whiteKingSafety + blackKingSafety;
+		return {
+			score: ((33/100)*((whiteMaterial-blackMaterial)/totalMaterial)) +
+					((33/100)*((whitePieceQuality-blackPieceQuality)/totalPieceQuality)) +
+					((33/100)*((whiteKingSafety-blackKingSafety)/totalKingSafety))
+		};
+		/*
 		return {
 			score: this.teamsByName[WhiteTeam.name].points - this.teamsByName[BlackTeam.name].points
 		};
+		*/
 	}
 
 	fancyEvaluate(depth = FANCY_ANALYSIS_DEPTH)
@@ -303,11 +324,11 @@ class Game
 		search time into worthwhile continuations.
 		*/
 		if(this.kingCapturable()){return;}
+		if(this.isDrawByRepetition()){return {score:0};}
+		if(this.isDrawByMoveRule()){return {score:0};}
 		if(depth==0){
 			return this.immediatePositionEvaluation();
 		}
-		if(this.isDrawByRepetition()){return {score:0};}
-		if(this.isDrawByMoveRule()){return {score:0};}
 		
 		const moves = this.calculateMoves();		
 		const evaluations = [];
@@ -356,7 +377,7 @@ class Game
 		
 		//only expand the few best continuations
 		//const numBestEvaluations = Math.pow(evaluations.length,1/2);	//square root of total number
-		const numBestEvaluations = 4;
+		const numBestEvaluations = 3;
 		
 		for(let i=0; i<numBestEvaluations; i++)
 		{
@@ -399,12 +420,13 @@ class Game
 
 	evaluate(depth = DEFAULT_ANALYSIS_DEPTH)
 	{
+		this.numPositionsAnalysed++;
 		if(this.kingCapturable()){return;}
+		if(this.isDrawByRepetition()){return {score:0};}
+		if(this.isDrawByMoveRule()){return {score:0};}
 		if(depth==0){
 			return this.immediatePositionEvaluation();
 		}
-		if(this.isDrawByRepetition()){return {score:0};}
-		if(this.isDrawByMoveRule()){return {score:0};}
 		const continuations = this.calculateMoves();
 		
 		let bestContinuation;

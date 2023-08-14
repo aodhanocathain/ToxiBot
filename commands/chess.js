@@ -7,6 +7,9 @@ const commandName = "chess";
 const playersById = {};
 const doNotReplyWithOK = true;
 
+//const evaluateFunctionName = "evaluate";
+const evaluateFunctionName = "fancyEvaluate";
+
 class DiscordGame
 {
 	chessGame;
@@ -44,7 +47,7 @@ class DiscordGame
 		//if it is the bot's turn and there are legal moves to play
 		if(this.isBotTurn() && (this.chessGame.calculateLegals().length>0))
 		{
-			this.makeMoveAndEditInteraction(this.chessGame.evaluate().bestMove)
+			this.makeMoveAndEditInteraction(this.chessGame[evaluateFunctionName]().bestMove)
 		}
 	}
 	
@@ -97,8 +100,7 @@ class DiscordGame
 		const availableMovesString = this.availableStrings.join("\t");
 		
 		//get the best line in string form
-		const evaluation = this.chessGame.evaluate();
-		//const evaluation = this.chessGame.fancyEvaluate();
+		const evaluation = this.chessGame[evaluateFunctionName]();
 		
 		const bestLineString = this.chessGame.lineString(evaluation.reverseLine?.slice().reverse() ?? []);
 		const statusString = 
@@ -119,7 +121,7 @@ class DiscordGame
 				//.concat(`\n`)
 				.concat(`**Available Moves**:\t${availableMovesString}\n`)
 				//.concat(`\n`)
-				.concat(`**${process.env.BOT_NAME}'s Evaluation**:\t||${statusString}||\n`)
+				//.concat(`**${process.env.BOT_NAME}'s Evaluation**:\t||${statusString}||\n`)
 				.concat(`**${process.env.BOT_NAME}'s Best Continuation**:\t||${bestLineString==""?"none":bestLineString}||\n`),
 				files: [boardPicture],
 			}
@@ -313,8 +315,8 @@ module.exports = {
 				
 				discordGame.buildDisplayMessage()
 				.then((displayMessage)=>{
+					discordGame.advanceGameIfBotTurnAndEditInteraction();
 					interaction.editReply(displayMessage);
-					setTimeout(()=>{discordGame.advanceGameIfBotTurnAndEditInteraction();}, 3000);
 				})
 				
 				return doNotReplyWithOK;

@@ -96,6 +96,8 @@ class Piece
 		this.watchingBits = this.attackingBits;
 		
 		this.kingSeer = new Manager(0);
+		this.kingProximity = new Manager(0);
+		this.quality = new Manager(0);
 		
 		this.image = Canvas.loadImage(imageFileName(this.team.constructor.name, this.constructor.name));
 	}
@@ -133,6 +135,38 @@ class Piece
 		this.team.numKingSeers += newKingSeer - oldKingSeer;
 	}
 	
+	updateQuality()
+	{
+		const oldQuality = this.quality.get();
+		const newQuality = this.attackingSquares.get().length;
+		this.quality.update(newQuality);
+		this.team.pieceQuality += newQuality - oldQuality;
+	}
+	
+	revertQuality()
+	{
+		const oldQuality = this.quality.get();
+		this.quality.revert();
+		const newQuality = this.quality.get();
+		this.team.pieceQuality += newQuality - oldQuality;
+	}
+	
+	updateKingProximity()
+	{
+		const oldProximity = this.kingProximity.get();
+		const newProximity = Square.distance(this.square, this.team.king.square);
+		this.kingProximity.update(newProximity);
+		this.team.kingSafety += newProximity - oldProximity;
+	}
+	
+	revertKingProximity()
+	{
+		const oldProximity = this.kingProximity.get();
+		this.kingProximity.revert();
+		const newProximity = this.kingProximity.get();
+		this.team.kingSafety += newProximity - oldProximity;
+	}
+	
 	addAttackingMovesToArray(array)
 	{
 		array.push([this.basicMoves.get()]);
@@ -157,6 +191,8 @@ class Piece
 			return accumulator;
 		}, []));
 		this.updateKingSeer();
+		this.updateKingProximity();
+		this.updateQuality();
 	}
 	
 	revertKnowledge()
@@ -165,6 +201,8 @@ class Piece
 		this.attackingBits.revert();
 		this.basicMoves.revert();
 		this.revertKingSeer();
+		this.revertKingProximity();
+		this.revertQuality();
 	}
 	
 	toString()
@@ -559,7 +597,10 @@ class Pawn extends BlockablePiece
 		this.nonAttackingSquares.update(nonAttackingDomain.squares);
 		this.nonAttackingBits.update(nonAttackingDomain.bits);
 		
-		this.watchingBits.update(nonAttackingDomain.watch);
+		const newWatchingBits = new BitVector();
+		newWatchingBits.or(attackingDomain.bits);
+		newWatchingBits.or(nonAttackingDomain.bits);
+		this.watchingBits.update(newWatchingBits);
 		
 		const basicMoves = [];
 		const specialMoves = [];
@@ -624,6 +665,8 @@ class Pawn extends BlockablePiece
 		this.specialMoves.update(specialMoves);
 		
 		this.updateKingSeer();
+		this.updateKingProximity();
+		this.updateQuality();
 	}
 	
 	revertKnowledge()
@@ -640,6 +683,8 @@ class Pawn extends BlockablePiece
 		this.watchingBits.revert();
 		
 		this.revertKingSeer();
+		this.revertKingProximity();
+		this.revertQuality();
 	}
 }
 

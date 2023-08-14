@@ -34,6 +34,13 @@ class Square
 		return square % NUM_FILES;
 	}
 	
+	static distance(square1, square2)
+	{
+		const fileDistance = Square.file(square1) - Square.file(square2);
+		const rankDistance = Square.rank(square1) - Square.rank(square2);
+		return Math.sqrt((fileDistance*fileDistance)+(rankDistance*rankDistance));
+	}
+	
 	static rankString(square)
 	{
 		return asciiOffset(MIN_RANK, this.rank(square));
