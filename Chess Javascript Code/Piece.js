@@ -78,6 +78,8 @@ class Piece
 	basicMoves;
 	
 	kingSeer;	//1 if this piece currently sees the enemy king, 0 otherwise
+	quality;
+	kingProximity;
 	
 	image;
 	
@@ -154,7 +156,7 @@ class Piece
 	updateKingProximity()
 	{
 		const oldProximity = this.kingProximity.get();
-		const newProximity = Square.distance(this.square, this.team.king.square);
+		const newProximity = 1/(1+Square.distance(this.square, this.team.king.square));
 		this.kingProximity.update(newProximity);
 		this.team.kingSafety += newProximity - oldProximity;
 	}

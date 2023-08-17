@@ -67,7 +67,7 @@ class Game
 {	
 	//static DEFAULT_FEN_STRING = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";	//default game
 	
-	//static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";	//king,knight,bishop,rook,queen game
+	static DEFAULT_FEN_STRING = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";	//king,knight,bishop,rook,queen game
 	//static DEFAULT_FEN_STRING = "rnb1kbnr/8/8/8/8/8/8/RNB1KBNR w KQkq - 0 1";	//king,knight,bishop,rook game
 	//static DEFAULT_FEN_STRING = "1nb1kbn1/8/8/8/8/8/8/1NB1KBN1 w KQkq - 0 1";	//king,knight,bishop game
 	//static DEFAULT_FEN_STRING = "1n2k1n1/8/8/8/8/8/8/1N2K1N1 w KQkq - 0 1";	//king,knight game
@@ -83,7 +83,7 @@ class Game
 		
 	//static DEFAULT_FEN_STRING = "k7/8/K7/Q7/8/8/8/8 w KQkq - 0 1";	//white gives checkmate in 1 test (evaluate at 1)
 	//static DEFAULT_FEN_STRING = "3k4/5Q2/K7/8/8/8/8/8 b - - 0 1";	//white gives checkmate in 2 test (evaluate at 5)
-	static DEFAULT_FEN_STRING = "b6K/4qq2/8/8/8/8/Q7/7k w KQkq - 0 1";	//stalemate test (queen sac) (evaluate at 3)
+	//static DEFAULT_FEN_STRING = "b6K/4qq2/8/8/8/8/Q7/7k w KQkq - 0 1";	//stalemate test (queen sac) (evaluate at 3)
 	
 	pieces;	//indexed by a square on the board
 	
@@ -120,7 +120,7 @@ class Game
 		}
 	}
 	
-	constructor(FENString)
+	constructor(FENString = this.constructor.DEFAULT_FEN_STRING)
 	{		
 		this.teamsByName = {
 			[WhiteTeam.name]: new WhiteTeam(this),
@@ -291,6 +291,7 @@ class Game
 	
 	immediatePositionEvaluation()
 	{
+		///*
 		const whiteMaterial = this.teamsByName[WhiteTeam.name].points;
 		const blackMaterial = this.teamsByName[BlackTeam.name].points;
 		const totalMaterial = whiteMaterial + blackMaterial;
@@ -307,6 +308,7 @@ class Game
 					((33/100)*((whitePieceQuality-blackPieceQuality)/totalPieceQuality)) +
 					((33/100)*((whiteKingSafety-blackKingSafety)/totalKingSafety))
 		};
+		//*/
 		/*
 		return {
 			score: this.teamsByName[WhiteTeam.name].points - this.teamsByName[BlackTeam.name].points
@@ -422,11 +424,11 @@ class Game
 	{
 		this.numPositionsAnalysed++;
 		if(this.kingCapturable()){return;}
-		if(this.isDrawByRepetition()){return {score:0};}
-		if(this.isDrawByMoveRule()){return {score:0};}
 		if(depth==0){
 			return this.immediatePositionEvaluation();
 		}
+		if(this.isDrawByRepetition()){return {score:0};}
+		if(this.isDrawByMoveRule()){return {score:0};}
 		const continuations = this.calculateMoves();
 		
 		let bestContinuation;
@@ -503,13 +505,21 @@ class Game
 		};
 	}
 	
-	updateMovingPieceAndPiecesSeeingMove(movingPiece, move)
+	updateMovingPieceAndOppositionPiecesSeeingMove(movingPiece, move)
 	{
+		
 		const fullUpdatedPieces = [];
 		const partUpdatedPieces = [];
 		
-		//update opposition first because current castle legality depends on opponent squares
-		[this.movingTeam.opposition, this.movingTeam].forEach((team)=>{
+		//When the moving team makes a move, only need to update the opposition's available moves
+		//to be able to expand the game tree search
+		
+		//This saves updating both teams on the last step when only one update is required
+		//but requires also checking the previous move (for which this opposition was not updated)
+		
+		const lastMove = this.playedMoves[this.playedMoves.length-1] ?? move;
+		//[this.movingTeam.opposition, this.movingTeam].forEach((team)=>{
+		[this.movingTeam.opposition].forEach((team)=>{
 			team.activePieces.forEach((piece)=>{
 				if((piece==movingPiece) || (piece==move.otherPiece))
 				{
@@ -521,8 +531,11 @@ class Game
 					const watchingBits = piece.watchingBits.get();
 					if
 					(
+						//each team is updated every 2 halfmoves, must check the last 2 halfmoves
 						watchingBits.interact(BitVector.READ, move.mainBefore) ||
-						watchingBits.interact(BitVector.READ, move.mainAfter)
+						watchingBits.interact(BitVector.READ, move.mainAfter) ||
+						watchingBits.interact(BitVector.READ, lastMove.mainBefore) ||
+						watchingBits.interact(BitVector.READ, lastMove.mainAfter)
 					)
 					{
 						piece.updateKnowledge();
@@ -564,7 +577,9 @@ class Game
 		
 		this.targetPiece.update(newTargetPiece);
 		
-		this.updateMovingPieceAndPiecesSeeingMove(movingPiece, move);
+		this.changeTurns();
+		this.updateMovingPieceAndOppositionPiecesSeeingMove(movingPiece, move);
+		this.changeTurns();
 		
 		this.playedMoves.push(move);
 		
@@ -643,7 +658,7 @@ class Game
 		this.movingPiece.update(movingPiece);
 		this.targetPiece.update(targetPiece);
 		
-		this.updateMovingPieceAndPiecesSeeingMove(movingPiece, move);
+		this.updateMovingPieceAndOppositionPiecesSeeingMove(movingPiece, move);
 		
 		this.playedMoves.push(move);
 		
@@ -730,9 +745,10 @@ class Game
 		return this.movingTeam.numKingSeers > 0;
 	}
 	
-	kingChecked()
+	kingChecked()	//opposition's numKingSeers not guaranteed to be up to date
 	{
-		return this.movingTeam.opposition.numKingSeers > 0;
+		//return this.movingTeam.opposition.numKingSeers > 0;
+		return this.clone().teamsByName[this.movingTeam.opposition.constructor.name].numKingSeers > 0;
 	}
 	
 	moveHistoryString()
