@@ -1,16 +1,15 @@
-const {Team, WhiteTeam, BlackTeam, TEAM_CLASSES} = require("./Team.js");
-const {Piece, BlockablePiece, King, Queen, Rook, Pawn, PieceClassesByTypeChar} = require("./Piece.js");
-const {asciiOffset, asciiDistance} = require("./Helpers.js");
 const {NUM_RANKS, NUM_FILES, MIN_FILE} = require("./Constants.js");
-const {PlainMove, CastleMove, EnPassantMove, PromotionMove} = require("./Move.js");
+const {asciiOffset, asciiDistance} = require("./Helpers.js");
 const {BitVector} = require("./BitVector.js");
-const {Square} = require("./Square.js");
 const {Manager} = require("./Manager.js");
-const Canvas = require("canvas");
+const {Square} = require("./Square.js");
+const {PromotionMove} = require("./Move.js");
+const {Team, WhiteTeam, BlackTeam} = require("./Team.js");
+const {Piece, King, Queen, Rook, Pawn, PieceClassesByTypeChar} = require("./Piece.js");
 
 const DEFAULT_ANALYSIS_DEPTH = 3;
+const FANCY_ANALYSIS_FORESIGHT = 0;
 const FANCY_ANALYSIS_DEPTH = 3;
-const FANCY_ANALYSIS_FORESIGHT = 1;
 
 const DRAW_AFTER_NO_PROGRESS_HALFMOVES = 100;
 const DRAW_BY_REPETITIONS = 3;
@@ -326,11 +325,11 @@ class Game
 		search time into worthwhile continuations.
 		*/
 		if(this.kingCapturable()){return;}
+		if(depth==0){
+			return this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
+		}
 		if(this.isDrawByRepetition()){return {score:0};}
 		if(this.isDrawByMoveRule()){return {score:0};}
-		if(depth==0){
-			return this.immediatePositionEvaluation();
-		}
 		
 		const moves = this.calculateMoves();		
 		const evaluations = [];
@@ -378,8 +377,8 @@ class Game
 		let bestMove;
 		
 		//only expand the few best continuations
-		//const numBestEvaluations = Math.pow(evaluations.length,1/2);	//square root of total number
-		const numBestEvaluations = 3;
+		const numBestEvaluations = Math.pow(evaluations.length,1/2);	//square root of total number
+		//const numBestEvaluations = 3;
 		
 		for(let i=0; i<numBestEvaluations; i++)
 		{
@@ -541,11 +540,13 @@ class Game
 						piece.updateKnowledge();
 						fullUpdatedPieces.push(piece);
 					}
+					/*
 					else if(piece instanceof Pawn)
 					{
 						piece.updateKingSeer();
 						partUpdatedPieces.push(piece);
 					}
+					*/
 				}
 			});
 		});
@@ -848,81 +849,8 @@ class Game
 		if(castleRightsString==""){castleRightsString="-";}
 		return [boardString, this.movingTeam.constructor.char, castleRightsString, this.enPassantable.get(), this.halfMove.get(), this.fullMove].join(" ");
 	}
-	
-	toPNGBuffer()
-	{
-		const LIGHT_COLOUR = "#e0d0b0";
-		const DARK_COLOUR = "#e0a070";
-		const FONT_COLOUR = "#0000ff";
-		
-		const SQUARE_PIXELS = 50;
-
-		const canvas = Canvas.createCanvas(NUM_FILES*SQUARE_PIXELS, NUM_RANKS*SQUARE_PIXELS);
-		const context = canvas.getContext("2d");
-
-		context.font = `${SQUARE_PIXELS/4}px Arial`;//SQUARE_PIXELS/4 is an arbitrarily chosen size
-
-		const drawCalls = [];
-
-		const lastLastMove = this.playedMoves[this.playedMoves.length-2] ?? {};
-		const lastMove = this.playedMoves[this.playedMoves.length-1] ?? {};
-
-		//draw the board bottom up so that higher squares' text does not get blocked by lower squares
-		//start at the highest drawing rank, because highest coordinate is lowest on the display
-		for(let drawRank=7; drawRank>=0; drawRank--)	//the "rank" on the drawn board, not necessarily the real rank
-		{
-			for(let drawFile=0; drawFile<NUM_FILES; drawFile++)	//the "file" on the drawn board, not necessarily the real file
-			{
-				//the game's square corresponding at the current draw position depends on the moving team (POV)
-				const realRank = (this.movingTeam instanceof WhiteTeam)? (NUM_RANKS-1)-drawRank : drawRank;
-				const realFile = (this.movingTeam instanceof WhiteTeam)? drawFile : (NUM_FILES-1)-drawFile;
-				const square = Square.make(realRank,realFile);
-				
-				const x = drawFile*SQUARE_PIXELS;
-				const y = drawRank*SQUARE_PIXELS;
-				
-				//colour the square
-				const defaultColour = (((realRank+realFile)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
-				
-				const fillColour = ((square == lastMove.mainBefore) || (square == lastMove.pieceEndSquare?.()))?
-				(this.movingTeam.opposition.constructor.MOVE_COLOUR) : defaultColour;
-				
-				const borderColour = ((square == lastLastMove.mainBefore) || (square == lastLastMove.pieceEndSquare?.()))?
-				(this.movingTeam.constructor.MOVE_COLOUR) : fillColour;
-				
-				const BORDER_WIDTH = 3;
-				
-				context.fillStyle = borderColour;
-				context.fillRect(x, y, SQUARE_PIXELS, SQUARE_PIXELS);
-				
-				context.fillStyle = fillColour;
-				context.fillRect(x+BORDER_WIDTH,y+BORDER_WIDTH,SQUARE_PIXELS-(2*BORDER_WIDTH),SQUARE_PIXELS-(2*BORDER_WIDTH));
-
-				//draw a piece if one is present
-				const piece = this.pieces[square];
-				if(piece)
-				{
-					drawCalls.push(new Promise((resolve, reject)=>{
-						piece.image.then((i)=>{
-							context.drawImage(i, x, y, SQUARE_PIXELS, SQUARE_PIXELS);
-							resolve("done");
-						});
-					}))
-				}
-				
-				//annotate the square name e.g. "f3"
-				context.fillStyle = FONT_COLOUR;
-				context.fillText(Square.fullString(square), x, y+SQUARE_PIXELS);
-			}
-		}
-
-		//make sure all pieces have been drawn
-		return Promise.all(drawCalls).then(()=>{
-			return canvas.toBuffer("image/png");
-		});
-	}
 }
 
 module.exports = {
-	Game:Game
+	Game: Game
 }

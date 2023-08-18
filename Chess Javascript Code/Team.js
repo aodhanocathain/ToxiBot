@@ -1,7 +1,7 @@
-const {King, Queen, Rook} = require("./Piece.js");
-const {Square} = require("./Square.js");
+const {NUM_FILES} = require("./Constants.js");
 const {Manager} = require("./Manager.js");
-const {NUM_FILES, NUM_RANKS} = require("./Constants.js");
+const {Square} = require("./Square.js");
+const {King, Queen, Rook} = require("./Piece.js");
 
 class Team
 {

@@ -1,5 +1,5 @@
-const {asciiOffset} = require("./Helpers.js");
 const {MIN_FILE, MIN_RANK, NUM_FILES, NUM_RANKS} = require("./Constants.js");
+const {asciiOffset} = require("./Helpers.js");
 
 //represent a square as a single integer
 class Square

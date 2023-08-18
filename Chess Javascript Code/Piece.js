@@ -1,10 +1,9 @@
+const {MIN_FILE} = require("./Constants.js");
+const {asciiDistance} = require("./Helpers.js");
+const {BitVector} = require("./BitVector.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
-const {BitVector} = require("./BitVector.js");
 const {PlainMove, CastleMove, EnPassantMove, PromotionMove} = require("./Move.js");
-const {imageFileName, asciiDistance} = require("./Helpers.js");
-const {MIN_FILE} = require("./Constants.js");
-const Canvas = require("canvas");
 
 class Piece
 {
@@ -81,8 +80,6 @@ class Piece
 	quality;
 	kingProximity;
 	
-	image;
-	
 	//set by the piece's team
 	id;
 	
@@ -100,8 +97,6 @@ class Piece
 		this.kingSeer = new Manager(0);
 		this.kingProximity = new Manager(0);
 		this.quality = new Manager(0);
-		
-		this.image = Canvas.loadImage(imageFileName(this.team.constructor.name, this.constructor.name));
 	}
 	
 	isActive()
