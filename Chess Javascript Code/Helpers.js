@@ -10,6 +10,20 @@ module.exports = {
 		return distantCharacter.charCodeAt(0) - baseCharacter.charCodeAt(0);
 	},
 	
+	deferredPromise()
+	{
+		let resolveFunction;
+		
+		const promise = new Promise((resolve, reject)=>{
+			resolveFunction = resolve;
+		});
+		
+		return {
+			promise: promise,
+			resolveFunction: resolveFunction
+		};
+	},
+	
 	generateMask(length)
 	//generate a mask *length* bits wide
 	{

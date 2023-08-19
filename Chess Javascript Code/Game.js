@@ -1,11 +1,13 @@
 const {NUM_RANKS, NUM_FILES, MIN_FILE} = require("./Constants.js");
-const {asciiOffset, asciiDistance} = require("./Helpers.js");
+const {asciiOffset, asciiDistance, deferredPromise} = require("./Helpers.js");
 const {BitVector} = require("./BitVector.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
 const {PromotionMove} = require("./Move.js");
 const {Team, WhiteTeam, BlackTeam} = require("./Team.js");
 const {Piece, King, Queen, Rook, Pawn, PieceClassesByTypeChar} = require("./Piece.js");
+
+const {Worker, isMainThread, parentPort} = require("worker_threads");
 
 const DEFAULT_ANALYSIS_DEPTH = 3;
 const FANCY_ANALYSIS_FORESIGHT = 0;
@@ -418,6 +420,120 @@ class Game
 			reverseLine: reverseLine
 		};
 	}
+	
+	threadedFancyEvaluate(depth = FANCY_ANALYSIS_DEPTH)
+	{
+		if(this.kingCapturable()){return;}
+		if(depth==0){
+			return this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
+		}
+		if(this.isDrawByRepetition()){return {score:0};}
+		if(this.isDrawByMoveRule()){return {score:0};}
+		
+		const moves = this.calculateMoves();		
+		const evaluations = [];
+		
+		//evaluate available continuations and order them by the moving team's preference
+		
+		let moveIndex=0;
+		for(const [basicMoves,specialMoves] of moves)
+		{
+			if(basicMoves?.length>0)
+			{
+				let newContinuation = basicMoves[0];
+				this.makeMove(newContinuation);
+				let evaluation = this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
+				evaluation.move = newContinuation;
+				evaluations[moveIndex++] = evaluation;
+				
+				//swap basic moves
+				for(let i=1; i<basicMoves.length; i++)
+				{
+					newContinuation = basicMoves[i];
+					this.switchMoveBySamePiece(newContinuation);
+					evaluation = this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
+					evaluation.move = newContinuation;
+					evaluations[moveIndex++] = evaluation;
+				}
+				this.undoMove();
+			}
+			
+			//make and take back individual special moves
+			for(let i=0; i<specialMoves?.length; i++)
+			{
+				const newContinuation = specialMoves[i];
+				this.makeMove(newContinuation);
+				const evaluation = this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
+				evaluation.move = newContinuation;
+				evaluations[moveIndex++] = evaluation;
+				this.undoMove();
+			}
+		}
+		
+		mergeSortEvaluations(evaluations, 0, evaluations.length, this.movingTeam);
+		
+		let bestEval;
+		let bestIndex;
+		
+		//only expand the few best continuations
+		const numBestEvaluations = Math.ceil(Math.pow(evaluations.length,1/2));	//square root of total number
+		
+		const workers = Array(numBestEvaluations).fill(null).map((item)=>{return new Worker("./Chess Javascript Code/GameFancyEvaluatorThread.js");});
+		const threadStatusObjects = workers.map((worker)=>{return deferredPromise();});
+		const threadStatusPromises = threadStatusObjects.map((statusObject)=>{return statusObject.promise;});
+		
+		
+		workers.forEach((worker, index)=>{
+			worker.on("message", (message)=>{
+				const nonCircularEvaluation = JSON.parse(message);
+				if(this.movingTeam.evalPreferredToEval(nonCircularEvaluation, bestEval))
+				{
+					bestEval = nonCircularEvaluation;
+					bestIndex = index;
+				}
+				threadStatusObjects[index].resolveFunction("done");
+			});
+			
+			this.makeMove(evaluations[index].move);			
+			worker.postMessage(JSON.stringify(
+				{
+					gameString: this.toString(),
+					workerDepth: depth-1
+				}
+			));
+			this.undoMove();
+		});
+		
+		return Promise.all(threadStatusPromises).then((values)=>{
+			if(!bestEval)
+			{
+				//No VALID continuation found, i.e. can't make a move without leaving king vulnerable.
+				//This means the current position is either checkmate or stalemate against movingTeam
+				return (this.movingTeam.opposition.numKingSeers>0)?
+				{
+					checkmate_in_halfmoves: 0
+				}:
+				{
+					score: 0
+				};
+			}
+			
+			this.makeMove(evaluations[bestIndex].move);
+			bestEval = this.fancyEvaluate(depth-1);
+			this.undoMove();
+			
+			const reverseLine = bestEval.reverseLine ?? [];
+			const bestContinuation = evaluations[bestIndex].move;
+			reverseLine.push(bestContinuation);
+		
+			const checkmate = "checkmate_in_halfmoves" in bestEval;
+			return {
+				[checkmate? "checkmate_in_halfmoves" : "score"]: checkmate? bestEval.checkmate_in_halfmoves+1 : bestEval.score,
+				bestMove: bestContinuation,
+				reverseLine: reverseLine
+			};
+		});
+	}
 
 	evaluate(depth = DEFAULT_ANALYSIS_DEPTH)
 	{
@@ -502,6 +618,70 @@ class Game
 			bestMove: bestContinuation,
 			reverseLine: reverseLine
 		};
+	}
+	
+	threadedEvaluate(depth = DEFAULT_ANALYSIS_DEPTH)
+	{
+		if(this.kingCapturable()){return;}
+		if(depth==0){
+			return this.immediatePositionEvaluation();
+		}
+		if(this.isDrawByRepetition()){return {score:0};}
+		if(this.isDrawByMoveRule()){return {score:0};}		
+		
+		const gameString = this.toString();
+		const moves = this.calculateMoves().flat(2);
+		
+		const GAMES_PER_THREAD = 5;
+		const NUM_THREADS = Math.ceil(moves.length/GAMES_PER_THREAD);
+		
+		const workers = Array(NUM_THREADS).fill(null).map((item)=>{return new Worker("./Chess Javascript Code/GameEvaluatorThread.js");});
+		const threadStatusObjects = workers.map((worker)=>{return deferredPromise();});
+		const threadStatusPromises = threadStatusObjects.map((statusObject)=>{return statusObject.promise;});
+		
+		const choosingTeam = this.movingTeam;
+		let bestEval;
+		let bestIndex;
+		
+		workers.forEach((worker, index)=>{
+			worker.on("message", (message)=>{
+				const moveIndex = parseInt(message);
+				if(!isNaN(moveIndex))
+				{
+					this.makeMove(moves[moveIndex]);
+					const evaluation = this.evaluate(depth-1);
+					if(choosingTeam.evalPreferredToEval(evaluation, bestEval))
+					{
+						bestEval = evaluation;
+						bestIndex = moveIndex;
+					}
+					this.undoMove();
+				}
+				threadStatusObjects[index].resolveFunction("done");
+			});
+			
+			worker.postMessage(JSON.stringify(
+				{
+					gameString: gameString,
+					threadIndex: index,
+					numThreads: NUM_THREADS,
+					workerDepth: depth-1
+				}
+			));
+		});
+		
+		return Promise.all(threadStatusPromises).then((values)=>{
+			const reverseLine = bestEval.reverseLine ?? [];
+			const bestContinuation = moves[bestIndex];
+			reverseLine.push(bestContinuation);
+		
+			const checkmate = "checkmate_in_halfmoves" in bestEval;
+			return {
+				[checkmate? "checkmate_in_halfmoves" : "score"]: checkmate? bestEval.checkmate_in_halfmoves+1 : bestEval.score,
+				bestMove: bestContinuation,
+				reverseLine: reverseLine
+			};
+		});
 	}
 	
 	updateMovingPieceAndOppositionPiecesSeeingMove(movingPiece, move)
