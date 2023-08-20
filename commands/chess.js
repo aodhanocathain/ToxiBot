@@ -1,4 +1,5 @@
 const {Game} = require("../Chess Javascript Code/Game.js");
+const {gameToPNGBuffer} = require("../Chess Javascript Code/GameImager.js")
 const {Team, WhiteTeam, BlackTeam, TEAM_CLASSES} = require("../Chess Javascript Code/Team.js");
 
 const Discord = require("discord.js");
@@ -9,6 +10,7 @@ const doNotReplyWithOK = true;
 
 //const evaluateFunctionName = "evaluate";
 const evaluateFunctionName = "fancyEvaluate";
+//const evaluateFunctionName = "threadedFancyEvaluate";
 
 class DiscordGame
 {
@@ -88,7 +90,7 @@ class DiscordGame
 
 	buildDisplayMessage()
 	{
-		const boardPictureBuffer = this.chessGame.toPNGBuffer();
+		const boardPictureBuffer = gameToPNGBuffer(this.chessGame);
 		const playedMovesString = this.chessGame.moveHistoryString();
 		const FENString = this.chessGame.toString();
 		
@@ -99,9 +101,40 @@ class DiscordGame
 		});
 		const availableMovesString = this.availableStrings.join("\t");
 		
-		//get the best line in string form
-		const evaluation = this.chessGame[evaluateFunctionName]();
+		//for multithreaded versions (async) :
+		//const evaluationPromise = this.chessGame[evaluateFunctionName]();
+		//for singlethreaded versions (sync) :
+		const evaluationPromise = new Promise((resolve, reject)=>{resolve(this.chessGame[evaluateFunctionName]());});
 		
+		return evaluationPromise.then((evaluation)=>{
+			const bestLineString = this.chessGame.lineString(evaluation.reverseLine?.slice().reverse() ?? []);
+			const statusString = 
+			this.chessGame.isCheckmate()? `${this.chessGame.movingTeam.opposition.constructor.name} wins` :
+			this.chessGame.isDrawByRepetition()? "draw by repetition" :
+			this.chessGame.isDrawByMoveRule()? "draw by move clock" :
+			this.chessGame.isStalemate()? "draw by stalemate" :
+			this.chessGame.scoreString(evaluation);
+			
+			const team0Username = playersById[this.IdsByTeamName[WhiteTeam.name]]?.username ?? process.env.BOT_NAME;
+			const team1Username = playersById[this.IdsByTeamName[BlackTeam.name]]?.username ?? process.env.BOT_NAME;
+			
+			return boardPictureBuffer.then((boardPicture)=>{
+				return {
+					content:`# (${WhiteTeam.name}) ${team0Username} vs ${team1Username} (${BlackTeam.name})\n`
+					.concat(`**Played Moves**:\t${playedMovesString}\n`)
+					.concat(`**FEN String**:\t${FENString}\n`)
+					//.concat(`\n`)
+					.concat(`**Available Moves**:\t${availableMovesString}\n`)
+					//.concat(`\n`)
+					//.concat(`**${process.env.BOT_NAME}'s Evaluation**:\t||${statusString}||\n`)
+					.concat(`**${process.env.BOT_NAME}'s Best Continuation**:\t||${bestLineString==""?"none":bestLineString}||\n`),
+					files: [boardPicture],
+				}
+			});
+		});
+		
+		/*
+		const evaluation = new Promise((resolve, reject)=>{resolve(this.chessGame[evaluateFunctionName]());});
 		const bestLineString = this.chessGame.lineString(evaluation.reverseLine?.slice().reverse() ?? []);
 		const statusString = 
 		this.chessGame.isCheckmate()? `${this.chessGame.movingTeam.opposition.constructor.name} wins` :
@@ -126,6 +159,7 @@ class DiscordGame
 				files: [boardPicture],
 			}
 		});
+		*/
 	}
 }
 

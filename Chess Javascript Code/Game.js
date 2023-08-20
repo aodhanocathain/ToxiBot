@@ -9,9 +9,13 @@ const {Piece, King, Queen, Rook, Pawn, PieceClassesByTypeChar} = require("./Piec
 
 const {Worker, isMainThread, parentPort} = require("worker_threads");
 
+const numCPUs = require("os").cpus().length;
+
 const DEFAULT_ANALYSIS_DEPTH = 3;
-const FANCY_ANALYSIS_FORESIGHT = 0;
-const FANCY_ANALYSIS_DEPTH = 3;
+
+const FANCY_ANALYSIS_DEPTH = 2;
+const FANCY_ANALYSIS_FORESIGHT = 2;
+const FANCY_ANALYSIS_BRANCH_FACTOR = 4;
 
 const DRAW_AFTER_NO_PROGRESS_HALFMOVES = 100;
 const DRAW_BY_REPETITIONS = 3;
@@ -379,8 +383,7 @@ class Game
 		let bestMove;
 		
 		//only expand the few best continuations
-		const numBestEvaluations = Math.pow(evaluations.length,1/2);	//square root of total number
-		//const numBestEvaluations = 3;
+		const numBestEvaluations = FANCY_ANALYSIS_BRANCH_FACTOR;
 		
 		for(let i=0; i<numBestEvaluations; i++)
 		{
@@ -476,7 +479,7 @@ class Game
 		let bestIndex;
 		
 		//only expand the few best continuations
-		const numBestEvaluations = Math.ceil(Math.pow(evaluations.length,1/2));	//square root of total number
+		const numBestEvaluations = FANCY_ANALYSIS_BRANCH_FACTOR;
 		
 		const workers = Array(numBestEvaluations).fill(null).map((item)=>{return new Worker("./Chess Javascript Code/GameFancyEvaluatorThread.js");});
 		const threadStatusObjects = workers.map((worker)=>{return deferredPromise();});
@@ -622,6 +625,8 @@ class Game
 	
 	threadedEvaluate(depth = DEFAULT_ANALYSIS_DEPTH)
 	{
+		const NUM_THREADS = Math.max(1, numCPUs-1);
+		
 		if(this.kingCapturable()){return;}
 		if(depth==0){
 			return this.immediatePositionEvaluation();
@@ -631,9 +636,6 @@ class Game
 		
 		const gameString = this.toString();
 		const moves = this.calculateMoves().flat(2);
-		
-		const GAMES_PER_THREAD = 5;
-		const NUM_THREADS = Math.ceil(moves.length/GAMES_PER_THREAD);
 		
 		const workers = Array(NUM_THREADS).fill(null).map((item)=>{return new Worker("./Chess Javascript Code/GameEvaluatorThread.js");});
 		const threadStatusObjects = workers.map((worker)=>{return deferredPromise();});
