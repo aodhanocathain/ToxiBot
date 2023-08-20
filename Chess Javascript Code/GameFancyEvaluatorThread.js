@@ -9,7 +9,7 @@ parentPort.on("message", (objectString)=>{
 	
 	const nonCircularEvaluation = 
 	(!evaluation) ? 
-		(this.movingTeam.opposition.numKingSeers>0)? 
+		(game.movingTeam.opposition.numKingSeers>0)? 
 			{checkmate_in_halfmoves: 0}
 			:
 			{score: 0}

@@ -13,8 +13,9 @@ const numCPUs = require("os").cpus().length;
 
 const DEFAULT_ANALYSIS_DEPTH = 3;
 
-const FANCY_ANALYSIS_DEPTH = 2;
-const FANCY_ANALYSIS_FORESIGHT = 2;
+//fancy analysis time is approximately (branch factor)^(depth + foresight) but foresight is more expensive than depth
+const FANCY_ANALYSIS_DEPTH = 3;
+const FANCY_ANALYSIS_FORESIGHT = 1;
 const FANCY_ANALYSIS_BRANCH_FACTOR = 4;
 
 const DRAW_AFTER_NO_PROGRESS_HALFMOVES = 100;
@@ -325,8 +326,8 @@ class Game
 	{
 		/*
 		Generally, some good continuations are easy to spot early.
-		fancyEvaluate uses a shortsighted regular evaluate function to rate each available move,
-		then it selects some of the best to expand the search further.
+		fancyEvaluate uses a shortsighted evaluation to rate each available move,
+		then it only expands the best continuations.
 		The idea is that this would direct a greater proportion of the
 		search time into worthwhile continuations.
 		*/
@@ -337,54 +338,29 @@ class Game
 		if(this.isDrawByRepetition()){return {score:0};}
 		if(this.isDrawByMoveRule()){return {score:0};}
 		
-		const moves = this.calculateMoves();		
-		const evaluations = [];
-		
+		//better to iterate through legals than unverified moves because
+		//1) it is easier
+		//2) if the "best" unverified moves are illegal then this function will return no best move
+		//even if there is a legal move in the position
+		//The above is not a problem in regular evaluate because all moves are checked
+		const legals = this.calculateLegals();
 		//evaluate available continuations and order them by the moving team's preference
+		const evaluations = legals.map((legal, index)=>{
+			this.makeMove(legal);
+			const evaluation = this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
+			evaluation.move = legal;
+			this.undoMove();
+			return evaluation;
+		})
 		
-		let moveIndex=0;
-		for(const [basicMoves,specialMoves] of moves)
-		{
-			if(basicMoves?.length>0)
-			{
-				let newContinuation = basicMoves[0];
-				this.makeMove(newContinuation);
-				let evaluation = this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
-				evaluation.move = newContinuation;
-				evaluations[moveIndex++] = evaluation;
-				
-				//swap basic moves
-				for(let i=1; i<basicMoves.length; i++)
-				{
-					newContinuation = basicMoves[i];
-					this.switchMoveBySamePiece(newContinuation);
-					evaluation = this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
-					evaluation.move = newContinuation;
-					evaluations[moveIndex++] = evaluation;
-				}
-				this.undoMove();
-			}
-			
-			//make and take back individual special moves
-			for(let i=0; i<specialMoves?.length; i++)
-			{
-				const newContinuation = specialMoves[i];
-				this.makeMove(newContinuation);
-				const evaluation = this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
-				evaluation.move = newContinuation;
-				evaluations[moveIndex++] = evaluation;
-				this.undoMove();
-			}
-		}
-		
+		//sort by preference of the moving team
 		mergeSortEvaluations(evaluations, 0, evaluations.length, this.movingTeam);
 		
 		let bestEval;
 		let bestMove;
 		
 		//only expand the few best continuations
-		const numBestEvaluations = FANCY_ANALYSIS_BRANCH_FACTOR;
-		
+		const numBestEvaluations = Math.min(FANCY_ANALYSIS_BRANCH_FACTOR, legals.length);
 		for(let i=0; i<numBestEvaluations; i++)
 		{
 			const move = evaluations[i].move;
@@ -404,7 +380,7 @@ class Game
 		{
 			//No VALID continuation found, i.e. can't make a move without leaving king vulnerable.
 			//This means the current position is either checkmate or stalemate against movingTeam
-			return (this.movingTeam.opposition.numKingSeers>0)?
+			return (this.kingChecked())?
 			{
 				checkmate_in_halfmoves: 0
 			}:
@@ -422,120 +398,6 @@ class Game
 			bestMove: bestMove,
 			reverseLine: reverseLine
 		};
-	}
-	
-	threadedFancyEvaluate(depth = FANCY_ANALYSIS_DEPTH)
-	{
-		if(this.kingCapturable()){return;}
-		if(depth==0){
-			return this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
-		}
-		if(this.isDrawByRepetition()){return {score:0};}
-		if(this.isDrawByMoveRule()){return {score:0};}
-		
-		const moves = this.calculateMoves();		
-		const evaluations = [];
-		
-		//evaluate available continuations and order them by the moving team's preference
-		
-		let moveIndex=0;
-		for(const [basicMoves,specialMoves] of moves)
-		{
-			if(basicMoves?.length>0)
-			{
-				let newContinuation = basicMoves[0];
-				this.makeMove(newContinuation);
-				let evaluation = this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
-				evaluation.move = newContinuation;
-				evaluations[moveIndex++] = evaluation;
-				
-				//swap basic moves
-				for(let i=1; i<basicMoves.length; i++)
-				{
-					newContinuation = basicMoves[i];
-					this.switchMoveBySamePiece(newContinuation);
-					evaluation = this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
-					evaluation.move = newContinuation;
-					evaluations[moveIndex++] = evaluation;
-				}
-				this.undoMove();
-			}
-			
-			//make and take back individual special moves
-			for(let i=0; i<specialMoves?.length; i++)
-			{
-				const newContinuation = specialMoves[i];
-				this.makeMove(newContinuation);
-				const evaluation = this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
-				evaluation.move = newContinuation;
-				evaluations[moveIndex++] = evaluation;
-				this.undoMove();
-			}
-		}
-		
-		mergeSortEvaluations(evaluations, 0, evaluations.length, this.movingTeam);
-		
-		let bestEval;
-		let bestIndex;
-		
-		//only expand the few best continuations
-		const numBestEvaluations = FANCY_ANALYSIS_BRANCH_FACTOR;
-		
-		const workers = Array(numBestEvaluations).fill(null).map((item)=>{return new Worker("./Chess Javascript Code/GameFancyEvaluatorThread.js");});
-		const threadStatusObjects = workers.map((worker)=>{return deferredPromise();});
-		const threadStatusPromises = threadStatusObjects.map((statusObject)=>{return statusObject.promise;});
-		
-		
-		workers.forEach((worker, index)=>{
-			worker.on("message", (message)=>{
-				const nonCircularEvaluation = JSON.parse(message);
-				if(this.movingTeam.evalPreferredToEval(nonCircularEvaluation, bestEval))
-				{
-					bestEval = nonCircularEvaluation;
-					bestIndex = index;
-				}
-				threadStatusObjects[index].resolveFunction("done");
-			});
-			
-			this.makeMove(evaluations[index].move);			
-			worker.postMessage(JSON.stringify(
-				{
-					gameString: this.toString(),
-					workerDepth: depth-1
-				}
-			));
-			this.undoMove();
-		});
-		
-		return Promise.all(threadStatusPromises).then((values)=>{
-			if(!bestEval)
-			{
-				//No VALID continuation found, i.e. can't make a move without leaving king vulnerable.
-				//This means the current position is either checkmate or stalemate against movingTeam
-				return (this.movingTeam.opposition.numKingSeers>0)?
-				{
-					checkmate_in_halfmoves: 0
-				}:
-				{
-					score: 0
-				};
-			}
-			
-			this.makeMove(evaluations[bestIndex].move);
-			bestEval = this.fancyEvaluate(depth-1);
-			this.undoMove();
-			
-			const reverseLine = bestEval.reverseLine ?? [];
-			const bestContinuation = evaluations[bestIndex].move;
-			reverseLine.push(bestContinuation);
-		
-			const checkmate = "checkmate_in_halfmoves" in bestEval;
-			return {
-				[checkmate? "checkmate_in_halfmoves" : "score"]: checkmate? bestEval.checkmate_in_halfmoves+1 : bestEval.score,
-				bestMove: bestContinuation,
-				reverseLine: reverseLine
-			};
-		});
 	}
 
 	evaluate(depth = DEFAULT_ANALYSIS_DEPTH)
@@ -569,7 +431,7 @@ class Game
 					bestEval = newEval;
 				}
 				
-				//swap basic moves
+				//swap basic moves (faster than undoing and making the next move)
 				for(let i=1; i<basicMoves.length; i++)
 				{
 					const newContinuation = basicMoves[i];
@@ -603,7 +465,7 @@ class Game
 		{
 			//No VALID continuation found, i.e. can't make a move without leaving king vulnerable.
 			//This means the current position is either checkmate or stalemate against movingTeam
-			return (this.movingTeam.opposition.numKingSeers>0)?
+			return (this.kingChecked())?
 			{
 				checkmate_in_halfmoves: 0
 			}:
@@ -637,6 +499,7 @@ class Game
 		const gameString = this.toString();
 		const moves = this.calculateMoves().flat(2);
 		
+		//the available continuations will be divided among a number of threads
 		const workers = Array(NUM_THREADS).fill(null).map((item)=>{return new Worker("./Chess Javascript Code/GameEvaluatorThread.js");});
 		const threadStatusObjects = workers.map((worker)=>{return deferredPromise();});
 		const threadStatusPromises = threadStatusObjects.map((statusObject)=>{return statusObject.promise;});
@@ -647,6 +510,10 @@ class Game
 		
 		workers.forEach((worker, index)=>{
 			worker.on("message", (message)=>{
+				//can't pass circular objects (evaluations) back from the worker
+				//solution: worker passes the index of its best continuation,
+				//this index is then tried in the main thread and checked against
+				//the best current index
 				const moveIndex = parseInt(message);
 				if(!isNaN(moveIndex))
 				{
@@ -672,6 +539,7 @@ class Game
 			));
 		});
 		
+		//when all threads have finished, the current best is the best
 		return Promise.all(threadStatusPromises).then((values)=>{
 			const reverseLine = bestEval.reverseLine ?? [];
 			const bestContinuation = moves[bestIndex];
@@ -698,9 +566,8 @@ class Game
 		//This saves updating both teams on the last step when only one update is required
 		//but requires also checking the previous move (for which this opposition was not updated)
 		
-		const lastMove = this.playedMoves[this.playedMoves.length-1] ?? move;
-		//[this.movingTeam.opposition, this.movingTeam].forEach((team)=>{
-		[this.movingTeam.opposition].forEach((team)=>{
+		//must update both teams if checking for mate etc
+		[this.movingTeam.opposition, this.movingTeam].forEach((team)=>{
 			team.activePieces.forEach((piece)=>{
 				if((piece==movingPiece) || (piece==move.otherPiece))
 				{
@@ -712,23 +579,13 @@ class Game
 					const watchingBits = piece.watchingBits.get();
 					if
 					(
-						//each team is updated every 2 halfmoves, must check the last 2 halfmoves
 						watchingBits.interact(BitVector.READ, move.mainBefore) ||
-						watchingBits.interact(BitVector.READ, move.mainAfter) ||
-						watchingBits.interact(BitVector.READ, lastMove.mainBefore) ||
-						watchingBits.interact(BitVector.READ, lastMove.mainAfter)
+						watchingBits.interact(BitVector.READ, move.mainAfter)
 					)
 					{
 						piece.updateKnowledge();
 						fullUpdatedPieces.push(piece);
 					}
-					/*
-					else if(piece instanceof Pawn)
-					{
-						piece.updateKingSeer();
-						partUpdatedPieces.push(piece);
-					}
-					*/
 				}
 			});
 		});
@@ -739,6 +596,8 @@ class Game
 	
 	switchMoveBySamePiece(move)
 	{
+		//can skip moving the same piece back and then to a new square, just move to the new square
+		
 		this.positionFrequenciesByBoardString[this.boardString()]--;
 		
 		const lastMove = this.playedMoves.pop();
@@ -928,10 +787,9 @@ class Game
 		return this.movingTeam.numKingSeers > 0;
 	}
 	
-	kingChecked()	//opposition's numKingSeers not guaranteed to be up to date
+	kingChecked()
 	{
-		//return this.movingTeam.opposition.numKingSeers > 0;
-		return this.clone().teamsByName[this.movingTeam.opposition.constructor.name].numKingSeers > 0;
+		return this.movingTeam.opposition.numKingSeers > 0;
 	}
 	
 	moveHistoryString()
