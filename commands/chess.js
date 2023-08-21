@@ -10,7 +10,7 @@ const doNotReplyWithOK = true;
 
 //const evaluateFunctionName = "evaluate";
 const evaluateFunctionName = "fancyEvaluate";
-//const evaluateFunctionName = "threadedFancyEvaluate";
+//const evaluateFunctionName = "threadedEvaluate";
 
 class DiscordGame
 {
@@ -78,7 +78,7 @@ class DiscordGame
 				}, 3000);
 			}
 		}
-		this.editInteraction();
+		return this.editInteraction();
 	}
 	
 	editInteraction()
@@ -132,34 +132,6 @@ class DiscordGame
 				}
 			});
 		});
-		
-		/*
-		const evaluation = new Promise((resolve, reject)=>{resolve(this.chessGame[evaluateFunctionName]());});
-		const bestLineString = this.chessGame.lineString(evaluation.reverseLine?.slice().reverse() ?? []);
-		const statusString = 
-		this.chessGame.isCheckmate()? `${this.chessGame.movingTeam.opposition.constructor.name} wins` :
-		this.chessGame.isDrawByRepetition()? "draw by repetition" :
-		this.chessGame.isDrawByMoveRule()? "draw by move clock" :
-		this.chessGame.isStalemate()? "draw by stalemate" :
-		this.chessGame.scoreString(evaluation);
-		
-		const team0Username = playersById[this.IdsByTeamName[WhiteTeam.name]]?.username ?? process.env.BOT_NAME;
-		const team1Username = playersById[this.IdsByTeamName[BlackTeam.name]]?.username ?? process.env.BOT_NAME;
-		
-		return boardPictureBuffer.then((boardPicture)=>{
-			return {
-				content:`# (${WhiteTeam.name}) ${team0Username} vs ${team1Username} (${BlackTeam.name})\n`
-				.concat(`**Played Moves**:\t${playedMovesString}\n`)
-				.concat(`**FEN String**:\t${FENString}\n`)
-				//.concat(`\n`)
-				.concat(`**Available Moves**:\t${availableMovesString}\n`)
-				//.concat(`\n`)
-				//.concat(`**${process.env.BOT_NAME}'s Evaluation**:\t||${statusString}||\n`)
-				.concat(`**${process.env.BOT_NAME}'s Best Continuation**:\t||${bestLineString==""?"none":bestLineString}||\n`),
-				files: [boardPicture],
-			}
-		});
-		*/
 	}
 }
 
@@ -433,13 +405,11 @@ module.exports = {
 					return interaction.editReply("Your game has no move to undo");
 				}
 				
-				return interaction.deferReply().then(()=>{
-					interaction.deleteReply();
+				interaction.deleteReply();
 				
-					player.discordGame.undoMoveAndEditInteraction();
+				player.discordGame.undoMoveAndEditInteraction();
 				
-					return doNotReplyWithOK;
-				});
+				return doNotReplyWithOK;
 			}
 		});
 	},
