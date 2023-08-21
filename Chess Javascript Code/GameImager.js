@@ -39,8 +39,9 @@ module.exports = {
 				
 				//colour the square
 				const defaultColour = (((realRank+realFile)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
-				
-				const fillColour = ((square == lastMove.mainBefore) || (square == lastMove.pieceEndSquare?.()))?
+				//compare by strings, not by square numeric value because square 0 is logically false and is missed
+				const fillColour = ((Square.fullString(square) == Square.fullString(lastMove.mainBefore)) ||
+									(Square.fullString(square) == Square.fullString(lastMove.pieceEndSquare?.())))?
 				(game.movingTeam.opposition.constructor.MOVE_COLOUR) : defaultColour;
 				
 				const borderColour = ((square == lastLastMove.mainBefore) || (square == lastLastMove.pieceEndSquare?.()))?
