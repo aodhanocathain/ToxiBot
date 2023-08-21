@@ -16,3 +16,8 @@ void Node_destroy(Node* node)
 {
 	free(node);
 }
+
+void Node_print(Node* node)
+{
+	printf("%lld", node->item);
+}

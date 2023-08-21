@@ -66,7 +66,7 @@ void DoublyLinkedList_print(DoublyLinkedList* list)
 {
 	for(Node* node = list->head; node!=NULL; node = node->next)
 	{
-		printf("%lld\t", node->item);
+		Node_print(node);
+		if((node->next)!=NULL){printf("\t");}
 	}
-	printf("\n");
 }

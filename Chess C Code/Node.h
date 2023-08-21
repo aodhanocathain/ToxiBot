@@ -13,3 +13,5 @@ struct Node {
 
 Node* Node_create(Item item);
 void Node_destroy(Node* node);
+
+void Node_print(Node* node);

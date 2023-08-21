@@ -1,1 +1,1 @@
-nvcc "Chess C Code/Node.c" "Chess C Code/DoublyLinkedList.c" "Chess C Code/main.c" -o main.exe
+nvcc "Chess C Code/Node.c" "Chess C Code/DoublyLinkedList.c" "Chess C Code/Square.c" "Chess C Code/Move.c" "Chess C Code/main.c" -o main.exe
