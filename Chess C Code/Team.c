@@ -3,13 +3,14 @@
 #include "Constants.h"
 #include "Piece.h"
 
-enum TEAM_TYPE {WHITE_TEAM_TYPE, BLACK_TEAM_TYPE};
+#include <stdlib.h>
+
 const char TEAM_TYPE_CHARS[] = {'w','b'};
-const (*TEAM_TYPE_CHAR_CONVERTERS[])(char letter) = {toUpperCase, toLowerCase};
+const char (*TEAM_TYPE_CHAR_CONVERTERS[])(char unteamedChar) = {toUpperCase, toLowerCase};
 
 enum TEAM_TYPE Team_teamedChar_to_type(char unteamedChar)
 {
-	if(TEAM_TYPE_CHAR_CONVERTERS[WHITE_TEAM_TYPE](teamedChar) == teamedChar)
+	if(TEAM_TYPE_CHAR_CONVERTERS[WHITE_TEAM_TYPE](unteamedChar) == unteamedChar)
 	{
 		return WHITE_TEAM_TYPE;
 	}
@@ -19,7 +20,7 @@ enum TEAM_TYPE Team_teamedChar_to_type(char unteamedChar)
 	}
 }
 
-Team* Team_create(TEAM_TYPE type)
+Team* Team_create(enum TEAM_TYPE type)
 {	
 	Team* team = (Team*)malloc(sizeof(Team));
 	
@@ -31,8 +32,6 @@ Team* Team_create(TEAM_TYPE type)
 		team->inactivePieces[i] = NULL;
 	}
 	team->nextId = 0;
-	
-	team->points = 0;	
 	return team;
 }
 
