@@ -1,11 +1,14 @@
 #pragma once
 
+struct Game;
+typedef struct Game Game;
+
 #include "Piece.h"
 #include "constants.h"
 
-typedef struct {
+struct Game {
 	Piece* pieces[NUM_SQUARES];
-} Game;
+};
 
 extern char* GAME_DEFAULT_FEN_STRING;
 

@@ -1,11 +1,19 @@
 #pragma once
 
-enum PIECE_TYPE {KING};
+struct Piece;
+typedef struct Piece Piece;
+enum PIECE_TYPE {KING_PIECE_TYPE, NUM_PIECE_TYPES};
+
+#include "Team.h"
+
+struct Piece {
+	enum TEAM_TYPE teamType;
+	enum PIECE_TYPE pieceType;
+	unsigned char id;
+};
+
 extern const char PIECE_TYPE_CHARS[];
 
-typedef struct {
-	enum PIECE_TYPE type;
-	unsigned char id;
-} Piece;
+Piece* Piece_create(enum TEAM_TYPE teamType, enum PIECE_TYPE pieceType, unsigned char id);
 
-Piece* Piece_create(enum PIECE_TYPE type, unsigned char id);
+enum PIECE_TYPE Piece_type_of_teamedChar(char teamedChar);

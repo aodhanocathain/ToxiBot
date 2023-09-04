@@ -8,7 +8,7 @@
 const char TEAM_TYPE_CHARS[] = {'w','b'};
 const char (*TEAM_TYPE_CHAR_CONVERTERS[])(char unteamedChar) = {toUpperCase, toLowerCase};
 
-enum TEAM_TYPE Team_teamedChar_to_type(char unteamedChar)
+enum TEAM_TYPE Team_type_of_teamedChar(char unteamedChar)
 {
 	if(TEAM_TYPE_CHAR_CONVERTERS[WHITE_TEAM_TYPE](unteamedChar) == unteamedChar)
 	{

@@ -1,6 +1,7 @@
 #include "Game.h"
 #include "Piece.h"
 #include "Square.h"
+#include "Team.h"
 
 #include <stdlib.h>
 
@@ -10,22 +11,23 @@ Game* Game_create(char* FENString)
 {
 	Game* game = (Game*)malloc(sizeof(Game));
 	
-	int i = 0;
-	char currentChar = FENString[i];
+	int charIndex = 0;
+	char currentChar = FENString[charIndex];
 	
-	int rank=0;
+	int rank=NUM_RANKS-1;	//the board string lists ranks in descending order
 	int file=0;
 	while(currentChar!=0)
 	{
-		if(currentChar=='/')
+		if(currentChar=='/')	//delimits different ranks in the board string
 		{
-			rank++;
+			rank--;
 			file=0;
 		}
 		else
 		{
 			unsigned int asciiOffset = currentChar - MIN_RANK_CHAR;
 			if(asciiOffset < NUM_RANKS)
+			//numeric character indicates a number of consecutive empty squares in the same rank
 			{
 				for(int offset=0; offset<=asciiOffset; offset++)
 				{
@@ -33,14 +35,16 @@ Game* Game_create(char* FENString)
 					file++;
 				}
 			}
-			else
+			else	//(assumed alphabetic) character indicates a piece
 			{
-				Piece* piece = Piece_create(currentChar, 0);
+				enum PIECE_TYPE pieceType = Piece_type_of_teamedChar(currentChar);
+				enum TEAM_TYPE teamType = Team_type_of_teamedChar(currentChar);
+				Piece* piece = Piece_create(teamType, pieceType, 0);
 				game->pieces[Square_make(rank,file)] = piece;
 				file++;
 			}
 		}
-		currentChar = FENString[++i];
+		currentChar = FENString[++charIndex];
 	}
 	
 	return game;
@@ -49,8 +53,8 @@ Game* Game_create(char* FENString)
 char* Game_toString(Game* game)
 {
 	char* string = (char*)malloc(sizeof(char)*100);
-	int i = 0;
-	for(int rank=NUM_RANKS-1; rank>=0; rank--)
+	int charIndex = 0;
+	for(int rank=NUM_RANKS-1; rank>=0; rank--)	//list ranks in descending order
 	{
 		int filesSinceLastPiece = 0;
 		for(int file=0; file<NUM_FILES; file++)
@@ -60,27 +64,25 @@ char* Game_toString(Game* game)
 			{
 				if(filesSinceLastPiece>0)
 				{
-					string[i++] = '0'+filesSinceLastPiece;
+					string[charIndex++] = '0'+filesSinceLastPiece;	//denote number of empty squares since last piece
 				}
 				filesSinceLastPiece = 0;
-				//string[i++] = PIECE_TYPE_CHARS[piece->type];
-				string[i++] = 'L';
+				string[charIndex++] = TEAM_TYPE_CHAR_CONVERTERS[piece->teamType](PIECE_TYPE_CHARS[piece->pieceType]);
 			}
 			else
 			{
 				filesSinceLastPiece++;
 			}
 		}
-		if(filesSinceLastPiece>0)
+		if(filesSinceLastPiece>0)	//denote number of empty squares before end of rank
 		{
-			string[i++] = '0'+filesSinceLastPiece;
+			string[charIndex++] = '0'+filesSinceLastPiece;
 		}
-		if(rank>0)
+		if(rank>0)	//delimit rank strings except for the last rank (rank 0)
 		{
-			string[i++] = '/';
+			string[charIndex++] = '/';
 		}
 	}
-	string[i] = 0;
+	string[charIndex] = 0;
 	return string;
-	//return "test";
 }

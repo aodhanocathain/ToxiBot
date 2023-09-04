@@ -1,21 +1,24 @@
 #pragma once
 
+struct Team;
+typedef struct Team Team;
+enum TEAM_TYPE {WHITE_TEAM_TYPE, BLACK_TEAM_TYPE};
+
 #include "Piece.h"
 #include "Constants.h"
 
-enum TEAM_TYPE {WHITE_TEAM_TYPE, BLACK_TEAM_TYPE};
-extern const char TEAM_TYPE_CHARS[];
-extern const char (*TEAM_TYPE_CHAR_CONVERTERS[])(char unteamedChar);
-
-typedef struct {
+struct Team {
 	enum TEAM_TYPE type;
 	
 	Piece* activePieces[NUM_SQUARES];
 	Piece* inactivePieces[NUM_SQUARES];
 	unsigned char nextId;
-} Team;
+};
 
-enum TEAM_TYPE Team_teamedChar_to_type(char teamedChar);
+extern const char TEAM_TYPE_CHARS[];
+extern const char (*TEAM_TYPE_CHAR_CONVERTERS[])(char unteamedChar);
+
+enum TEAM_TYPE Team_type_of_teamedChar(char teamedChar);
 
 Team* Team_create(enum TEAM_TYPE type);
 

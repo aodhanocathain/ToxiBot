@@ -2,8 +2,6 @@
 
 #include "constants.h"
 
-#define MAX_SQUARE (NUM_RANKS*NUM_FILES)
-
 typedef unsigned char Square;
 
 Square Square_make(int rank, int file);
