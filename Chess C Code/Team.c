@@ -35,17 +35,6 @@ Team* Team_create(enum TEAM_TYPE type)
 	return team;
 }
 
-void Team_addActivePiece(Team* team, Piece* piece)
-{
-	Team_registerPiece(team, piece);
-	Team_activatePiece(team, piece);
-}
-
-void Team_registerPiece(Team* team, Piece* piece)
-{
-	piece->id = team->nextId++;
-}
-
 void Team_activatePiece(Team* team, Piece* piece)
 {
 	team->activePieces[piece->id] = piece;

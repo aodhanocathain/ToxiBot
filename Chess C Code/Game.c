@@ -11,6 +11,11 @@ Game* Game_create(char* FENString)
 {
 	Game* game = (Game*)malloc(sizeof(Game));
 	
+	game->white = Team_create(WHITE_TEAM_TYPE);
+	game->black = Team_create(BLACK_TEAM_TYPE);
+	game->teams[WHITE_TEAM_TYPE] = game->white;
+	game->teams[BLACK_TEAM_TYPE] = game->black;
+	
 	int charIndex = 0;
 	char currentChar = FENString[charIndex];
 	
@@ -39,8 +44,14 @@ Game* Game_create(char* FENString)
 			{
 				enum PIECE_TYPE pieceType = Piece_type_of_teamedChar(currentChar);
 				enum TEAM_TYPE teamType = Team_type_of_teamedChar(currentChar);
-				Piece* piece = Piece_create(teamType, pieceType, 0);
+				
+				Team* team = game->teams[teamType];
+				int id = (team->nextId)++;
+				
+				Piece* piece = Piece_create(teamType, pieceType, id);			
+				Team_activatePiece(team, piece);
 				game->pieces[Square_make(rank,file)] = piece;
+				
 				file++;
 			}
 		}

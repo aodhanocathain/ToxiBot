@@ -7,6 +7,9 @@ typedef struct Game Game;
 #include "constants.h"
 
 struct Game {
+	Team* white;
+	Team* black;
+	Team* teams[NUM_TEAM_TYPES];
 	Piece* pieces[NUM_SQUARES];
 };
 

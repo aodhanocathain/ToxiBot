@@ -2,7 +2,7 @@
 
 struct Team;
 typedef struct Team Team;
-enum TEAM_TYPE {WHITE_TEAM_TYPE, BLACK_TEAM_TYPE};
+enum TEAM_TYPE {WHITE_TEAM_TYPE, BLACK_TEAM_TYPE, NUM_TEAM_TYPES};
 
 #include "Piece.h"
 #include "Constants.h"
@@ -22,6 +22,4 @@ enum TEAM_TYPE Team_type_of_teamedChar(char teamedChar);
 
 Team* Team_create(enum TEAM_TYPE type);
 
-void Team_addActivePiece(Team* team, Piece* piece);
-void Team_registerPiece(Team* team, Piece* piece);
 void Team_activatePiece(Team* team, Piece* piece);
