@@ -12,7 +12,7 @@ struct Team {
 	
 	Piece* activePieces[NUM_SQUARES];
 	Piece* inactivePieces[NUM_SQUARES];
-	unsigned char nextId;
+	int numPieces;
 };
 
 extern const char TEAM_TYPE_CHARS[];

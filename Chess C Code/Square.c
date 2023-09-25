@@ -3,7 +3,7 @@
 #include "Square.h"
 #include "constants.h"
 
-Square Square_make(int rank, int file)
+Square Square_create(int rank, int file)
 {
 	return (rank*NUM_FILES)+file;
 }
@@ -30,6 +30,11 @@ int Square_rank(Square square)
 int Square_file(Square square)
 {
 	return square%NUM_FILES;
+}
+
+int Square_equal(Square s1, Square s2)
+{
+	return s1==s2;
 }
 
 void Square_print(Square square)

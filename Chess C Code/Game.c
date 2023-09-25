@@ -11,10 +11,10 @@ Game* Game_create(char* FENString)
 {
 	Game* game = (Game*)malloc(sizeof(Game));
 	
-	game->white = Team_create(WHITE_TEAM_TYPE);
-	game->black = Team_create(BLACK_TEAM_TYPE);
-	game->teams[WHITE_TEAM_TYPE] = game->white;
-	game->teams[BLACK_TEAM_TYPE] = game->black;
+	game->teams[WHITE_TEAM_TYPE] = Team_create(WHITE_TEAM_TYPE);
+	game->teams[BLACK_TEAM_TYPE] = Team_create(BLACK_TEAM_TYPE);
+	
+	game->movingTeam = game->teams[WHITE_TEAM_TYPE];	//for now
 	
 	int charIndex = 0;
 	char currentChar = FENString[charIndex];
@@ -36,7 +36,7 @@ Game* Game_create(char* FENString)
 			{
 				for(int offset=0; offset<=asciiOffset; offset++)
 				{
-					game->pieces[Square_make(rank,file)] = NULL;
+					game->pieces[Square_create(rank,file)] = NULL;
 					file++;
 				}
 			}
@@ -46,11 +46,13 @@ Game* Game_create(char* FENString)
 				enum TEAM_TYPE teamType = Team_type_of_teamedChar(currentChar);
 				
 				Team* team = game->teams[teamType];
-				int id = (team->nextId)++;
+				int id = (team->numPieces)++;
 				
-				Piece* piece = Piece_create(teamType, pieceType, id);			
-				Team_activatePiece(team, piece);
-				game->pieces[Square_make(rank,file)] = piece;
+				Piece* piece = Piece_create(teamType, pieceType, id);
+				
+				team->activePieces[id] = piece;
+				team->inactivePieces[id] = NULL;
+				game->pieces[Square_create(rank,file)] = piece;
 				
 				file++;
 			}
@@ -70,7 +72,7 @@ char* Game_toString(Game* game)
 		int filesSinceLastPiece = 0;
 		for(int file=0; file<NUM_FILES; file++)
 		{
-			Piece* piece = game->pieces[Square_make(rank,file)];
+			Piece* piece = game->pieces[Square_create(rank,file)];
 			if(piece!=NULL)
 			{
 				if(filesSinceLastPiece>0)
@@ -96,4 +98,27 @@ char* Game_toString(Game* game)
 	}
 	string[charIndex] = 0;
 	return string;
+}
+
+Move* Game_moves(Game* game)
+{
+	Move movesArray[NUM_SQUARES*NUM_SQUARES];	//definitely WAY less than this
+	int nextMoveIndex = 0;
+	
+	for(int id=0; id<game->movingTeam->numPieces; id++)
+	{
+		Piece* piece = game->movingTeam->activePieces[id];
+		if(piece != NULL)
+		{
+			Piece_addMoves(piece, &(movesArray[nextMoveIndex]));
+		}
+	}
+	Move* movesList = (Move*)malloc(sizeof(Move)*nextMoveIndex+1);
+	for(int i=0; i<nextMoveIndex; i++)
+	{
+		movesList[i] = movesArray[i];
+	}
+	movesList[nextMoveIndex] = DUMMY_MOVE;
+	
+	return movesList;
 }

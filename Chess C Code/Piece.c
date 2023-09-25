@@ -1,4 +1,5 @@
 #include "Piece.h"
+#include "Move.h"
 #include "Team.h"
 #include "helpers.h"
 
@@ -25,4 +26,8 @@ enum PIECE_TYPE Piece_type_of_teamedChar(char teamedChar)
 		}
 	}
 	return -1;
+}
+
+void Piece_addMoves(Piece* piece, Move* moves)
+{
 }

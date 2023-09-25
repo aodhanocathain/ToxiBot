@@ -31,7 +31,7 @@ Team* Team_create(enum TEAM_TYPE type)
 		team->activePieces[i] = NULL;
 		team->inactivePieces[i] = NULL;
 	}
-	team->nextId = 0;
+	team->numPieces = 0;
 	return team;
 }
 
