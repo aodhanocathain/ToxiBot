@@ -24,12 +24,6 @@ module.exports = {
 		};
 	},
 	
-	generateMask(length)
-	//generate a mask *length* bits wide
-	{
-		return (1 << length)-1;
-	},
-	
 	imageFileName(teamName, pieceName)
 	{
 		return `./images/chess/${teamName}/${pieceName}.png`;
