@@ -78,7 +78,6 @@ class Piece
 	
 	kingSeer;	//1 if this piece currently sees the enemy king, 0 otherwise
 	quality;
-	kingProximity;
 	
 	//set by the piece's team
 	id;
@@ -95,7 +94,6 @@ class Piece
 		this.watchingBits = this.attackingBits;
 		
 		this.kingSeer = new Manager(0);
-		this.kingProximity = new Manager(0);
 		this.quality = new Manager(0);
 	}
 	
@@ -148,22 +146,6 @@ class Piece
 		this.team.pieceQuality += newQuality - oldQuality;
 	}
 	
-	updateKingProximity()
-	{
-		const oldProximity = this.kingProximity.get();
-		const newProximity = 1/(1+Square.distance(this.square, this.team.king.square));
-		this.kingProximity.update(newProximity);
-		this.team.kingSafety += newProximity - oldProximity;
-	}
-	
-	revertKingProximity()
-	{
-		const oldProximity = this.kingProximity.get();
-		this.kingProximity.revert();
-		const newProximity = this.kingProximity.get();
-		this.team.kingSafety += newProximity - oldProximity;
-	}
-	
 	addAttackingMovesToArray(array)
 	{
 		array.push([this.basicMoves.get()]);
@@ -188,7 +170,6 @@ class Piece
 			return accumulator;
 		}, []));
 		this.updateKingSeer();
-		this.updateKingProximity();
 		this.updateQuality();
 	}
 	
@@ -198,7 +179,6 @@ class Piece
 		this.attackingBits.revert();
 		this.basicMoves.revert();
 		this.revertKingSeer();
-		this.revertKingProximity();
 		this.revertQuality();
 	}
 	
@@ -235,7 +215,7 @@ class RangedPiece extends BlockablePiece
 			//keep stepping further in the given direction until reaching the edge of the board or another piece
 			while(Square.validRankAndFile(newRank,newFile) && !blocked)
 			{
-				const newSquare = Square.make(newRank,newFile);
+				const newSquare = Square.withRankAndFile(newRank,newFile);
 				
 				//checking if the way is blocked AFTER adding the potentially blocked square is important
 				//e.g. capturing a piece necessarily involves being able to move to the square that is blocked
@@ -280,7 +260,7 @@ class PatternPiece extends Piece
 			//if it is in the board, include it
 			if(Square.validRankAndFile(newRank,newFile))
 			{
-				const newSquare = Square.make(newRank,newFile);
+				const newSquare = Square.withRankAndFile(newRank,newFile);
 				squaresArray.push(newSquare);
 				squaresBits.interact(BitVector.SET, newSquare);
 			}
@@ -359,7 +339,7 @@ class King extends PatternPiece
 							const endFile = Math.max(kingFile, rookFile);
 							for(let i=startFile+1; i<endFile; i++)
 							{
-								const square = Square.make(this.team.constructor.BACK_RANK, i);
+								const square = Square.withRankAndFile(this.team.constructor.BACK_RANK, i);
 								noPiecesBetween = noPiecesBetween && !(this.game.pieces[square]);
 							}
 							
@@ -369,7 +349,7 @@ class King extends PatternPiece
 								const postcastleFile = Square.file(this.team.constructor.CASTLE_KING_SQUARES_BY_WINGCHAR[wingChar]);
 								const middleFile = (precastleFile + postcastleFile)/2;	//assumes start square and castle square are 2 apart
 								//can't castle through check
-								const passingSquare = Square.make(this.team.constructor.BACK_RANK, middleFile);
+								const passingSquare = Square.withRankAndFile(this.team.constructor.BACK_RANK, middleFile);
 								if(!(this.team.opposition.activePieces.some((piece)=>{
 									return piece.attackingBits.get().interact(BitVector.READ, passingSquare);
 								})))
@@ -485,13 +465,13 @@ class Pawn extends BlockablePiece
 		
 		if(Square.validRankAndFile(nextRank,lessFile))
 		{
-			const captureSquare = Square.make(nextRank, lessFile);
+			const captureSquare = Square.withRankAndFile(nextRank, lessFile);
 			squares.push(captureSquare);
 			bits.interact(BitVector.SET, captureSquare);
 		}
 		if(Square.validRankAndFile(nextRank,moreFile))
 		{
-			const captureSquare = Square.make(nextRank, moreFile);
+			const captureSquare = Square.withRankAndFile(nextRank, moreFile);
 			squares.push(captureSquare);
 			bits.interact(BitVector.SET, captureSquare);
 		}
@@ -514,7 +494,7 @@ class Pawn extends BlockablePiece
 		
 		if(Square.validRankAndFile(nextRank, file))
 		{
-			const nextSquare = Square.make(nextRank, file);
+			const nextSquare = Square.withRankAndFile(nextRank, file);
 			watch.interact(BitVector.SET, nextSquare);
 			if(!(game.pieces[nextSquare]))
 			{
@@ -523,7 +503,7 @@ class Pawn extends BlockablePiece
 				if(rank==team.constructor.PAWN_START_RANK)
 				{
 					const nextNextRank = rank+(this.LONG_MOVE_RANK_INCREMENT_MULTIPLIER*team.constructor.PAWN_RANK_INCREMENT);
-					const nextNextSquare = Square.make(nextNextRank, file);
+					const nextNextSquare = Square.withRankAndFile(nextNextRank, file);
 					watch.interact(BitVector.SET, nextNextSquare);
 					if(!(game.pieces[nextNextSquare]))
 					{
@@ -633,7 +613,7 @@ class Pawn extends BlockablePiece
 					(Pawn.LONG_MOVE_RANK_INCREMENT_MULTIPLIER*this.team.opposition.constructor.PAWN_RANK_INCREMENT);
 					if(Square.rank(this.square)==opponentLongMoveRank)
 					{
-						const enPassantSquare = Square.make(opponentLongMoveRank,enPassantFile);
+						const enPassantSquare = Square.withRankAndFile(opponentLongMoveRank,enPassantFile);
 						specialMoves.push(new EnPassantMove(this.game, this.square, attackingSquare, enPassantSquare));
 					}
 				}
@@ -662,7 +642,6 @@ class Pawn extends BlockablePiece
 		this.specialMoves.update(specialMoves);
 		
 		this.updateKingSeer();
-		this.updateKingProximity();
 		this.updateQuality();
 	}
 	
@@ -680,7 +659,6 @@ class Pawn extends BlockablePiece
 		this.watchingBits.revert();
 		
 		this.revertKingSeer();
-		this.revertKingProximity();
 		this.revertQuality();
 	}
 }

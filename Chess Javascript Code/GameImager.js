@@ -32,7 +32,7 @@ module.exports = {
 				//the game's square corresponding at the current draw position depends on the moving team (POV)
 				const realRank = (game.movingTeam instanceof WhiteTeam)? (NUM_RANKS-1)-drawRank : drawRank;
 				const realFile = (game.movingTeam instanceof WhiteTeam)? drawFile : (NUM_FILES-1)-drawFile;
-				const square = Square.make(realRank,realFile);
+				const square = Square.withRankAndFile(realRank,realFile);
 				
 				const x = drawFile*SQUARE_PIXELS;
 				const y = drawRank*SQUARE_PIXELS;

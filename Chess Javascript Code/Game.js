@@ -161,7 +161,7 @@ class Game
 					const teamClass = Team.classOfTeamedChar(character);
 					const team = this.teamsByName[teamClass.name];
 					
-					const square = Square.make(rank,file);
+					const square = Square.withRankAndFile(rank,file);
 					const piece = new pieceClass(this,team,square);
 					
 					//current square is occupied
@@ -855,7 +855,7 @@ class Game
 			let emptySquares=0;
 			for(let file=0; file<NUM_FILES; file++)
 			{
-				const square = Square.make(rank,file);
+				const square = Square.withRankAndFile(rank,file);
 				const piece = this.pieces[square];
 				if(piece)
 				{

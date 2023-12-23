@@ -116,7 +116,6 @@ class Team
 		delete this.inactivePieces[piece.id];
 		this.points += piece.constructor.points;
 		this.pieceQuality += piece.quality.get();
-		this.kingSafety += piece.kingProximity.get();
 		this.numKingSeers += piece.kingSeer.get();
 	}
 	
@@ -126,7 +125,6 @@ class Team
 		delete this.activePieces[piece.id];
 		this.points -= piece.constructor.points;
 		this.pieceQuality -= piece.quality.get();
-		this.kingSafety -= piece.kingProximity.get();
 		this.numKingSeers -= piece.kingSeer.get();
 	}
 	
@@ -230,25 +228,25 @@ const TEAM_CLASSES = [WhiteTeam, BlackTeam];
 
 TEAM_CLASSES.forEach((teamClass)=>{
 	//king starts on the e-file
-	teamClass.STARTING_KING_SQUARE = Square.make(teamClass.BACK_RANK, 4);
+	teamClass.STARTING_KING_SQUARE = Square.withRankAndFile(teamClass.BACK_RANK, 4);
 	teamClass.STARTING_ROOK_SQUARES_BY_WINGCHAR = {
 		//king rook starts on the h-file
-		[King.typeChar]: Square.make(teamClass.BACK_RANK, NUM_FILES-1),
+		[King.typeChar]: Square.withRankAndFile(teamClass.BACK_RANK, NUM_FILES-1),
 		//queen rook starts on the a-file
-		[Queen.typeChar]: Square.make(teamClass.BACK_RANK, 0)
+		[Queen.typeChar]: Square.withRankAndFile(teamClass.BACK_RANK, 0)
 	};
 	
 	//king goes 2 spaces towards the edge
 	teamClass.CASTLE_KING_SQUARES_BY_WINGCHAR = {
-		[King.typeChar]: Square.make(teamClass.BACK_RANK, Square.file(teamClass.STARTING_KING_SQUARE)+2),
-		[Queen.typeChar]: Square.make(teamClass.BACK_RANK, Square.file(teamClass.STARTING_KING_SQUARE)-2)
+		[King.typeChar]: Square.withRankAndFile(teamClass.BACK_RANK, Square.file(teamClass.STARTING_KING_SQUARE)+2),
+		[Queen.typeChar]: Square.withRankAndFile(teamClass.BACK_RANK, Square.file(teamClass.STARTING_KING_SQUARE)-2)
 	};
 	//rook goes 1 space closer to the center than the king
 	teamClass.CASTLE_ROOK_SQUARES_BY_WINGCHAR = {
 		[King.typeChar]: 
-		Square.make(teamClass.BACK_RANK, Square.file(teamClass.CASTLE_KING_SQUARES_BY_WINGCHAR[King.typeChar])-1),
+		Square.withRankAndFile(teamClass.BACK_RANK, Square.file(teamClass.CASTLE_KING_SQUARES_BY_WINGCHAR[King.typeChar])-1),
 		[Queen.typeChar]: 
-		Square.make(teamClass.BACK_RANK, Square.file(teamClass.CASTLE_KING_SQUARES_BY_WINGCHAR[Queen.typeChar])+1),
+		Square.withRankAndFile(teamClass.BACK_RANK, Square.file(teamClass.CASTLE_KING_SQUARES_BY_WINGCHAR[Queen.typeChar])+1),
 	};
 });
 
