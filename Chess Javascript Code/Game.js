@@ -302,16 +302,16 @@ class Game
 		const blackMaterial = this.teamsByName[BlackTeam.name].points;
 		const totalMaterial = whiteMaterial + blackMaterial;
 		
-		const whitePieceQuality = this.teamsByName[WhiteTeam.name].pieceQuality;
-		const blackPieceQuality = this.teamsByName[BlackTeam.name].pieceQuality;
-		const totalPieceQuality = whitePieceQuality + blackPieceQuality;
+		const whitePieceenemyKingProximity = this.teamsByName[WhiteTeam.name].pieceenemyKingProximity;
+		const blackPieceenemyKingProximity = this.teamsByName[BlackTeam.name].pieceenemyKingProximity;
+		const totalPieceenemyKingProximity = whitePieceenemyKingProximity + blackPieceenemyKingProximity;
 		
 		const whiteKingSafety = this.teamsByName[WhiteTeam.name].kingSafety;
 		const blackKingSafety = this.teamsByName[BlackTeam.name].kingSafety;
 		const totalKingSafety = whiteKingSafety + blackKingSafety;
 		return {
 			score: ((33/100)*((whiteMaterial-blackMaterial)/totalMaterial)) +
-					((33/100)*((whitePieceQuality-blackPieceQuality)/totalPieceQuality)) +
+					((33/100)*((whitePieceenemyKingProximity-blackPieceenemyKingProximity)/totalPieceenemyKingProximity)) +
 					((33/100)*((whiteKingSafety-blackKingSafety)/totalKingSafety))
 		};
 		//*/
@@ -579,8 +579,8 @@ class Game
 					const watchingBits = piece.watchingBits.get();
 					if
 					(
-						watchingBits.interact(BitVector.READ, move.mainBefore) ||
-						watchingBits.interact(BitVector.READ, move.mainAfter)
+						watchingBits.interact(BitVector.READ, move.mainPieceSquareBefore) ||
+						watchingBits.interact(BitVector.READ, move.mainPieceSquareAfter)
 					)
 					{
 						piece.updateKnowledge();
@@ -607,15 +607,15 @@ class Game
 		this.fullUpdatedPieces.pop().forEach((piece)=>{piece.revertKnowledge();});
 		this.partUpdatedPieces.pop().forEach((piece)=>{piece.revertKingSeer();});
 		
-		this.pieces[lastMove.targetSquare] = lastTargetPiece;
+		this.pieces[lastMove.captureTargetSquare] = lastTargetPiece;
 		lastTargetPiece?.activate();
 		
-		const newTargetPiece = this.pieces[move.targetSquare];
-		this.pieces[move.targetSquare] = null;
+		const newTargetPiece = this.pieces[move.captureTargetSquare];
+		this.pieces[move.captureTargetSquare] = null;
 		newTargetPiece?.deactivate();
 		
-		movingPiece.square = move.mainAfter;
-		this.pieces[move.mainAfter] = movingPiece;
+		movingPiece.square = move.mainPieceSquareAfter;
+		this.pieces[move.mainPieceSquareAfter] = movingPiece;
 		
 		this.targetPiece.update(newTargetPiece);
 		
@@ -638,23 +638,23 @@ class Game
 	
 	makeMove(move)
 	{
-		const targetPiece = this.pieces[move.targetSquare];
+		const targetPiece = this.pieces[move.captureTargetSquare];
 		targetPiece?.deactivate();
-		this.pieces[move.targetSquare] = null;
+		this.pieces[move.captureTargetSquare] = null;
 		
-		const movingPiece = this.pieces[move.mainBefore];
-		movingPiece.square = move.mainAfter;
-		this.pieces[move.mainAfter] = movingPiece;
+		const movingPiece = this.pieces[move.mainPieceSquareBefore];
+		movingPiece.square = move.mainPieceSquareAfter;
+		this.pieces[move.mainPieceSquareAfter] = movingPiece;
 		movingPiece.canCastle?.update(false);
 		
-		this.pieces[move.mainBefore] = null;
+		this.pieces[move.mainPieceSquareBefore] = null;
 		
 		const otherPiece = move.otherPiece;
-		(otherPiece??{}).square = move.otherAfter;
-		this.pieces[move.otherAfter] = otherPiece;
+		(otherPiece??{}).square = move.otherPieceSquareAfter;
+		this.pieces[move.otherPieceSquareAfter] = otherPiece;
 		otherPiece?.canCastle?.update(false);
 		
-		this.pieces[move.otherBefore] = null;
+		this.pieces[move.otherPieceSquareBefore] = null;
 		
 		if(move instanceof PromotionMove)
 		{
@@ -680,12 +680,12 @@ class Game
 			
 		if(movingPiece instanceof Pawn)
 		{
-			const beforeRank = Square.rank(move.mainBefore);
-			const afterRank = Square.rank(move.mainAfter);
+			const beforeRank = Square.rank(move.mainPieceSquareBefore);
+			const afterRank = Square.rank(move.mainPieceSquareAfter);
 			const distance = afterRank-beforeRank;
 			if((distance/Pawn.LONG_MOVE_RANK_INCREMENT_MULTIPLIER)==movingPiece.team.constructor.PAWN_RANK_INCREMENT)
 			{
-				this.enPassantable.update(asciiOffset(MIN_FILE, Square.file(move.mainAfter)));	//could have used move.before too
+				this.enPassantable.update(asciiOffset(MIN_FILE, Square.file(move.mainPieceSquareAfter)));	//could have used move.before too
 			}
 			else
 			{
@@ -745,19 +745,19 @@ class Game
 			movingPiece.team.swapOldPieceForNewPiece(otherPiece, movingPiece);
 		}
 		
-		this.pieces[move.otherBefore] = otherPiece;
+		this.pieces[move.otherPieceSquareBefore] = otherPiece;
 		
 		otherPiece?.canCastle?.revert();
-		this.pieces[move.otherAfter] = null;
-		(otherPiece??{}).square = move.otherBefore;
+		this.pieces[move.otherPieceSquareAfter] = null;
+		(otherPiece??{}).square = move.otherPieceSquareBefore;
 		
-		this.pieces[move.mainBefore] = movingPiece;
+		this.pieces[move.mainPieceSquareBefore] = movingPiece;
 		
 		movingPiece.canCastle?.revert();
-		this.pieces[move.mainAfter] = null;
-		movingPiece.square = move.mainBefore;
+		this.pieces[move.mainPieceSquareAfter] = null;
+		movingPiece.square = move.mainPieceSquareBefore;
 		
-		this.pieces[move.targetSquare] = targetPiece;
+		this.pieces[move.captureTargetSquare] = targetPiece;
 		targetPiece?.activate();
 	}
 	

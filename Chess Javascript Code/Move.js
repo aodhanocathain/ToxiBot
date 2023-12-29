@@ -5,52 +5,52 @@ class Move
 	game;
 	
 	//squares pertaining to the main piece of the move
-	mainBefore;	//the square the piece started at
-	mainAfter;	//the square the piece ended at
-	targetSquare;	//the square a capture targetted (not the same as mainAfter for en passant captures)
+	mainPieceSquareBefore;	//the square the piece started at
+	mainPieceSquareAfter;	//the square the piece ended at
+	captureTargetSquare;	//the square a capture targetted (not the same as mainPieceSquareAfter for en passant captures)
 	
 	otherPiece;	//a promotion piece, or a castling rook
 	//squares pertaining to otherPiece
-	otherBefore;
-	otherAfter;
+	otherPieceSquareBefore;
+	otherPieceSquareAfter;
 	
 	string;
 	
-	constructor(game, mainBefore, mainAfter, targetSquare, otherPiece, otherBefore, otherAfter)
+	constructor(game, mainPieceSquareBefore, mainPieceSquareAfter, captureTargetSquare, otherPiece, otherPieceSquareBefore, otherPieceSquareAfter)
 	{
 		this.game = game;
 		
-		this.mainBefore = mainBefore;
-		this.mainAfter = mainAfter;
-		this.targetSquare = targetSquare;
+		this.mainPieceSquareBefore = mainPieceSquareBefore;
+		this.mainPieceSquareAfter = mainPieceSquareAfter;
+		this.captureTargetSquare = captureTargetSquare;
 		this.otherPiece = otherPiece;
-		this.otherBefore = otherBefore;
-		this.otherAfter = otherAfter;
+		this.otherPieceSquareBefore = otherPieceSquareBefore;
+		this.otherPieceSquareAfter = otherPieceSquareAfter;
 	}
 	
 	//store the string, which varies with the game position, at a specific moment in the game
 	takeStringSnapshot()
 	{
 		const copyGame = this.game.clone();
-		this.string = this.game.pieces[this.mainBefore].constructor.makeMoveString(this);
+		this.string = this.game.pieces[this.mainPieceSquareBefore].constructor.makeMoveString(this);
 	}
 	
 	toString()
 	{
-		return this.string ?? `${Square.fullString(this.mainBefore)}->${Square.fullString(this.mainAfter)}`;
+		return this.string ?? `${Square.fullString(this.mainPieceSquareBefore)}->${Square.fullString(this.mainPieceSquareAfter)}`;
 	}
 	
 	pieceEndSquare()
 	{
-		return this.mainAfter || this.otherAfter;
+		return this.mainPieceSquareAfter || this.otherPieceSquareAfter;
 	}
 }
 
 class PlainMove extends Move
 {
-	constructor(game, mainBefore, mainAfter)
+	constructor(game, mainPieceSquareBefore, mainPieceSquareAfter)
 	{
-		super(game, mainBefore, mainAfter, mainAfter, null, null, null);
+		super(game, mainPieceSquareBefore, mainPieceSquareAfter, mainPieceSquareAfter, null, null, null);
 	}
 }
 
@@ -63,7 +63,7 @@ class CastleMove extends Move
 	
 	takeStringSnapshot()
 	{
-		this.string = (Square.file(this.mainBefore) > Square.file(this.mainAfter))? "O-O-O" : "O-O";
+		this.string = (Square.file(this.mainPieceSquareBefore) > Square.file(this.mainPieceSquareAfter))? "O-O-O" : "O-O";
 	}
 }
 
@@ -77,9 +77,9 @@ class EnPassantMove extends Move
 
 class PromotionMove extends Move
 {
-	constructor(game, mainBefore, mainAfter, promotionPiece)
+	constructor(game, mainPieceSquareBefore, mainPieceSquareAfter, promotionPiece)
 	{
-		super(game, mainBefore, mainAfter, mainAfter, promotionPiece, mainBefore, mainAfter)
+		super(game, mainPieceSquareBefore, mainPieceSquareAfter, mainPieceSquareAfter, promotionPiece, mainPieceSquareBefore, mainPieceSquareAfter)
 	}
 }
 

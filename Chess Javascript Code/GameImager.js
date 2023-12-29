@@ -40,11 +40,11 @@ module.exports = {
 				//colour the square
 				const defaultColour = (((realRank+realFile)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
 				//compare by strings, not by square numeric value because square 0 is logically false and is missed
-				const fillColour = ((Square.fullString(square) == Square.fullString(lastMove.mainBefore)) ||
+				const fillColour = ((Square.fullString(square) == Square.fullString(lastMove.mainPieceSquareBefore)) ||
 									(Square.fullString(square) == Square.fullString(lastMove.pieceEndSquare?.())))?
 				(game.movingTeam.opposition.constructor.MOVE_COLOUR) : defaultColour;
 				
-				const borderColour = ((square == lastLastMove.mainBefore) || (square == lastLastMove.pieceEndSquare?.()))?
+				const borderColour = ((square == lastLastMove.mainPieceSquareBefore) || (square == lastLastMove.pieceEndSquare?.()))?
 				(game.movingTeam.constructor.MOVE_COLOUR) : fillColour;
 				
 				const BORDER_WIDTH = 3;

@@ -4,14 +4,6 @@ const {asciiOffset} = require("./Helpers.js");
 //represent a square as a single integer
 class Square
 {
-	/*
-	static make(rank,file)
-	{
-		//return (rank*NUM_FILES) + file;
-		return this.withRankAndFile(rank,file);
-	}
-	*/
-	
 	static withRankAndFile(rank,file)
 	{
 		return (rank*NUM_FILES) + file;
@@ -42,14 +34,12 @@ class Square
 		return square % NUM_FILES;
 	}
 	
-	/*
 	static distance(square1, square2)
 	{
 		const fileDistance = Square.file(square1) - Square.file(square2);
 		const rankDistance = Square.rank(square1) - Square.rank(square2);
 		return Math.sqrt((fileDistance*fileDistance)+(rankDistance*rankDistance));
 	}
-	*/
 	
 	static rankString(square)
 	{

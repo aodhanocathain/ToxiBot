@@ -25,9 +25,9 @@ class Piece
 	{
 		const game = move.game;
 		//See what squares this type of piece could have come from to reach the new square
-		const movingPiece = game.pieces[move.mainBefore]		
+		const movingPiece = game.pieces[move.mainPieceSquareBefore]		
 		let otherOrigins =
-		this.attackingDomainFromSquareInGame(move.mainAfter,game).squares.filter((otherOrigin)=>{
+		this.attackingDomainFromSquareInGame(move.mainPieceSquareAfter,game).squares.filter((otherOrigin)=>{
 			const otherPiece = game.pieces[otherOrigin];
 			//ignore the square the moving piece came from
 			if(movingPiece==otherPiece){return false;}
@@ -39,20 +39,20 @@ class Piece
 			return true;
 		})
 		
-		const sameOriginFiles = otherOrigins.filter((square)=>{return Square.file(move.mainBefore)==Square.file(square);});
-		const sameOriginRanks = otherOrigins.filter((square)=>{return Square.rank(move.mainBefore)==Square.rank(square);});
+		const sameOriginFiles = otherOrigins.filter((square)=>{return Square.file(move.mainPieceSquareBefore)==Square.file(square);});
+		const sameOriginRanks = otherOrigins.filter((square)=>{return Square.rank(move.mainPieceSquareBefore)==Square.rank(square);});
 		
 		const beforeDetails = 
 		(otherOrigins.length==0)?	//piece is the only possible candidate for the move, needs no clarification
 		"":
 		(sameOriginFiles.length==0)?	//need to uniquely identify piece by its file
-		Square.fileString(move.mainBefore) :
+		Square.fileString(move.mainPieceSquareBefore) :
 		(sameOriginRanks.length==0)?	//need to uniquely identify piece by its rank
-		Square.rankString(move.mainBefore) :
+		Square.rankString(move.mainPieceSquareBefore) :
 		//must fully specify the square the piece starts on
-		Square.fullString(move.mainBefore);
+		Square.fullString(move.mainPieceSquareBefore);
 		
-		const capture = game.pieces[move.mainAfter]? "x" : "";
+		const capture = game.pieces[move.mainPieceSquareAfter]? "x" : "";
 		
 		//const checkStatus = "";
 		///*
@@ -64,7 +64,7 @@ class Piece
 		game.undoMove();
 		//*/
 		
-		return `${movingPiece.constructor.typeChar}${beforeDetails}${capture}${Square.fullString(move.mainAfter)}${checkStatus}`;
+		return `${movingPiece.constructor.typeChar}${beforeDetails}${capture}${Square.fullString(move.mainPieceSquareAfter)}${checkStatus}`;
 	}
 	
 	game;
@@ -77,8 +77,8 @@ class Piece
 	basicMoves;
 	
 	kingSeer;	//1 if this piece currently sees the enemy king, 0 otherwise
-	quality;
-	kingProximity;
+	ownKingProximity;
+	enemyKingProximity;
 	
 	//set by the piece's team
 	id;
@@ -95,8 +95,8 @@ class Piece
 		this.watchingBits = this.attackingBits;
 		
 		this.kingSeer = new Manager(0);
-		this.kingProximity = new Manager(0);
-		this.quality = new Manager(0);
+		this.ownKingProximity = new Manager(0);
+		this.enemyKingProximity = new Manager(0);
 	}
 	
 	isActive()
@@ -132,35 +132,35 @@ class Piece
 		this.team.numKingSeers += newKingSeer - oldKingSeer;
 	}
 	
-	updateQuality()
+	updateEnemyKingProximity()
 	{
-		const oldQuality = this.quality.get();
-		const newQuality = this.attackingSquares.get().length;
-		this.quality.update(newQuality);
-		this.team.pieceQuality += newQuality - oldQuality;
+		const oldenemyKingProximity = this.enemyKingProximity.get();
+		const newenemyKingProximity = this.attackingSquares.get().length;
+		this.enemyKingProximity.update(newenemyKingProximity);
+		this.team.pieceenemyKingProximity += newenemyKingProximity - oldenemyKingProximity;
 	}
 	
-	revertQuality()
+	revertEnemyKingProximity()
 	{
-		const oldQuality = this.quality.get();
-		this.quality.revert();
-		const newQuality = this.quality.get();
-		this.team.pieceQuality += newQuality - oldQuality;
+		const oldenemyKingProximity = this.enemyKingProximity.get();
+		this.enemyKingProximity.revert();
+		const newenemyKingProximity = this.enemyKingProximity.get();
+		this.team.pieceenemyKingProximity += newenemyKingProximity - oldenemyKingProximity;
 	}
 	
-	updateKingProximity()
+	updateOwnKingProximity()
 	{
-		const oldProximity = this.kingProximity.get();
+		const oldProximity = this.ownKingProximity.get();
 		const newProximity = 1/(1+Square.distance(this.square, this.team.king.square));
-		this.kingProximity.update(newProximity);
+		this.ownKingProximity.update(newProximity);
 		this.team.kingSafety += newProximity - oldProximity;
 	}
 	
-	revertKingProximity()
+	revertOwnKingProximity()
 	{
-		const oldProximity = this.kingProximity.get();
-		this.kingProximity.revert();
-		const newProximity = this.kingProximity.get();
+		const oldProximity = this.ownKingProximity.get();
+		this.ownKingProximity.revert();
+		const newProximity = this.ownKingProximity.get();
 		this.team.kingSafety += newProximity - oldProximity;
 	}
 	
@@ -188,8 +188,8 @@ class Piece
 			return accumulator;
 		}, []));
 		this.updateKingSeer();
-		this.updateKingProximity();
-		this.updateQuality();
+		this.updateOwnKingProximity();
+		this.updateEnemyKingProximity();
 	}
 	
 	revertKnowledge()
@@ -198,8 +198,8 @@ class Piece
 		this.attackingBits.revert();
 		this.basicMoves.revert();
 		this.revertKingSeer();
-		this.revertKingProximity();
-		this.revertQuality();
+		this.revertOwnKingProximity();
+		this.revertEnemyKingProximity();
 	}
 	
 	toString()
@@ -546,8 +546,8 @@ class Pawn extends BlockablePiece
 		const game = move.game;		
 		
 		//if there is a capture, include current file and capture character
-		const beforeDetails = (game.pieces[move.mainAfter] || game.pieces[move.targetSquare] || game.pieces[move.otherAfter])?
-		`${Square.fileString(move.mainBefore)}x` : ``;
+		const beforeDetails = (game.pieces[move.mainPieceSquareAfter] || game.pieces[move.captureTargetSquare] || game.pieces[move.otherPieceSquareAfter])?
+		`${Square.fileString(move.mainPieceSquareBefore)}x` : ``;
 		
 		game.makeMove(move);
 		const checkStatus = 
@@ -556,7 +556,7 @@ class Pawn extends BlockablePiece
 		"";
 		game.undoMove();
 		
-		const afterDetails = `${Square.fullString(move.mainAfter || move.otherAfter)}`;
+		const afterDetails = `${Square.fullString(move.mainPieceSquareAfter || move.otherPieceSquareAfter)}`;
 		
 		const promotionString = (move instanceof PromotionMove)? `=${move.otherPiece.constructor.typeChar}`:"";
 		
@@ -662,8 +662,8 @@ class Pawn extends BlockablePiece
 		this.specialMoves.update(specialMoves);
 		
 		this.updateKingSeer();
-		this.updateKingProximity();
-		this.updateQuality();
+		this.updateownKingProximity();
+		this.updateenemyKingProximity();
 	}
 	
 	revertKnowledge()
@@ -680,8 +680,8 @@ class Pawn extends BlockablePiece
 		this.watchingBits.revert();
 		
 		this.revertKingSeer();
-		this.revertKingProximity();
-		this.revertQuality();
+		this.revertownKingProximity();
+		this.revertenemyKingProximity();
 	}
 }
 
