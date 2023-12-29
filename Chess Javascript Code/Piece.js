@@ -78,6 +78,7 @@ class Piece
 	
 	kingSeer;	//1 if this piece currently sees the enemy king, 0 otherwise
 	quality;
+	kingProximity;
 	
 	//set by the piece's team
 	id;
@@ -94,6 +95,7 @@ class Piece
 		this.watchingBits = this.attackingBits;
 		
 		this.kingSeer = new Manager(0);
+		this.kingProximity = new Manager(0);
 		this.quality = new Manager(0);
 	}
 	
@@ -146,6 +148,22 @@ class Piece
 		this.team.pieceQuality += newQuality - oldQuality;
 	}
 	
+	updateKingProximity()
+	{
+		const oldProximity = this.kingProximity.get();
+		const newProximity = 1/(1+Square.distance(this.square, this.team.king.square));
+		this.kingProximity.update(newProximity);
+		this.team.kingSafety += newProximity - oldProximity;
+	}
+	
+	revertKingProximity()
+	{
+		const oldProximity = this.kingProximity.get();
+		this.kingProximity.revert();
+		const newProximity = this.kingProximity.get();
+		this.team.kingSafety += newProximity - oldProximity;
+	}
+	
 	addAttackingMovesToArray(array)
 	{
 		array.push([this.basicMoves.get()]);
@@ -170,6 +188,7 @@ class Piece
 			return accumulator;
 		}, []));
 		this.updateKingSeer();
+		this.updateKingProximity();
 		this.updateQuality();
 	}
 	
@@ -179,6 +198,7 @@ class Piece
 		this.attackingBits.revert();
 		this.basicMoves.revert();
 		this.revertKingSeer();
+		this.revertKingProximity();
 		this.revertQuality();
 	}
 	
@@ -642,6 +662,7 @@ class Pawn extends BlockablePiece
 		this.specialMoves.update(specialMoves);
 		
 		this.updateKingSeer();
+		this.updateKingProximity();
 		this.updateQuality();
 	}
 	
@@ -659,6 +680,7 @@ class Pawn extends BlockablePiece
 		this.watchingBits.revert();
 		
 		this.revertKingSeer();
+		this.revertKingProximity();
 		this.revertQuality();
 	}
 }

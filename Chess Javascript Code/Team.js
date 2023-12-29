@@ -116,6 +116,7 @@ class Team
 		delete this.inactivePieces[piece.id];
 		this.points += piece.constructor.points;
 		this.pieceQuality += piece.quality.get();
+		this.kingSafety += piece.kingProximity.get();
 		this.numKingSeers += piece.kingSeer.get();
 	}
 	
@@ -125,6 +126,7 @@ class Team
 		delete this.activePieces[piece.id];
 		this.points -= piece.constructor.points;
 		this.pieceQuality -= piece.quality.get();
+		this.kingSafety -= piece.kingProximity.get();
 		this.numKingSeers -= piece.kingSeer.get();
 	}
 	

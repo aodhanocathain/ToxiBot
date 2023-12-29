@@ -8,8 +8,8 @@ const commandName = "chess";
 const playersById = {};
 const doNotReplyWithOK = true;
 
-//const evaluateFunctionName = "evaluate";
-const evaluateFunctionName = "fancyEvaluate";
+const evaluateFunctionName = "evaluate";
+//const evaluateFunctionName = "fancyEvaluate";
 //const evaluateFunctionName = "threadedEvaluate";
 
 class DiscordGame
