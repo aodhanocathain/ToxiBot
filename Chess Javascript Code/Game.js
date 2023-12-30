@@ -571,8 +571,8 @@ class Game
 					const watchingBits = piece.squaresWatchedBitVector.get();
 					if
 					(
-						watchingBits.interact(BitVector.READ, move.mainPieceSquareBefore) ||
-						watchingBits.interact(BitVector.READ, move.mainPieceSquareAfter)
+						watchingBits.read(move.mainPieceSquareBefore) ||
+						watchingBits.read(move.mainPieceSquareAfter)
 					)
 					{
 						piece.updateAllProperties();

@@ -7,11 +7,6 @@
 const WORD_WIDTH = 32;	//assuming 32-bit integers in javascript
 class BitVector
 {
-	static INTERACTION_NAMES = ["set","clear","read"];
-	static SET = this.INTERACTION_NAMES.indexOf("set");
-	static CLEAR = this.INTERACTION_NAMES.indexOf("clear");
-	static READ = this.INTERACTION_NAMES.indexOf("read");
-
 	words;	//the integers that hold the bits
 	
 	constructor(numBits)
@@ -19,26 +14,24 @@ class BitVector
 		this.words = [];
 	}
 	
-	interact(interactionIndex, index)
+	set(index)
 	{
 		const wordIndex = Math.floor(index / WORD_WIDTH);
 		const bitIndex = index % WORD_WIDTH;	//the bit's index within the chosen word
-		const funcName = this.constructor.INTERACTION_NAMES[interactionIndex];
-		return this[funcName](wordIndex, bitIndex);
-	}
-	
-	set(wordIndex, bitIndex)
-	{
 		this.words[wordIndex] |= (1 << bitIndex);
 	}
 	
-	clear(wordIndex, bitIndex)
+	clear(index)
 	{
+		const wordIndex = Math.floor(index / WORD_WIDTH);
+		const bitIndex = index % WORD_WIDTH;	//the bit's index within the chosen word
 		this.words[wordIndex] &= ~(1 << bitIndex);
 	}
 	
-	read(wordIndex, bitIndex)
+	read(index)
 	{
+		const wordIndex = Math.floor(index / WORD_WIDTH);
+		const bitIndex = index % WORD_WIDTH;	//the bit's index within the chosen word
 		return (this.words[wordIndex] >> bitIndex) & 1;
 	}
 	
