@@ -302,17 +302,8 @@ class Game
 		const blackMaterial = this.teamsByName[BlackTeam.name].points;
 		const totalMaterial = whiteMaterial + blackMaterial;
 		
-		const whitePieceenemyKingProximity = this.teamsByName[WhiteTeam.name].pieceenemyKingProximity;
-		const blackPieceenemyKingProximity = this.teamsByName[BlackTeam.name].pieceenemyKingProximity;
-		const totalPieceenemyKingProximity = whitePieceenemyKingProximity + blackPieceenemyKingProximity;
-		
-		const whiteKingSafety = this.teamsByName[WhiteTeam.name].kingSafety;
-		const blackKingSafety = this.teamsByName[BlackTeam.name].kingSafety;
-		const totalKingSafety = whiteKingSafety + blackKingSafety;
 		return {
-			score: ((33/100)*((whiteMaterial-blackMaterial)/totalMaterial)) +
-					((33/100)*((whitePieceenemyKingProximity-blackPieceenemyKingProximity)/totalPieceenemyKingProximity)) +
-					((33/100)*((whiteKingSafety-blackKingSafety)/totalKingSafety))
+			score: ((whiteMaterial-blackMaterial)/totalMaterial)
 		};
 		//*/
 		/*
@@ -571,19 +562,19 @@ class Game
 			team.activePieces.forEach((piece)=>{
 				if((piece==movingPiece) || (piece==move.otherPiece))
 				{
-					piece.updateKnowledge();
+					piece.updateAllProperties();
 					fullUpdatedPieces.push(piece);
 				}
 				else
 				{
-					const watchingBits = piece.watchingBits.get();
+					const watchingBits = piece.squaresWatchedBitVector.get();
 					if
 					(
 						watchingBits.interact(BitVector.READ, move.mainPieceSquareBefore) ||
 						watchingBits.interact(BitVector.READ, move.mainPieceSquareAfter)
 					)
 					{
-						piece.updateKnowledge();
+						piece.updateAllProperties();
 						fullUpdatedPieces.push(piece);
 					}
 				}
@@ -604,8 +595,8 @@ class Game
 		const movingPiece = this.movingPiece.get();
 		const lastTargetPiece = this.targetPiece.pop();
 		
-		this.fullUpdatedPieces.pop().forEach((piece)=>{piece.revertKnowledge();});
-		this.partUpdatedPieces.pop().forEach((piece)=>{piece.revertKingSeer();});
+		this.fullUpdatedPieces.pop().forEach((piece)=>{piece.revertAllProperties();});
+		this.partUpdatedPieces.pop().forEach((piece)=>{piece.revertSightOfEnemyKing();});
 		
 		this.pieces[lastMove.captureTargetSquare] = lastTargetPiece;
 		lastTargetPiece?.activate();
@@ -733,9 +724,9 @@ class Game
 		const otherPiece = move.otherPiece;
 		
 		const fullUpdatedPieces = this.fullUpdatedPieces.pop();
-		fullUpdatedPieces.forEach((piece)=>{piece.revertKnowledge();});
+		fullUpdatedPieces.forEach((piece)=>{piece.revertAllProperties();});
 		const partUpdatedPieces = this.partUpdatedPieces.pop();
-		partUpdatedPieces.forEach((piece)=>{piece.revertKingSeer();});
+		partUpdatedPieces.forEach((piece)=>{piece.revertSightOfEnemyKing();});
 		
 		this.enPassantable.revert();
 		if((movingPiece instanceof King) || (movingPiece instanceof Rook)){this.castleRights.revert();}

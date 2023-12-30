@@ -16,9 +16,9 @@ class Piece
 		return teamedChar.toUpperCase();
 	}
 	
-	static attackingDomainFromSquareInGame(square, game)
+	static squaresAttackedFromSquareInGame(square, game)
 	{
-		throw "attackingDomainFromSquareInGame called but not implemented";
+		throw "squaresAttackedFromSquareInGame called but not implemented";
 	}
 	
 	static makeMoveString(move)
@@ -27,7 +27,7 @@ class Piece
 		//See what squares this type of piece could have come from to reach the new square
 		const movingPiece = game.pieces[move.mainPieceSquareBefore]		
 		let otherOrigins =
-		this.attackingDomainFromSquareInGame(move.mainPieceSquareAfter,game).squares.filter((otherOrigin)=>{
+		this.squaresAttackedFromSquareInGame(move.mainPieceSquareAfter,game).squares.filter((otherOrigin)=>{
 			const otherPiece = game.pieces[otherOrigin];
 			//ignore the square the moving piece came from
 			if(movingPiece==otherPiece){return false;}
@@ -71,14 +71,15 @@ class Piece
 	team;
 	square;
 	
-	attackingSquares;
-	attackingBits;	//BitVector where a bit is set if its index is a square in attackingSquares
-	watchingBits;	//BitVector where a bit is set if a change in its square requires updating the piece's knowledge
+	squaresAttacked;
+	squaresAttackedBitVector;	//BitVector where a bit is set if its index is a square in attackingSquares
+	squaresWatchedBitVector;	//BitVector where a bit is set if a change in its square requires updating the piece's knowledge
+	
 	basicMoves;
 	
-	kingSeer;	//1 if this piece currently sees the enemy king, 0 otherwise
-	ownKingProximity;
-	enemyKingProximity;
+	seesEnemyKing;
+	
+	qualities;
 	
 	//set by the piece's team
 	id;
@@ -89,19 +90,41 @@ class Piece
 		this.team = team;
 		this.square = square;
 		
-		this.attackingSquares = new Manager([]);
-		this.attackingBits = new Manager(new BitVector());
-		this.basicMoves = new Manager([]);
-		this.watchingBits = this.attackingBits;
+		this.squaresAttacked = new Manager([]);
+		this.squaresAttackedBitVector = new Manager(new BitVector());
+		this.squaresWatchedBitVector = this.squaresAttackedBitVector;
 		
-		this.kingSeer = new Manager(0);
-		this.ownKingProximity = new Manager(0);
-		this.enemyKingProximity = new Manager(0);
+		this.basicMoves = new Manager([]);
+		
+		this.seesEnemyKing = new Manager(false);
+		
+		this.qualities = {
+			ownKingProximity: 
+			{
+				manager: new Manager(Infinity),
+				measure: (piece) => {
+					return Infinity;
+				}
+			},
+			enemyKingProximity: {
+				manager: new Manager(Infinity),
+				measure: (piece) => {
+					return Infinity;
+				}
+			},
+			numAvailableMoves:
+			{
+				manager: new Manager(0),
+				measure: (piece) => {
+					return 0;
+				}
+			}
+		};
 	}
 	
 	isActive()
 	{
-		return this.id in this.team.activePieces;
+		return !!(this.team.activePieces[this.id]);
 	}
 	
 	activate()
@@ -114,54 +137,72 @@ class Piece
 		this.team.deactivatePiece(this);
 	}
 	
-	updateKingSeer()
+	updateSquaresAndMoves()
 	{
-		//reflect the change of this piece's kingSeer value in its team
-		const oldKingSeer = this.kingSeer.get();
-		const newKingSeer = this.attackingBits.get().interact(BitVector.READ, this.team.opposition.king.square)
-		this.kingSeer.update(newKingSeer);
+		const squaresAttacked = this.constructor.squaresAttackedFromSquareInGame(this.square, this.game);
+		
+		this.squaresAttacked.update(squaresAttacked.squares);
+		this.squaresAttackedBitVector.update(squaresAttacked.bits);
+		
+		this.basicMoves.update(this.squaresAttacked.get().reduce((accumulator, attackingSquare)=>{
+			//only allow moves that do not capture pieces from the same team
+			if(this.game.pieces[attackingSquare]?.team != this.team)
+			{
+				accumulator.push(new PlainMove(this.game, this.square, attackingSquare));
+			}
+			return accumulator;
+		}, []));
+	}
+	
+	revertSquaresAndMoves()
+	{
+		this.squaresAttacked.revert();
+		this.squaresAttackedBitVector.revert();
+		
+		this.basicMoves.revert();
+	}
+	
+	updateSightOfEnemyKing()
+	{
+		const oldKingSeer = this.seesEnemyKing.get();
+		const newKingSeer = this.squaresAttackedBitVector.get().interact(BitVector.READ, this.team.opposition.king.square)
+		this.seesEnemyKing.update(newKingSeer);
 		this.team.numKingSeers += newKingSeer - oldKingSeer;
 	}
 	
-	revertKingSeer()
+	revertSightOfEnemyKing()
 	{
-		//reflect the change in whether this piece sees the king in its team
-		const oldKingSeer = this.kingSeer.get();
-		this.kingSeer.revert();
-		const newKingSeer = this.kingSeer.get();
+		const oldKingSeer = this.seesEnemyKing.pop();
+		const newKingSeer = this.seesEnemyKing.get();
 		this.team.numKingSeers += newKingSeer - oldKingSeer;
 	}
 	
-	updateEnemyKingProximity()
+	updateQualities()
 	{
-		const oldenemyKingProximity = this.enemyKingProximity.get();
-		const newenemyKingProximity = this.attackingSquares.get().length;
-		this.enemyKingProximity.update(newenemyKingProximity);
-		this.team.pieceenemyKingProximity += newenemyKingProximity - oldenemyKingProximity;
+		Object.values(this.qualities).forEach((quality)=>{
+			quality.manager.update(quality.measure(this));
+		});
 	}
 	
-	revertEnemyKingProximity()
+	revertQualities()
 	{
-		const oldenemyKingProximity = this.enemyKingProximity.get();
-		this.enemyKingProximity.revert();
-		const newenemyKingProximity = this.enemyKingProximity.get();
-		this.team.pieceenemyKingProximity += newenemyKingProximity - oldenemyKingProximity;
+		Object.values(this.qualities).forEach((quality)=>{
+			quality.manager.revert();
+		});
 	}
 	
-	updateOwnKingProximity()
+	updateAllProperties()
 	{
-		const oldProximity = this.ownKingProximity.get();
-		const newProximity = 1/(1+Square.distance(this.square, this.team.king.square));
-		this.ownKingProximity.update(newProximity);
-		this.team.kingSafety += newProximity - oldProximity;
+		this.updateSquaresAndMoves();
+		this.updateSightOfEnemyKing();
+		this.updateQualities();
 	}
 	
-	revertOwnKingProximity()
+	revertAllProperties()
 	{
-		const oldProximity = this.ownKingProximity.get();
-		this.ownKingProximity.revert();
-		const newProximity = this.ownKingProximity.get();
-		this.team.kingSafety += newProximity - oldProximity;
+		this.revertSquaresAndMoves();
+		this.revertSightOfEnemyKing();
+		this.revertQualities();
 	}
 	
 	addAttackingMovesToArray(array)
@@ -172,34 +213,6 @@ class Piece
 	addMovesToArray(array)
 	{
 		this.addAttackingMovesToArray(array);
-	}
-	
-	updateKnowledge()
-	{
-		const attackingDomain = this.constructor.attackingDomainFromSquareInGame(this.square, this.game);
-		this.attackingSquares.update(attackingDomain.squares);
-		this.attackingBits.update(attackingDomain.bits);
-		this.basicMoves.update(this.attackingSquares.get().reduce((accumulator, attackingSquare)=>{
-			//only allow moves that do not capture pieces from the same team
-			if(this.game.pieces[attackingSquare]?.team != this.team)
-			{
-				accumulator.push(new PlainMove(this.game, this.square, attackingSquare));
-			}
-			return accumulator;
-		}, []));
-		this.updateKingSeer();
-		this.updateOwnKingProximity();
-		this.updateEnemyKingProximity();
-	}
-	
-	revertKnowledge()
-	{
-		this.attackingSquares.revert();
-		this.attackingBits.revert();
-		this.basicMoves.revert();
-		this.revertKingSeer();
-		this.revertOwnKingProximity();
-		this.revertEnemyKingProximity();
 	}
 	
 	toString()
@@ -218,7 +231,7 @@ class RangedPiece extends BlockablePiece
 {
 	static directions;
 	
-	static attackingDomainFromSquareInGame(square, game)
+	static squaresAttackedFromSquareInGame(square, game)
 	{
 		const squaresArray = [];
 		const squaresBits = new BitVector();
@@ -264,7 +277,7 @@ class PatternPiece extends Piece
 {
 	static pattern;
 	
-	static attackingDomainFromSquareInGame(square, game)
+	static squaresAttackedFromSquareInGame(square, game)
 	{
 		const squaresArray = [];
 		const squaresBits = new BitVector();
@@ -331,9 +344,9 @@ class King extends PatternPiece
 		array.push([this.basicMoves.get(),this.castleMoves.get()]);
 	}
 	
-	updateKnowledge()
+	updateSquaresAndMoves()
 	{
-		super.updateKnowledge();
+		super.updateSquaresAndMoves();
 		
 		const castleMoves = [];
 		//add castle moves if allowed
@@ -371,7 +384,7 @@ class King extends PatternPiece
 								//can't castle through check
 								const passingSquare = Square.withRankAndFile(this.team.constructor.BACK_RANK, middleFile);
 								if(!(this.team.opposition.activePieces.some((piece)=>{
-									return piece.attackingBits.get().interact(BitVector.READ, passingSquare);
+									return piece.squaresAttackedBitVector.get().interact(BitVector.READ, passingSquare);
 								})))
 								{
 									castleMoves.push(new CastleMove(
@@ -389,9 +402,9 @@ class King extends PatternPiece
 		this.castleMoves.update(castleMoves);
 	}
 	
-	revertKnowledge()
+	revertSquaresAndMoves()
 	{
-		super.revertKnowledge();
+		super.revertSquaresAndMoves();
 		this.castleMoves.revert();
 	}
 }
@@ -472,7 +485,7 @@ class Pawn extends BlockablePiece
 	
 	static LONG_MOVE_RANK_INCREMENT_MULTIPLIER = 2;
 	
-	static attackingDomainFromSquareInGameForTeam(square, game, team)
+	static squaresAttackedFromSquareInGameForTeam(square, game, team)
 	{
 		const squares = [];
 		const bits = new BitVector();
@@ -501,11 +514,10 @@ class Pawn extends BlockablePiece
 		};
 	}
 	
-	static nonAttackingDomainFromSquareInGameForTeam(square, game, team)
+	static squaresWatchedFromSquareInGameForTeam(square, game, team)
 	{
 		const squares = [];
 		const bits = new BitVector();
-		const watch = new BitVector();
 		
 		const rank = Square.rank(square);
 		const file = Square.file(square);
@@ -515,21 +527,16 @@ class Pawn extends BlockablePiece
 		if(Square.validRankAndFile(nextRank, file))
 		{
 			const nextSquare = Square.withRankAndFile(nextRank, file);
-			watch.interact(BitVector.SET, nextSquare);
+			squares.push(nextSquare);
+			bits.interact(BitVector.SET, nextSquare);
 			if(!(game.pieces[nextSquare]))
 			{
-				squares.push(nextSquare);
-				bits.interact(BitVector.SET, nextSquare);
 				if(rank==team.constructor.PAWN_START_RANK)
 				{
 					const nextNextRank = rank+(this.LONG_MOVE_RANK_INCREMENT_MULTIPLIER*team.constructor.PAWN_RANK_INCREMENT);
 					const nextNextSquare = Square.withRankAndFile(nextNextRank, file);
-					watch.interact(BitVector.SET, nextNextSquare);
-					if(!(game.pieces[nextNextSquare]))
-					{
-						squares.push(nextNextSquare);
-						bits.interact(BitVector.SET, nextNextSquare);
-					}
+					squares.push(nextNextSquare);
+					bits.interact(BitVector.SET, nextNextSquare);
 				}
 			}
 		}
@@ -537,7 +544,6 @@ class Pawn extends BlockablePiece
 		return {
 			squares: squares,
 			bits: bits,
-			watch: watch
 		};
 	}
 	
@@ -563,8 +569,7 @@ class Pawn extends BlockablePiece
 		return `${beforeDetails}${afterDetails}${promotionString}${checkStatus}`;
 	}
 	
-	nonAttackingSquares;
-	nonAttackingBits;
+	squaresWatched;
 	
 	specialMoves;
 	
@@ -572,10 +577,9 @@ class Pawn extends BlockablePiece
 	{
 		super(game, team, square);
 		
-		this.watchingBits = new Manager(new BitVector());
+		this.squaresWatched = new Manager([]);
+		this.squaresWatchedBitVector = new Manager(new BitVector());
 		
-		this.nonAttackingSquares = new Manager([]);
-		this.nonAttackingBits = new Manager(new BitVector());
 		this.specialMoves = new Manager([]);
 	}
 	
@@ -584,25 +588,20 @@ class Pawn extends BlockablePiece
 		array.push([this.basicMoves.get(), this.specialMoves.get()]);
 	}
 	
-	updateKnowledge()
+	updateSquaresAndMoves()
 	{
-		const attackingDomain = this.constructor.attackingDomainFromSquareInGameForTeam(this.square, this.game, this.team);
-		this.attackingSquares.update(attackingDomain.squares);
-		this.attackingBits.update(attackingDomain.bits);
+		const squaresAttacked = this.constructor.squaresAttackedFromSquareInGameForTeam(this.square, this.game, this.team);
+		this.squaresAttacked.update(squaresAttacked.squares);
+		this.squaresAttackedBitVector.update(squaresAttacked.bits)
 		
-		const nonAttackingDomain = this.constructor.nonAttackingDomainFromSquareInGameForTeam(this.square, this.game, this.team);
-		this.nonAttackingSquares.update(nonAttackingDomain.squares);
-		this.nonAttackingBits.update(nonAttackingDomain.bits);
-		
-		const newWatchingBits = new BitVector();
-		newWatchingBits.or(attackingDomain.bits);
-		newWatchingBits.or(nonAttackingDomain.bits);
-		this.watchingBits.update(newWatchingBits);
+		const squaresWatched = this.constructor.squaresWatchedFromSquareInGameForTeam(this.square, this.game, this.team);
+		this.squaresWatched.update(squaresWatched.squares);
+		this.squaresWatchedBitVector.update(squaresWatched.bits);
 		
 		const basicMoves = [];
 		const specialMoves = [];
 		
-		this.attackingSquares.get().forEach((attackingSquare)=>{
+		this.squaresAttacked.get().forEach((attackingSquare)=>{
 			//only allow moves that capture a piece, from the enemy team
 			if(this.game.pieces[attackingSquare])	//direct capture (enemy piece is on the attacking square)
 			{
@@ -640,48 +639,34 @@ class Pawn extends BlockablePiece
 			}
 		});
 		
-		this.nonAttackingSquares.get().forEach((nonAttackingSquare)=>{
+		this.squaresWatched.get().forEach((watchedSquare)=>{
 			//only allow moves to empty squares
-			if(!(this.game.pieces[nonAttackingSquare]))
+			if(!(this.game.pieces[watchedSquare]))
 			{
-				if(Square.rank(nonAttackingSquare)==this.team.opposition.constructor.BACK_RANK)
+				if(Square.rank(watchedSquare)==this.team.opposition.constructor.BACK_RANK)
 				{
-					specialMoves.push(new PromotionMove(this.game, this.square, nonAttackingSquare, new Queen(this.game, this.team, nonAttackingSquare)));
-					specialMoves.push(new PromotionMove(this.game, this.square, nonAttackingSquare, new Rook(this.game, this.team, nonAttackingSquare)));
-					specialMoves.push(new PromotionMove(this.game, this.square, nonAttackingSquare, new Bishop(this.game, this.team, nonAttackingSquare)));
-					specialMoves.push(new PromotionMove(this.game, this.square, nonAttackingSquare, new Knight(this.game, this.team, nonAttackingSquare)));
+					specialMoves.push(new PromotionMove(this.game, this.square, watchedSquare, new Queen(this.game, this.team, watchedSquare)));
+					specialMoves.push(new PromotionMove(this.game, this.square, watchedSquare, new Rook(this.game, this.team, watchedSquare)));
+					specialMoves.push(new PromotionMove(this.game, this.square, watchedSquare, new Bishop(this.game, this.team, watchedSquare)));
+					specialMoves.push(new PromotionMove(this.game, this.square, watchedSquare, new Knight(this.game, this.team, watchedSquare)));
 				}
 				else
 				{
-					basicMoves.push(new PlainMove(this.game, this.square, nonAttackingSquare));
+					basicMoves.push(new PlainMove(this.game, this.square, watchedSquare));
 				}
 			}
 		});
 		
 		this.basicMoves.update(basicMoves);
 		this.specialMoves.update(specialMoves);
-		
-		this.updateKingSeer();
-		this.updateownKingProximity();
-		this.updateenemyKingProximity();
 	}
 	
-	revertKnowledge()
+	revertSquaresAndMoves()
 	{
-		this.attackingSquares.revert();
-		this.attackingBits.revert();
+		super.revertSquaresAndMoves();
 		
-		this.nonAttackingSquares.revert();
-		this.nonAttackingBits.revert();
-		
-		this.basicMoves.revert();
+		this.squaresWatched.revert();
 		this.specialMoves.revert();
-		
-		this.watchingBits.revert();
-		
-		this.revertKingSeer();
-		this.revertownKingProximity();
-		this.revertenemyKingProximity();
 	}
 }
 

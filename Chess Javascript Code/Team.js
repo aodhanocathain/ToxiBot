@@ -35,8 +35,6 @@ class Team
 	nextId;
 	
 	points;
-	kingSafety;
-	pieceenemyKingProximity;
 	numKingSeers;
 	
 	king;
@@ -54,8 +52,6 @@ class Team
 		this.nextId = 0;
 		
 		this.points = 0;
-		this.kingSafety = 0;
-		this.pieceenemyKingProximity = 0;
 		this.numKingSeers = 0;
 		
 		this.rooksInStartSquaresByWingChar = {};
@@ -115,9 +111,7 @@ class Team
 		this.activePieces[piece.id] = piece;
 		delete this.inactivePieces[piece.id];
 		this.points += piece.constructor.points;
-		this.pieceenemyKingProximity += piece.enemyKingProximity.get();
-		this.kingSafety += piece.ownKingProximity.get();
-		this.numKingSeers += piece.kingSeer.get();
+		this.numKingSeers += piece.seesEnemyKing.get();
 	}
 	
 	deactivatePiece(piece)
@@ -125,9 +119,7 @@ class Team
 		this.inactivePieces[piece.id] = piece;
 		delete this.activePieces[piece.id];
 		this.points -= piece.constructor.points;
-		this.pieceenemyKingProximity -= piece.enemyKingProximity.get();
-		this.kingSafety -= piece.ownKingProximity.get();
-		this.numKingSeers -= piece.kingSeer.get();
+		this.numKingSeers -= piece.seesEnemyKing.get();
 	}
 	
 	swapOldPieceForNewPiece(oldPiece, newPiece)
@@ -135,21 +127,21 @@ class Team
 		newPiece.id = oldPiece.id;
 		
 		this.points -= oldPiece.constructor.points;
-		this.numKingSeers -= oldPiece.kingSeer.get();
+		this.numKingSeers -= oldPiece.seesEnemyKing.get();
 		
 		this.activePieces[oldPiece.id] = newPiece;
 		
 		this.points += newPiece.constructor.points;
-		this.points += newPiece.kingSeer.get();
+		this.points += newPiece.seesEnemyKing.get();
 		
-		//piece updates team king seers in updateKnowledge
-		//this.numKingSeers += newPiece.kingSeer.get();
+		//piece updates team king seers in updateAllProperties
+		//this.numKingSeers += newPiece.seesEnemyKing.get();
 	}
 	
 	init()
 	{
 		this.activePieces.forEach((piece)=>{
-			piece.updateKnowledge();
+			piece.updateAllProperties();
 		});
 	}
 	
