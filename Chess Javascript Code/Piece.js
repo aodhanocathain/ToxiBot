@@ -72,8 +72,8 @@ class Piece
 	square;
 	
 	squaresAttacked;
-	squaresAttackedBitVector;	//BitVector where a bit is set if its index is a square in attackingSquares
-	squaresWatchedBitVector;	//BitVector where a bit is set if a change in its square requires updating the piece's knowledge
+	squaresAttackedBitVector;	//BitVector where a bit is set if its index is a square in squaresAttacked
+	squaresWatchedBitVector;	//BitVector where a bit is set if a change in its square requires updating the piece's options
 	
 	basicMoves;
 	
@@ -144,11 +144,11 @@ class Piece
 		this.squaresAttacked.update(squaresAttacked.squares);
 		this.squaresAttackedBitVector.update(squaresAttacked.bits);
 		
-		this.basicMoves.update(this.squaresAttacked.get().reduce((accumulator, attackingSquare)=>{
+		this.basicMoves.update(this.squaresAttacked.get().reduce((accumulator, attackedSquare)=>{
 			//only allow moves that do not capture pieces from the same team
-			if(this.game.pieces[attackingSquare]?.team != this.team)
+			if(this.game.pieces[attackedSquare]?.team != this.team)
 			{
-				accumulator.push(new PlainMove(this.game, this.square, attackingSquare));
+				accumulator.push(new PlainMove(this.game, this.square, attackedSquare));
 			}
 			return accumulator;
 		}, []));
@@ -164,17 +164,17 @@ class Piece
 	
 	updateSightOfEnemyKing()
 	{
-		const oldKingSeer = this.seesEnemyKing.get();
-		const newKingSeer = this.squaresAttackedBitVector.get().interact(BitVector.READ, this.team.opposition.king.square)
-		this.seesEnemyKing.update(newKingSeer);
-		this.team.numKingSeers += newKingSeer - oldKingSeer;
+		const oldKingSight = this.seesEnemyKing.get();
+		const newKingSight = this.squaresAttackedBitVector.get().interact(BitVector.READ, this.team.opposition.king.square)
+		this.seesEnemyKing.update(newKingSight);
+		this.team.numKingSeers += newKingSight - oldKingSight;
 	}
 	
 	revertSightOfEnemyKing()
 	{
-		const oldKingSeer = this.seesEnemyKing.pop();
-		const newKingSeer = this.seesEnemyKing.get();
-		this.team.numKingSeers += newKingSeer - oldKingSeer;
+		const oldKingSight = this.seesEnemyKing.pop();
+		const newKingSight = this.seesEnemyKing.get();
+		this.team.numKingSeers += newKingSight - oldKingSight;
 	}
 	
 	updateQualities()
@@ -221,7 +221,7 @@ class Piece
 	}
 }
 
-//pieces that update their knowledge when something happens in the range of squares they can see
+//pieces that update their options when something happens in the range of squares they can see
 class BlockablePiece extends Piece
 {
 }
@@ -476,7 +476,6 @@ class Queen extends RangedPiece
 	];
 }
 
-//implement later
 class Pawn extends BlockablePiece
 {
 	static typeChar = "P";
@@ -601,22 +600,22 @@ class Pawn extends BlockablePiece
 		const basicMoves = [];
 		const specialMoves = [];
 		
-		this.squaresAttacked.get().forEach((attackingSquare)=>{
+		this.squaresAttacked.get().forEach((squareAttacked)=>{
 			//only allow moves that capture a piece, from the enemy team
-			if(this.game.pieces[attackingSquare])	//direct capture (enemy piece is on the attacking square)
+			if(this.game.pieces[squareAttacked])	//direct capture (enemy piece is on the attacked square)
 			{
-				if(this.game.pieces[attackingSquare].team != this.team)
+				if(this.game.pieces[squareAttacked].team != this.team)
 				{
-					if(Square.rank(attackingSquare)==this.team.opposition.constructor.BACK_RANK)
+					if(Square.rank(squareAttacked)==this.team.opposition.constructor.BACK_RANK)
 					{
-						specialMoves.push(new PromotionMove(this.game, this.square, attackingSquare, new Queen(this.game, this.team, attackingSquare)));
-						specialMoves.push(new PromotionMove(this.game, this.square, attackingSquare, new Rook(this.game, this.team, attackingSquare)));
-						specialMoves.push(new PromotionMove(this.game, this.square, attackingSquare, new Bishop(this.game, this.team, attackingSquare)));
-						specialMoves.push(new PromotionMove(this.game, this.square, attackingSquare, new Knight(this.game, this.team, attackingSquare)));
+						specialMoves.push(new PromotionMove(this.game, this.square, squareAttacked, new Queen(this.game, this.team, squareAttacked)));
+						specialMoves.push(new PromotionMove(this.game, this.square, squareAttacked, new Rook(this.game, this.team, squareAttacked)));
+						specialMoves.push(new PromotionMove(this.game, this.square, squareAttacked, new Bishop(this.game, this.team, squareAttacked)));
+						specialMoves.push(new PromotionMove(this.game, this.square, squareAttacked, new Knight(this.game, this.team, squareAttacked)));
 					}
 					else
 					{
-						basicMoves.push(new PlainMove(this.game, this.square, attackingSquare));
+						basicMoves.push(new PlainMove(this.game, this.square, squareAttacked));
 					}
 				}
 			}
@@ -624,7 +623,7 @@ class Pawn extends BlockablePiece
 			{
 				const enPassantFile = asciiDistance(this.game.enPassantable.get(), MIN_FILE);
 				//if enPassantFile is adjacent to current file
-				if(enPassantFile==Square.file(attackingSquare))
+				if(enPassantFile==Square.file(squareAttacked))
 				{
 					//if current rank is opponent long move rank
 					const opponentLongMoveRank = 
@@ -633,7 +632,7 @@ class Pawn extends BlockablePiece
 					if(Square.rank(this.square)==opponentLongMoveRank)
 					{
 						const enPassantSquare = Square.withRankAndFile(opponentLongMoveRank,enPassantFile);
-						specialMoves.push(new EnPassantMove(this.game, this.square, attackingSquare, enPassantSquare));
+						specialMoves.push(new EnPassantMove(this.game, this.square, squareAttacked, enPassantSquare));
 					}
 				}
 			}

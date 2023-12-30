@@ -120,8 +120,9 @@ class Game
 			new Game(FENString);
 			return true;
 		}
-		catch
+		catch(error)
 		{
+			console.log(error);
 			return false;
 		}
 	}
