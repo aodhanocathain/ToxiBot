@@ -6,6 +6,7 @@ const Discord = require("discord.js");
 const {DirectMessages, GuildMessages, Guilds, MessageContent} = Discord.GatewayIntentBits;
 const bot = new Discord.Client({intents: [DirectMessages, GuildMessages, Guilds, MessageContent]});
 
+const lastInteractionTimeByUserID = {};
 //load command functionalities
 bot.commandHandlers={};
 bot.exiters={};
@@ -39,8 +40,13 @@ bot.on(Discord.Events.MessageCreate, (message)=>{
 });
 
 bot.on(Discord.Events.InteractionCreate, (interaction)=>{
-	if(interaction.isChatInputCommand())
+	const millisSinceLastInteraction = Date.now()-lastInteractionTimeByUserID[interaction.user.id];
+	if(millisSinceLastInteraction < 3000){
+		interaction.reply(`wait ${Math.ceil(millisSinceLastInteraction/1000)} seconds before next interaction`);
+	}
+	else if(interaction.isChatInputCommand())
 	{
+		lastInteractionTimeByUserID[interaction.user.id] = Date.now();
 		try
 		{
 			const response = bot.commandHandlers[interaction.commandName](interaction);
