@@ -55,9 +55,9 @@ class DiscordGame
 	
 	makeMoveAndEditInteraction(move)
 	{
-		move.takeStringSnapshot();
+		move.generateString();
 		this.chessGame.makeMove(move);
-		this.editInteraction();
+		return this.editInteraction();
 	}
 	
 	undoMoveAndEditInteraction()
@@ -96,7 +96,7 @@ class DiscordGame
 		
 		this.availableMoves = this.chessGame.calculateLegals();
 		this.availableStrings = this.availableMoves.map((move)=>{
-			move.takeStringSnapshot();
+			move.generateString();
 			return move.toString();
 		});
 		const availableMovesString = this.availableStrings.join("\t");

@@ -29,7 +29,7 @@ class Move
 	}
 	
 	//store the string, which varies with the game position, at a specific moment in the game
-	takeStringSnapshot()
+	generateString()
 	{
 		const copyGame = this.game.clone();
 		this.string = this.game.pieces[this.mainPieceSquareBefore].constructor.makeMoveString(this);
@@ -37,7 +37,7 @@ class Move
 	
 	toString()
 	{
-		return this.string ?? ((move)=>{move.takeStringSnapshot(); return move.string;})(this);
+		return this.string ?? ((move)=>{move.generateString(); return move.string;})(this);
 	}
 	
 	pieceEndSquare()
@@ -61,7 +61,7 @@ class CastleMove extends Move
 		super(game, kingBefore, kingAfter, kingAfter, game.pieces[rookBefore], rookBefore, rookAfter);
 	}
 	
-	takeStringSnapshot()
+	generateString()
 	{
 		this.string = (Square.file(this.mainPieceSquareBefore) > Square.file(this.mainPieceSquareAfter))? "O-O-O" : "O-O";
 	}

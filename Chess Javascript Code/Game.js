@@ -795,7 +795,7 @@ class Game
 			{
 				accumulator = accumulator.concat("\t");
 			}
-			move.takeStringSnapshot();
+			move.generateString();
 			accumulator = accumulator.concat(move.toString());
 			this.makeMove(move);
 			return accumulator;
