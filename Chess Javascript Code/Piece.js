@@ -167,14 +167,14 @@ class Piece
 		const oldKingSight = this.seesEnemyKing.get();
 		const newKingSight = this.squaresAttackedBitVector.get().read(this.team.opposition.king.square)
 		this.seesEnemyKing.update(newKingSight);
-		this.team.numKingSeers += newKingSight - oldKingSight;
+		this.team.numEnemyKingSeers += newKingSight - oldKingSight;
 	}
 	
 	revertSightOfEnemyKing()
 	{
 		const oldKingSight = this.seesEnemyKing.pop();
 		const newKingSight = this.seesEnemyKing.get();
-		this.team.numKingSeers += newKingSight - oldKingSight;
+		this.team.numEnemyKingSeers += newKingSight - oldKingSight;
 	}
 	
 	updateQualities()
@@ -354,7 +354,7 @@ class King extends PatternPiece
 		if(this.canCastle.get())
 		{
 			//can't castle to get out of check
-			if(this.team.opposition.numKingSeers==0)
+			if(this.team.opposition.numEnemyKingSeers==0)
 			{
 				[King.typeChar, Queen.typeChar].forEach((wingChar)=>{
 					const rook = this.team.rooksInStartSquaresByWingChar[wingChar];

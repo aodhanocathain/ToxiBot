@@ -37,7 +37,7 @@ class Move
 	
 	toString()
 	{
-		return this.string ?? `${Square.fullString(this.mainPieceSquareBefore)}->${Square.fullString(this.mainPieceSquareAfter)}`;
+		return this.string ?? ((move)=>{move.takeStringSnapshot(); return move.string;})(this);
 	}
 	
 	pieceEndSquare()

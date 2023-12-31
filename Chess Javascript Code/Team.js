@@ -35,7 +35,7 @@ class Team
 	nextId;
 	
 	points;
-	numKingSeers;
+	numEnemyKingSeers;
 	
 	king;
 	rooksInStartSquaresByWingChar;
@@ -52,7 +52,7 @@ class Team
 		this.nextId = 0;
 		
 		this.points = 0;
-		this.numKingSeers = 0;
+		this.numEnemyKingSeers = 0;
 		
 		this.rooksInStartSquaresByWingChar = {};
 	}
@@ -111,7 +111,7 @@ class Team
 		this.activePieces[piece.id] = piece;
 		delete this.inactivePieces[piece.id];
 		this.points += piece.constructor.points;
-		this.numKingSeers += piece.seesEnemyKing.get();
+		this.numEnemyKingSeers += piece.seesEnemyKing.get();
 	}
 	
 	deactivatePiece(piece)
@@ -119,7 +119,7 @@ class Team
 		this.inactivePieces[piece.id] = piece;
 		delete this.activePieces[piece.id];
 		this.points -= piece.constructor.points;
-		this.numKingSeers -= piece.seesEnemyKing.get();
+		this.numEnemyKingSeers -= piece.seesEnemyKing.get();
 	}
 	
 	swapOldPieceForNewPiece(oldPiece, newPiece)
@@ -127,7 +127,7 @@ class Team
 		newPiece.id = oldPiece.id;
 		
 		this.points -= oldPiece.constructor.points;
-		this.numKingSeers -= oldPiece.seesEnemyKing.get();
+		this.numEnemyKingSeers -= oldPiece.seesEnemyKing.get();
 		
 		this.activePieces[oldPiece.id] = newPiece;
 		
@@ -135,7 +135,7 @@ class Team
 		this.points += newPiece.seesEnemyKing.get();
 		
 		//piece updates team king seers in updateAllProperties
-		//this.numKingSeers += newPiece.seesEnemyKing.get();
+		//this.numEnemyKingSeers += newPiece.seesEnemyKing.get();
 	}
 	
 	init()
