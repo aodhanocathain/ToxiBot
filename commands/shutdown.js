@@ -10,13 +10,13 @@ module.exports = {
 		if(interaction.user.id == process.env.OWNER_ID)
 		{
 			Object.values(interaction.client.exiters).forEach((exiter)=>{
-				exiter(interaction.client);
+				exiter?.(interaction.client);
 			});
-			return interaction.reply("Ok")
-			.then(()=>{
+			return interaction.reply("Ok").then(()=>{
 				interaction.client.destroy()
-			})
-			.then(()=>{process.exit();});
+			}).then(()=>{
+				process.exit();
+			});
 		}
 		else
 		{

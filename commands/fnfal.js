@@ -68,6 +68,7 @@ const ZombiesGames = {
 };
 
 const items = Object.values(ZombiesGames).flat(1);
+const maps = items.map((item)=>{return item.map;});
 
 const pickRandomArrayElement = (array) => {
 	return array[Math.floor(Math.random()*array.length)]
@@ -89,7 +90,7 @@ module.exports = {
 		}
 		else if(subcommand=="map")
 		{
-			return interaction.reply(pickRandomArrayElement(items.map((item)=>{return item.map;})));
+			return interaction.reply(pickRandomArrayElement(maps));
 		}
 		else if(subcommand=="experience")
 		{

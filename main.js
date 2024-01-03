@@ -7,6 +7,8 @@ const {DirectMessages, GuildMessages, Guilds, MessageContent} = Discord.GatewayI
 const bot = new Discord.Client({intents: [DirectMessages, GuildMessages, Guilds, MessageContent]});
 
 const lastInteractionTimeByUserID = {};
+const interactionCooldownMillis = 3000;
+
 //load command functionalities
 bot.commandHandlers={};
 bot.exiters={};
@@ -16,14 +18,8 @@ for(const commandFileName of commandFileNames)
 {
 	const commandProperties = require(`${commandsDirectory}/${commandFileName}`);
 	bot.commandHandlers[commandProperties.name] = commandProperties.execute;
-	if(commandProperties.exiter)
-	{
-		bot.exiters[commandProperties.name] = commandProperties.exiter;
-	}
-	if(commandProperties.configure)
-	{
-		commandProperties.configure(bot);
-	}
+	bot.exiters[commandProperties.name] = commandProperties.exiter;
+	commandProperties.configure?.(bot);	
 }
 
 bot.login(process.env.DISCORD_TOKEN);
@@ -41,8 +37,9 @@ bot.on(Discord.Events.MessageCreate, (message)=>{
 
 bot.on(Discord.Events.InteractionCreate, (interaction)=>{
 	const millisSinceLastInteraction = Date.now()-lastInteractionTimeByUserID[interaction.user.id];
-	if(millisSinceLastInteraction < 3000){
-		interaction.reply(`wait ${Math.ceil(millisSinceLastInteraction/1000)} seconds before next interaction`);
+	if(millisSinceLastInteraction < interactionCooldownMillis){
+		const waitTimeInSeconds = Math.ceil(millisSinceLastInteraction/1000);
+		interaction.reply(`wait ${waitTimeInSeconds} seconds before next interaction`);
 	}
 	else if(interaction.isChatInputCommand())
 	{
