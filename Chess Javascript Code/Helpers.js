@@ -4,6 +4,7 @@ module.exports = {
 	{
 		return String.fromCharCode(character.charCodeAt(0) + offset);
 	},
+	
 	asciiDistance(distantCharacter, baseCharacter)
 	//how much greater the ascii code of *distantCharacter* is than the ascii code of *baseCharacter*
 	{

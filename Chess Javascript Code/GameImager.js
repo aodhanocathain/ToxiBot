@@ -22,7 +22,18 @@ module.exports = {
 
 		const lastLastMove = game.playedMoves[game.playedMoves.length-2] ?? {};
 		const lastMove = game.playedMoves[game.playedMoves.length-1] ?? {};
-
+		
+		//need to know which squares are part of the move so that they can be coloured differently
+		//mainPieceSquareBefore is a given,
+		//need to know where the main piece ended up
+		const lastMovePieceEndSquare =
+			lastMove.mainPieceSquareAfter //either the piece moved to a square
+			|| lastMove.otherPieceSquareAfter	//or promoted to a new piece which ended on its own square
+			
+		const lastLastMovePieceEndSquare = 
+			lastLastMove.mainPieceSquareAfter
+			|| lastLastMove.otherPieceSquareAfter
+			
 		//draw the board bottom up so that higher squares' text does not get blocked by lower squares
 		//start at the highest drawing rank, because highest coordinate is lowest on the display
 		for(let drawRank=7; drawRank>=0; drawRank--)	//the "rank" on the drawn board, not necessarily the real rank
@@ -37,14 +48,15 @@ module.exports = {
 				const x = drawFile*SQUARE_PIXELS;
 				const y = drawRank*SQUARE_PIXELS;
 				
-				//colour the square
+				//colour the current square
 				const defaultColour = (((realRank+realFile)%2) == 0) ?  DARK_COLOUR : LIGHT_COLOUR;
+				
 				//compare by strings, not by square numeric value because square 0 is logically false and is missed
 				const fillColour = ((Square.fullString(square) == Square.fullString(lastMove.mainPieceSquareBefore)) ||
-									(Square.fullString(square) == Square.fullString(lastMove.pieceEndSquare?.())))?
+									(Square.fullString(square) == Square.fullString(lastMovePieceEndSquare)))?
 				(game.movingTeam.opposition.constructor.MOVE_COLOUR) : defaultColour;
 				
-				const borderColour = ((square == lastLastMove.mainPieceSquareBefore) || (square == lastLastMove.pieceEndSquare?.()))?
+				const borderColour = ((square == lastLastMove.mainPieceSquareBefore) || (square == lastLastMovePieceEndSquare))?
 				(game.movingTeam.constructor.MOVE_COLOUR) : fillColour;
 				
 				const BORDER_WIDTH = 3;

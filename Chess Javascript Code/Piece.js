@@ -54,15 +54,12 @@ class Piece
 		
 		const capture = game.pieces[move.mainPieceSquareAfter]? "x" : "";
 		
-		//const checkStatus = "";
-		///*
 		game.makeMove(move);
 		const checkStatus =
 		game.isCheckmate()? "#":
 		game.kingChecked()? "+":
 		"";
 		game.undoMove();
-		//*/
 		
 		return `${movingPiece.constructor.typeChar}${beforeDetails}${capture}${Square.fullString(move.mainPieceSquareAfter)}${checkStatus}`;
 	}

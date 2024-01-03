@@ -28,7 +28,8 @@ class Move
 		this.otherPieceSquareAfter = otherPieceSquareAfter;
 	}
 	
-	//store the string, which varies with the game position, at a specific moment in the game
+	//a move involving the same squares could have a different string representation across different positions
+	//this function generates the move's string for the current position
 	generateString()
 	{
 		const copyGame = this.game.clone();
@@ -37,12 +38,8 @@ class Move
 	
 	toString()
 	{
+		//if the string did not already exist, generate it on the spot
 		return this.string ?? ((move)=>{move.generateString(); return move.string;})(this);
-	}
-	
-	pieceEndSquare()
-	{
-		return this.mainPieceSquareAfter || this.otherPieceSquareAfter;
 	}
 }
 
