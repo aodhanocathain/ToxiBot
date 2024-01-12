@@ -126,16 +126,8 @@ class Team
 	{
 		newPiece.id = oldPiece.id;
 		
-		this.points -= oldPiece.constructor.points;
-		this.numEnemyKingSeers -= oldPiece.seesEnemyKing.get();
-		
-		this.activePieces[oldPiece.id] = newPiece;
-		
-		this.points += newPiece.constructor.points;
-		this.points += newPiece.seesEnemyKing.get();
-		
-		//piece updates team king seers in updateAllProperties
-		//this.numEnemyKingSeers += newPiece.seesEnemyKing.get();
+		this.deactivatePiece(oldPiece);
+		this.activatePiece(newPiece);
 	}
 	
 	init()
