@@ -161,17 +161,12 @@ class Piece
 	
 	updateSightOfEnemyKing()
 	{
-		const oldKingSight = this.seesEnemyKing.get();
-		const newKingSight = this.squaresAttackedBitVector.get().read(this.team.opposition.king.square)
-		this.seesEnemyKing.update(newKingSight);
-		this.team.numEnemyKingSeers += newKingSight - oldKingSight;
+		this.seesEnemyKing.update(this.squaresAttackedBitVector.get().read(this.team.opposition.king.square));
 	}
 	
 	revertSightOfEnemyKing()
 	{
-		const oldKingSight = this.seesEnemyKing.pop();
-		const newKingSight = this.seesEnemyKing.get();
-		this.team.numEnemyKingSeers += newKingSight - oldKingSight;
+		this.seesEnemyKing.revert();
 	}
 	
 	updateQualities()

@@ -96,7 +96,6 @@ class Game
 	targetPiece;
 	
 	fullUpdatedPieces;
-	partUpdatedPieces;
 	
 	numPositionsAnalysed;
 		
@@ -246,7 +245,6 @@ class Game
 		
 		this.playedMoves = [];
 		this.fullUpdatedPieces = new Manager();
-		this.partUpdatedPieces = new Manager();
 		
 		this.numPositionsAnalysed = 0;
 	}
@@ -538,7 +536,6 @@ class Game
 	{
 		
 		const fullUpdatedPieces = [];
-		const partUpdatedPieces = [];
 		
 		//When the moving team makes a move, only need to update the opposition's available moves
 		//to be able to expand the game tree search
@@ -551,7 +548,7 @@ class Game
 			team.activePieces.forEach((piece)=>{
 				if((piece==movingPiece) || (piece==move.otherPiece))
 				{
-					piece.updateAllProperties();
+					team.updatePiece(piece);
 					fullUpdatedPieces.push(piece);
 				}
 				else
@@ -563,7 +560,7 @@ class Game
 						watchingBits.read(move.mainPieceSquareAfter)
 					)
 					{
-						piece.updateAllProperties();
+						team.updatePiece(piece);
 						fullUpdatedPieces.push(piece);
 					}
 				}
@@ -571,7 +568,6 @@ class Game
 		});
 		
 		this.fullUpdatedPieces.update(fullUpdatedPieces);
-		this.partUpdatedPieces.update(partUpdatedPieces);
 	}
 	
 	switchMoveBySamePiece(move)
@@ -584,8 +580,7 @@ class Game
 		const movingPiece = this.movingPiece.get();
 		const lastTargetPiece = this.targetPiece.pop();
 		
-		this.fullUpdatedPieces.pop().forEach((piece)=>{piece.revertAllProperties();});
-		this.partUpdatedPieces.pop().forEach((piece)=>{piece.revertSightOfEnemyKing();});
+		this.fullUpdatedPieces.pop().forEach((piece)=>{piece.team.revertPiece(piece);});
 		
 		this.pieces[lastMove.captureTargetSquare] = lastTargetPiece;
 		lastTargetPiece?.activate();
@@ -713,9 +708,7 @@ class Game
 		const otherPiece = move.otherPiece;
 		
 		const fullUpdatedPieces = this.fullUpdatedPieces.pop();
-		fullUpdatedPieces.forEach((piece)=>{piece.revertAllProperties();});
-		const partUpdatedPieces = this.partUpdatedPieces.pop();
-		partUpdatedPieces.forEach((piece)=>{piece.revertSightOfEnemyKing();});
+		fullUpdatedPieces.forEach((piece)=>{piece.team.revertPiece(piece);});
 		
 		this.enPassantable.revert();
 		if((movingPiece instanceof King) || (movingPiece instanceof Rook)){this.castleRights.revert();}

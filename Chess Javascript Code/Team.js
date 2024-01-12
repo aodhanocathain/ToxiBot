@@ -122,6 +122,23 @@ class Team
 		this.numEnemyKingSeers -= piece.seesEnemyKing.get();
 	}
 	
+	updatePiece(piece)
+	{
+		const oldKingSight = piece.seesEnemyKing.get();
+		piece.updateAllProperties();
+		const newKingSight = piece.seesEnemyKing.get();
+		this.numEnemyKingSeers += newKingSight - oldKingSight;
+	}
+	
+	revertPiece(piece)
+	{
+		const oldKingSight = piece.seesEnemyKing.get();
+		piece.revertAllProperties();
+		const newKingSight = piece.seesEnemyKing.get();
+		this.numEnemyKingSeers += newKingSight - oldKingSight;
+		
+	}
+	
 	swapOldPieceForNewPiece(oldPiece, newPiece)
 	{
 		newPiece.id = oldPiece.id;
@@ -133,7 +150,7 @@ class Team
 	init()
 	{
 		this.activePieces.forEach((piece)=>{
-			piece.updateAllProperties();
+			this.updatePiece(piece);
 		});
 	}
 	
