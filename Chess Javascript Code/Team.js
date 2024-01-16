@@ -1,4 +1,4 @@
-const {NUM_FILES, NUM_RANKS} = require("./Constants.js");
+const {NUM_FILES, NUM_RANKS, MAX_EVALUATION_SCORE, MAX_EVALUATION_DEPTH} = require("./Constants.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
 const {King, Queen, Rook} = require("./Piece.js");
@@ -12,6 +12,8 @@ class Team
 	
 	static PAWN_START_RANK;
 	static PAWN_RANK_INCREMENT;
+	
+	static SCORE_MULTIPLIER;
 	
 	//assigned manually near the end of this file, after team class declarations
 	static STARTING_KING_SQUARE;
@@ -195,6 +197,8 @@ const WhiteTeam = class extends Team
 	static PAWN_START_RANK = this.BACK_RANK+1;
 	static PAWN_RANK_INCREMENT = 1;
 	
+	static SCORE_MULTIPLIER = 1;
+	
 	static charConverter(char)
 	{
 		return char.toUpperCase();
@@ -215,6 +219,8 @@ const BlackTeam = class extends Team
 	
 	static PAWN_START_RANK = this.BACK_RANK-1;
 	static PAWN_RANK_INCREMENT = -1;
+	
+	static SCORE_MULTIPLIER = -1;
 	
 	static charConverter(char)
 	{
