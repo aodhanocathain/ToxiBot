@@ -163,27 +163,10 @@ class Team
 	
 	evalPreferredToEval(newEval, oldEval)
 	{
-		//work out if what happens in newEval is better than what happened in oldEval
+		if(isNaN(newEval.score)){return false;}
+		if(isNaN(oldEval.score)){return true;}
 		
-		//any even number of halfmoves ago, this team was moving
-		const iGiveCheckmate = (newEval?.checkmate_in_halfmoves % 2) == 0;
-		const iGaveCheckmate = (oldEval?.checkmate_in_halfmoves % 2) == 0;
-		
-		//any odd number of halfmoves ago, the other team was moving
-		const iGetCheckmated = (newEval?.checkmate_in_halfmoves % 2) == 1;
-		const iGotCheckmated = (oldEval?.checkmate_in_halfmoves % 2) == 1;
-		
-		const giveMateInHalfMoves = newEval?.checkmate_in_halfmoves;
-		const gaveMateInHalfMoves = oldEval?.checkmate_in_halfmoves;
-		
-		return (!oldEval) ||
-		(newEval && 
-			(iGotCheckmated && ((!iGetCheckmated) || (giveMateInHalfMoves > gaveMateInHalfMoves))) ||
-			((!iGotCheckmated) && (
-				(iGaveCheckmate && (iGiveCheckmate && (giveMateInHalfMoves < gaveMateInHalfMoves))) ||
-				((!iGaveCheckmate) && (iGiveCheckmate || this.scorePreferredToScore(newEval?.score, oldEval?.score)))
-			))
-		);
+		return this.scorePreferredToScore(newEval.score, oldEval.score);
 	}
 }
 
@@ -206,7 +189,7 @@ const WhiteTeam = class extends Team
 	
 	scorePreferredToScore(newScore, oldScore)
 	{
-		return (newScore > (oldScore ?? -Infinity));
+		return (newScore > oldScore);
 	}
 };
 
@@ -229,7 +212,7 @@ const BlackTeam = class extends Team
 	
 	scorePreferredToScore(newScore, oldScore)
 	{
-		return (newScore < (oldScore ?? Infinity));
+		return (newScore < oldScore);
 	}
 }
 

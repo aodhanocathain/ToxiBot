@@ -282,22 +282,10 @@ class Game
 		return this.halfMove.get()==DRAW_AFTER_NO_PROGRESS_HALFMOVES;
 	}
 	
-	immediatePositionEvaluation()
-	{
-		///*
-		const whiteMaterial = this.teamsByName[WhiteTeam.name].points;
-		const blackMaterial = this.teamsByName[BlackTeam.name].points;
-		const totalMaterial = whiteMaterial + blackMaterial;
-		
-		return {
-			score: ((whiteMaterial-blackMaterial)/totalMaterial)
-		};
-		//*/
-		/*
-		return {
-			score: this.teamsByName[WhiteTeam.name].points - this.teamsByName[BlackTeam.name].points
-		};
-		*/
+	immediatePositionScore()
+	{		
+		return (this.teamsByName[WhiteTeam.name].points*WhiteTeam.SCORE_MULTIPLIER) + 
+				(this.teamsByName[BlackTeam.name].points*BlackTeam.SCORE_MULTIPLIER);
 	}
 
 	fancyEvaluate(depth = FANCY_ANALYSIS_DEPTH)
@@ -381,16 +369,14 @@ class Game
 	evaluate(depth = DEFAULT_ANALYSIS_DEPTH)
 	{
 		this.numPositionsAnalysed++;
-		if(this.kingCapturable()){return;}
-		if(depth==0){
-			return this.immediatePositionEvaluation();
-		}
+		if(this.kingCapturable()){return {score:NaN};}
+		if(depth==0){return {score:this.immediatePositionScore()};}
 		if(this.isDrawByRepetition()){return {score:0};}
 		if(this.isDrawByMoveRule()){return {score:0};}
 		const continuations = this.calculateMoves();
 		
 		let bestContinuation;
-		let bestEval;
+		let bestEval = {score:NaN};
 		
 		//check for better continuations
 		
@@ -439,25 +425,22 @@ class Game
 			}
 		}
 		
-		if(!bestEval)
+		if(isNaN(bestEval.score))
 		{
 			//No VALID continuation found, i.e. can't make a move without leaving king vulnerable.
 			//This means the current position is either checkmate or stalemate against movingTeam
-			return (this.kingChecked())?
-			{
-				checkmate_in_halfmoves: 0
-			}:
-			{
-				score: 0
-			};
+			return {
+				score: this.kingChecked()?
+				this.movingTeam.opposition.constructor.SCORE_MULTIPLIER*(MAX_EVALUATION_SCORE + 1 + (MAX_EVALUATION_DEPTH - depth)):
+				0
+			}
 		}
 		
 		const reverseLine = bestEval.reverseLine ?? [];
 		reverseLine.push(bestContinuation);
 		
-		const checkmate = "checkmate_in_halfmoves" in bestEval;
 		return {
-			[checkmate? "checkmate_in_halfmoves" : "score"]: checkmate? bestEval.checkmate_in_halfmoves+1 : bestEval.score,
+			score: bestEval.score,
 			bestMove: bestContinuation,
 			reverseLine: reverseLine
 		};
