@@ -1,4 +1,4 @@
-const {NUM_RANKS, NUM_FILES, MIN_FILE, MAX_EVALUATION_SCORE, MAX_EVALUATION_DEPTH} = require("./Constants.js");
+const {NUM_RANKS, NUM_FILES, MIN_FILE} = require("./Constants.js");
 const {asciiOffset, asciiDistance, deferredPromise} = require("./Helpers.js");
 const {BitVector} = require("./BitVector.js");
 const {Manager} = require("./Manager.js");
@@ -10,6 +10,9 @@ const {Piece, King, Queen, Rook, Pawn, PieceClassesByTypeChar} = require("./Piec
 const {Worker, isMainThread, parentPort} = require("worker_threads");
 
 const numCPUs = require("os").cpus().length;
+
+const MAX_EVALUATION_SCORE = 1000;
+const MAX_EVALUATION_DEPTH = 10;
 
 const DEFAULT_ANALYSIS_DEPTH = 1;
 

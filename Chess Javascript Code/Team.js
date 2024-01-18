@@ -1,4 +1,4 @@
-const {NUM_FILES, NUM_RANKS, MAX_EVALUATION_SCORE, MAX_EVALUATION_DEPTH} = require("./Constants.js");
+const {NUM_FILES, NUM_RANKS} = require("./Constants.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
 const {King, Queen, Rook} = require("./Piece.js");
