@@ -376,7 +376,7 @@ class Game
 		const continuations = this.calculateMoves();
 		
 		let bestContinuation;
-		let bestEval = {score:NaN};
+		let bestEval = {score:Infinity*this.movingTeam.opposition.constructor.SCORE_MULTIPLIER};
 		
 		//check for better continuations
 		
@@ -425,7 +425,7 @@ class Game
 			}
 		}
 		
-		if(isNaN(bestEval.score))
+		if(!bestContinuation)
 		{
 			//No VALID continuation found, i.e. can't make a move without leaving king vulnerable.
 			//This means the current position is either checkmate or stalemate against movingTeam

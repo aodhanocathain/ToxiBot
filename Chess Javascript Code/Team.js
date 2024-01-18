@@ -163,9 +163,6 @@ class Team
 	
 	evalPreferredToEval(newEval, oldEval)
 	{
-		if(isNaN(newEval.score)){return false;}
-		if(isNaN(oldEval.score)){return true;}
-		
 		return this.scorePreferredToScore(newEval.score, oldEval.score);
 	}
 }
