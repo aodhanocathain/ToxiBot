@@ -47,7 +47,7 @@ class BitVector
 		{
 			for(let i=0; i<WORD_WIDTH; i++)
 			{
-				str = `${str}${this.read(w,i)}`;
+				str = `${str}${this.read((w*WORD_WIDTH)+i)}`;
 			}
 			str = str.concat("\t");
 		}
