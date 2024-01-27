@@ -1,7 +1,8 @@
 const {NUM_FILES, NUM_RANKS} = require("./Constants.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
-const {King, Queen, Rook} = require("./Piece.js");
+const {King, Queen, Rook, WINGS} = require("./Piece.js");
+const {BitVector64} = require("./BitVector64.js");
 
 class Team
 {
@@ -17,9 +18,12 @@ class Team
 	
 	//assigned manually near the end of this file, after team class declarations
 	static STARTING_KING_SQUARE;
-	static STARTING_ROOK_SQUARES_BY_WINGCHAR;
-	static CASTLE_KING_SQUARES_BY_WINGCHAR;
-	static CASTLE_ROOK_SQUARES_BY_WINGCHAR
+	static STARTING_ROOK_SQUARES_BY_WING;
+	static CASTLE_KING_SQUARES_BY_WING;
+	static CASTLE_ROOK_SQUARES_BY_WING;
+	
+	static CASTLE_INTERMEDIATE_SQUARES_BITVECTOR_BY_WING;
+	static CASTLE_REQUIRED_SAFE_SQUARES_BITVECTOR_BY_WING;
 	
 	static charConverter(char)
 	{
@@ -36,11 +40,15 @@ class Team
 	inactivePieces;	
 	nextId;
 	
+	activePieceLocationsBitVector;
+	
 	points;
 	numEnemyKingSeers;
 	
+	idsSeeingEnemyCastleSafeSquaresBitVectorByWing;
+	
 	king;
-	rooksInStartSquaresByWingChar;
+	rooksInStartSquaresByWing;
 	
 	//assigned by the team's game
 	opposition;
@@ -53,10 +61,17 @@ class Team
 		this.inactivePieces = [];
 		this.nextId = 0;
 		
+		this.activePieceLocationsBitVector = new BitVector64();
+		
+		this.idsSeeingEnemyCastleSafeSquaresBitVectorByWing = WINGS.reduce((accumulator, wing)=>{
+			accumulator[wing] = new BitVector64();
+			return accumulator;
+		}, {});
+		
 		this.points = 0;
 		this.numEnemyKingSeers = 0;
 		
-		this.rooksInStartSquaresByWingChar = {};
+		this.rooksInStartSquaresByWing = {};
 	}
 	
 	addActivePiece(piece)
@@ -87,16 +102,16 @@ class Team
 		}
 		else if(piece instanceof Rook)
 		{
-			if(piece.square==this.constructor.STARTING_ROOK_SQUARES_BY_WINGCHAR[Queen.typeChar])
+			if(piece.square==this.constructor.STARTING_ROOK_SQUARES_BY_WING[Queen.typeChar])
 			{
-				this.rooksInStartSquaresByWingChar[Queen.typeChar] = piece;
+				this.rooksInStartSquaresByWing[Queen.typeChar] = piece;
 				//assume it is the original rook and that it never moved
 				piece.canCastle = new Manager(true);
 				//the game castling rights are used to verify this anyway
 			}
-			else if(piece.square==this.constructor.STARTING_ROOK_SQUARES_BY_WINGCHAR[King.typeChar])
+			else if(piece.square==this.constructor.STARTING_ROOK_SQUARES_BY_WING[King.typeChar])
 			{
-				this.rooksInStartSquaresByWingChar[King.typeChar] = piece;
+				this.rooksInStartSquaresByWing[King.typeChar] = piece;
 				//assume it is the original rook and that it never moved
 				piece.canCastle = new Manager(true);
 				//the game castling rights are used to verify this anyway
@@ -112,6 +127,7 @@ class Team
 	{
 		this.activePieces[piece.id] = piece;
 		delete this.inactivePieces[piece.id];
+		this.activePieceLocationsBitVector.set(piece.square);
 		this.points += piece.constructor.points;
 		this.numEnemyKingSeers += piece.seesEnemyKing.get();
 	}
@@ -120,6 +136,7 @@ class Team
 	{
 		this.inactivePieces[piece.id] = piece;
 		delete this.activePieces[piece.id];
+		this.activePieceLocationsBitVector.clear(piece.square);
 		this.points -= piece.constructor.points;
 		this.numEnemyKingSeers -= piece.seesEnemyKing.get();
 	}
@@ -128,6 +145,12 @@ class Team
 	{
 		const oldKingSight = piece.seesEnemyKing.get();
 		piece.updateAllProperties();
+		WINGS.forEach((wing)=>{
+			const seenSquares = piece.squaresAttackedBitVector.get().clone();
+			seenSquares.and(this.opposition.constructor.CASTLE_REQUIRED_SAFE_SQUARES_BITVECTOR_BY_WING[wing]);
+			const seesSquare = !(seenSquares.isEmpty());
+			this.idsSeeingEnemyCastleSafeSquaresBitVectorByWing[wing].write(seesSquare, piece.id);
+		});
 		const newKingSight = piece.seesEnemyKing.get();
 		this.numEnemyKingSeers += newKingSight - oldKingSight;
 	}
@@ -136,6 +159,12 @@ class Team
 	{
 		const oldKingSight = piece.seesEnemyKing.get();
 		piece.revertAllProperties();
+		WINGS.forEach((wing)=>{
+			const seenSquares = piece.squaresAttackedBitVector.get().clone();
+			seenSquares.and(this.opposition.constructor.CASTLE_REQUIRED_SAFE_SQUARES_BITVECTOR_BY_WING[wing]);
+			const seesSquare = !(seenSquares.isEmpty());
+			this.idsSeeingEnemyCastleSafeSquaresBitVectorByWing[wing].write(seesSquare, piece.id);
+		});
 		const newKingSight = piece.seesEnemyKing.get();
 		this.numEnemyKingSeers += newKingSight - oldKingSight;
 		
@@ -218,7 +247,7 @@ const TEAM_CLASSES = [WhiteTeam, BlackTeam];
 TEAM_CLASSES.forEach((teamClass)=>{
 	//king starts on the e-file
 	teamClass.STARTING_KING_SQUARE = Square.withRankAndFile(teamClass.BACK_RANK, 4);
-	teamClass.STARTING_ROOK_SQUARES_BY_WINGCHAR = {
+	teamClass.STARTING_ROOK_SQUARES_BY_WING = {
 		//king rook starts on the h-file
 		[King.typeChar]: Square.withRankAndFile(teamClass.BACK_RANK, NUM_FILES-1),
 		//queen rook starts on the a-file
@@ -226,17 +255,50 @@ TEAM_CLASSES.forEach((teamClass)=>{
 	};
 	
 	//king goes 2 spaces towards the edge
-	teamClass.CASTLE_KING_SQUARES_BY_WINGCHAR = {
+	teamClass.CASTLE_KING_SQUARES_BY_WING = {
 		[King.typeChar]: Square.withRankAndFile(teamClass.BACK_RANK, Square.file(teamClass.STARTING_KING_SQUARE)+2),
 		[Queen.typeChar]: Square.withRankAndFile(teamClass.BACK_RANK, Square.file(teamClass.STARTING_KING_SQUARE)-2)
 	};
 	//rook goes 1 space closer to the center than the king
-	teamClass.CASTLE_ROOK_SQUARES_BY_WINGCHAR = {
+	teamClass.CASTLE_ROOK_SQUARES_BY_WING = {
 		[King.typeChar]: 
-		Square.withRankAndFile(teamClass.BACK_RANK, Square.file(teamClass.CASTLE_KING_SQUARES_BY_WINGCHAR[King.typeChar])-1),
+		Square.withRankAndFile(teamClass.BACK_RANK, Square.file(teamClass.CASTLE_KING_SQUARES_BY_WING[King.typeChar])-1),
 		[Queen.typeChar]: 
-		Square.withRankAndFile(teamClass.BACK_RANK, Square.file(teamClass.CASTLE_KING_SQUARES_BY_WINGCHAR[Queen.typeChar])+1),
+		Square.withRankAndFile(teamClass.BACK_RANK, Square.file(teamClass.CASTLE_KING_SQUARES_BY_WING[Queen.typeChar])+1),
 	};
+});
+
+TEAM_CLASSES.forEach((teamClass)=>{
+	teamClass.CASTLE_INTERMEDIATE_SQUARES_BITVECTOR_BY_WING = WINGS.reduce((accumulator, wing)=>{
+		const intermediateSquaresBitVector = new BitVector64();
+		const kingFile = Square.file(teamClass.STARTING_KING_SQUARE);
+		const rookFile = Square.file(teamClass.STARTING_ROOK_SQUARES_BY_WING[wing]);
+		const startFile = Math.min(kingFile, rookFile);
+		const endFile = Math.max(kingFile, rookFile);
+		for(let i=startFile+1; i<endFile; i++)
+		{
+			const square = Square.withRankAndFile(teamClass.BACK_RANK, i);
+			intermediateSquaresBitVector.set(square);
+		}
+		accumulator[wing] = intermediateSquaresBitVector;
+		return accumulator;
+	}, {});
+});
+
+TEAM_CLASSES.forEach((teamClass)=>{
+	teamClass.CASTLE_REQUIRED_SAFE_SQUARES_BITVECTOR_BY_WING = WINGS.reduce((accumulator, wing)=>{
+		const requiredSafeSquaresBitVector = new BitVector64();
+		const kingFile = Square.file(teamClass.STARTING_KING_SQUARE);
+		const rookFile = Square.file(teamClass.STARTING_ROOK_SQUARES_BY_WING[wing]);
+		const increment = Math.sign(rookFile-kingFile);
+		for(let i=kingFile; i!=kingFile + (increment*3); i = i+increment)
+		{
+			const square = Square.withRankAndFile(teamClass.BACK_RANK, i);
+			requiredSafeSquaresBitVector.set(square);
+		}
+		accumulator[wing] = requiredSafeSquaresBitVector;
+		return accumulator;
+	}, {});
 });
 
 module.exports = {

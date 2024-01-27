@@ -1,11 +1,11 @@
 const {NUM_RANKS, NUM_FILES, MIN_FILE} = require("./Constants.js");
 const {asciiOffset, asciiDistance, deferredPromise} = require("./Helpers.js");
-const {BitVector} = require("./BitVector.js");
+const {BitVector64} = require("./BitVector64.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
 const {PromotionMove} = require("./Move.js");
 const {Team, WhiteTeam, BlackTeam} = require("./Team.js");
-const {Piece, King, Queen, Rook, Pawn, PieceClassesByTypeChar} = require("./Piece.js");
+const {Piece, King, Queen, Rook, Pawn, PieceClassesByTypeChar, WINGS} = require("./Piece.js");
 
 const {Worker, isMainThread, parentPort} = require("worker_threads");
 
@@ -190,7 +190,7 @@ class Game
 		if(castleRightsCharacters.some((teamedChar)=>{
 			if(teamedChar==EMPTY_FEN_FIELD){return false;}
 			const wingChar = Piece.typeCharOfTeamedChar(teamedChar);
-			return (wingChar != King.typeChar) && (wingChar != Queen.typeChar);
+			return !(WINGS.includes(wingChar));
 		})){throw "invalid castle right in FEN string";}
 		//check for duplicate castle rights characters
 		const differentRights = castleRightsCharacters.reduce((accumulator, teamedChar)=>{
@@ -206,7 +206,7 @@ class Game
 				const wingChar = Piece.typeCharOfTeamedChar(teamedChar);
 				const teamClass = Team.classOfTeamedChar(teamedChar);
 				const team = this.teamsByName[teamClass.name];
-				return (team.king.canCastle.get()) && (team.rooksInStartSquaresByWingChar[wingChar]?.canCastle.get());
+				return (team.king.canCastle.get()) && (team.rooksInStartSquaresByWing[wingChar]?.canCastle.get());
 			})
 		);
 		
@@ -240,6 +240,9 @@ class Game
 		
 		this.teamsByName[WhiteTeam.name].init();
 		this.teamsByName[BlackTeam.name].init();
+		//the white king was updated before the black pieces had any moves
+		//therefore, must update white king again to rule out moves based on enemy attacks
+		this.teamsByName[WhiteTeam.name].updatePiece(this.teamsByName[WhiteTeam.name].king);
 		
 		this.movingPiece = new Manager();
 		this.targetPiece = new Manager();
@@ -539,7 +542,7 @@ class Game
 				}
 				else if(piece instanceof King)
 				{
-					//Would be awkward to implement squaresWatchedBitVector for the King's castle moves
+					//Would be awkward to implement squaresWatchedBitVector64 for the King's castle moves
 					//For now just fully update the King every move
 					team.updatePiece(piece);
 					fullUpdatedPieces.push(piece);
@@ -642,7 +645,7 @@ class Game
 					const team = this.teamsByName[teamClass.name];
 					
 					const king = team.king;
-					const rook = team.rooksInStartSquaresByWingChar[wingChar];
+					const rook = team.rooksInStartSquaresByWing[wingChar];
 					
 					return (king.canCastle.get()) && (rook?.isActive()) && (rook.canCastle.get());
 				})

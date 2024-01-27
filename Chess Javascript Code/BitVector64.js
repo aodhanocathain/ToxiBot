@@ -5,13 +5,23 @@
 //bit 33 is [1][1]
 
 const WORD_WIDTH = 32;	//assuming 32-bit integers in javascript
-class BitVector
+class BitVector64
 {
 	words;	//the integers that hold the bits
 	
-	constructor(numBits)
+	constructor()
 	{
-		this.words = [];
+		this.words = [0,0];
+	}
+	
+	clone()
+	{
+		const clone = new BitVector64();
+		for(let i=0; i<this.words.length; i++)
+		{
+			clone.words[i] = this.words[i];
+		}
+		return clone;
 	}
 	
 	set(index)
@@ -19,6 +29,7 @@ class BitVector
 		const wordIndex = Math.floor(index / WORD_WIDTH);
 		const bitIndex = index % WORD_WIDTH;	//the bit's index within the chosen word
 		this.words[wordIndex] |= (1 << bitIndex);
+		return this;
 	}
 	
 	clear(index)
@@ -26,6 +37,7 @@ class BitVector
 		const wordIndex = Math.floor(index / WORD_WIDTH);
 		const bitIndex = index % WORD_WIDTH;	//the bit's index within the chosen word
 		this.words[wordIndex] &= ~(1 << bitIndex);
+		return this;
 	}
 	
 	read(index)
@@ -35,9 +47,28 @@ class BitVector
 		return (this.words[wordIndex] >> bitIndex) & 1;
 	}
 	
+	write(value, index)
+	{
+		const wordIndex = Math.floor(index / WORD_WIDTH);
+		const bitIndex = index % WORD_WIDTH;	//the bit's index within the chosen word
+		this.words[wordIndex] &= ~(1 << bitIndex);	//erase what was there (write a 0 by default)
+		this.words[wordIndex] |= (value << bitIndex);	//write the new value (write a 1 if necessary)
+		return this;
+	}
+	
 	or(otherVector)
 	{
 		otherVector.words.forEach((word,index)=>{this.words[index]|=word});
+	}
+	
+	and(otherVector)
+	{
+		otherVector.words.forEach((word,index)=>{this.words[index]&=word});
+	}
+	
+	isEmpty()
+	{
+		return (this.words[0] | this.words[1]) == 0;
 	}
 	
 	toString()
@@ -56,5 +87,5 @@ class BitVector
 }
 
 module.exports = {
-	BitVector: BitVector
+	BitVector64: BitVector64
 };

@@ -1,6 +1,6 @@
 const {MIN_FILE} = require("./Constants.js");
 const {asciiDistance} = require("./Helpers.js");
-const {BitVector} = require("./BitVector.js");
+const {BitVector64} = require("./BitVector64.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
 const {PlainMove, CastleMove, EnPassantMove, PromotionMove} = require("./Move.js");
@@ -69,8 +69,8 @@ class Piece
 	square;
 	
 	squaresAttacked;
-	squaresAttackedBitVector;	//BitVector where a bit is set if its index is a square in squaresAttacked
-	squaresWatchedBitVector;	//BitVector where a bit is set if a change in its square requires updating the piece's options
+	squaresAttackedBitVector;	//BitVector64 where a bit is set if its index is a square in squaresAttacked
+	squaresWatchedBitVector;	//BitVector64 where a bit is set if a change in its square requires updating the piece's options
 	
 	basicMoves;
 	
@@ -88,7 +88,7 @@ class Piece
 		this.square = square;
 		
 		this.squaresAttacked = new Manager([]);
-		this.squaresAttackedBitVector = new Manager(new BitVector());
+		this.squaresAttackedBitVector = new Manager(new BitVector64());
 		this.squaresWatchedBitVector = this.squaresAttackedBitVector;
 		
 		this.basicMoves = new Manager([]);
@@ -228,7 +228,7 @@ class RangedPiece extends BlockablePiece
 	static squaresAttackedFromSquareInGame(square, game)
 	{
 		const squaresArray = [];
-		const squaresBits = new BitVector();
+		const squaresBits = new BitVector64();
 		
 		const rank = Square.rank(square);
 		const file = Square.file(square);
@@ -274,7 +274,7 @@ class PatternPiece extends Piece
 	static squaresAttackedFromSquareInGame(square, game)
 	{
 		const squaresArray = [];
-		const squaresBits = new BitVector();
+		const squaresBits = new BitVector64();
 	
 		const rank = Square.rank(square);
 		const file = Square.file(square);
@@ -309,7 +309,7 @@ class King extends PatternPiece
 {
 	//King must update castle moves if own pieces move in/out of the way,
 	//or if enemy pieces guarding intermediate squares are blocked etc.
-	//Would be awkward to do with squaresWatchedBitVector,
+	//Would be awkward to do with squaresWatchedBitVector64,
 	//so for now the King is always fully updated after every move in the game
 	static typeChar = "K";
 	static name = "king";
@@ -347,56 +347,42 @@ class King extends PatternPiece
 		super.updateSquaresAndMoves();
 		
 		const castleMoves = [];
+		///*
 		//add castle moves if allowed
-		//king must not have moved
-		if(this.canCastle.get())
+		//king must not have moved, can't castle to get out of check
+		if(this.canCastle.get() && this.team.opposition.numEnemyKingSeers==0)
 		{
-			//can't castle to get out of check
-			if(this.team.opposition.numEnemyKingSeers==0)
-			{
-				[King.typeChar, Queen.typeChar].forEach((wingChar)=>{
-					const rook = this.team.rooksInStartSquaresByWingChar[wingChar];
-					//rook must not have moved
-					if(rook?.canCastle.get() && rook?.isActive())
+			WINGS.forEach((wingChar)=>{
+				const rook = this.team.rooksInStartSquaresByWing[wingChar];
+				//rook must not have moved
+				if(rook?.canCastle.get() && rook?.isActive())
+				{
+					//must have the right to castle
+					if(this.game.castleRights.get().includes(this.team.constructor.charConverter(wingChar)))
 					{
-						//must have the right to castle
-						if(this.game.castleRights.get().includes(this.team.constructor.charConverter(wingChar)))
+						//must not be any pieces between king and rook
+						const blockingPieceLocationsBitVector = this.team.activePieceLocationsBitVector.clone();
+						blockingPieceLocationsBitVector.or(this.team.opposition.activePieceLocationsBitVector);
+						blockingPieceLocationsBitVector.and(this.team.constructor.CASTLE_INTERMEDIATE_SQUARES_BITVECTOR_BY_WING[wingChar]);
+						const noPiecesBetween = blockingPieceLocationsBitVector.isEmpty();
+						
+						if(noPiecesBetween)
 						{
-							//must not be any pieces between king and rook
-							let noPiecesBetween = true;
-							const kingFile = Square.file(this.team.constructor.STARTING_KING_SQUARE);
-							const rookFile = Square.file(this.team.constructor.STARTING_ROOK_SQUARES_BY_WINGCHAR[wingChar]);
-							const startFile = Math.min(kingFile, rookFile);
-							const endFile = Math.max(kingFile, rookFile);
-							for(let i=startFile+1; i<endFile; i++)
+							const squaresAreSafe = this.team.opposition.idsSeeingEnemyCastleSafeSquaresBitVectorByWing[wingChar].isEmpty();
+							if(squaresAreSafe)
 							{
-								const square = Square.withRankAndFile(this.team.constructor.BACK_RANK, i);
-								noPiecesBetween = noPiecesBetween && !(this.game.pieces[square]);
-							}
-							
-							if(noPiecesBetween)
-							{
-								const precastleFile = Square.file(this.team.constructor.STARTING_KING_SQUARE);
-								const postcastleFile = Square.file(this.team.constructor.CASTLE_KING_SQUARES_BY_WINGCHAR[wingChar]);
-								const middleFile = (precastleFile + postcastleFile)/2;	//assumes start square and castle square are 2 apart
-								//can't castle through check
-								const passingSquare = Square.withRankAndFile(this.team.constructor.BACK_RANK, middleFile);
-								if(!(this.team.opposition.activePieces.some((piece)=>{
-									return piece.squaresAttackedBitVector.get().read(passingSquare);
-								})))
-								{
-									castleMoves.push(new CastleMove(
-									this.game,
-									this.square, this.team.constructor.CASTLE_KING_SQUARES_BY_WINGCHAR[wingChar],
-									rook.square, this.team.constructor.CASTLE_ROOK_SQUARES_BY_WINGCHAR[wingChar]
-									));
-								}
+								castleMoves.push(new CastleMove(
+								this.game,
+								this.square, this.team.constructor.CASTLE_KING_SQUARES_BY_WING[wingChar],
+								rook.square, this.team.constructor.CASTLE_ROOK_SQUARES_BY_WING[wingChar]
+								));
 							}
 						}
 					}
-				});
-			}
+				}
+			});
 		}
+		//*/
 		this.castleMoves.update(castleMoves);
 	}
 	
@@ -485,7 +471,7 @@ class Pawn extends BlockablePiece
 	static squaresAttackedFromSquareInGameForTeam(square, game, team)
 	{
 		const squares = [];
-		const bits = new BitVector();
+		const bits = new BitVector64();
 		
 		const rank = Square.rank(square);
 		const file = Square.file(square);
@@ -514,7 +500,7 @@ class Pawn extends BlockablePiece
 	static squaresWatchedFromSquareInGameForTeam(square, game, team)
 	{
 		const squares = [];
-		const bits = new BitVector();
+		const bits = new BitVector64();
 		
 		const rank = Square.rank(square);
 		const file = Square.file(square);
@@ -575,7 +561,7 @@ class Pawn extends BlockablePiece
 		super(game, team, square);
 		
 		this.squaresWatched = new Manager([]);
-		this.squaresWatchedBitVector = new Manager(new BitVector());
+		this.squaresWatchedBitVector = new Manager(new BitVector64());
 		
 		this.specialMoves = new Manager([]);
 	}
@@ -684,6 +670,8 @@ const PieceClassesByTypeChar = PieceClasses.reduce((accumulator, pieceClass)=>{
 	return accumulator;
 }, {});
 
+const WINGS = [King.typeChar, Queen.typeChar];
+
 module.exports = {
 	Piece:Piece,
 	BlockablePiece:BlockablePiece,
@@ -698,4 +686,6 @@ module.exports = {
 	Pawn:Pawn,
 	
 	PieceClassesByTypeChar: PieceClassesByTypeChar,
+	
+	WINGS: WINGS
 }
