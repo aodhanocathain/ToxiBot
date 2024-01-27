@@ -32,7 +32,6 @@ class Move
 	//this function generates the move's string for the current position
 	generateString()
 	{
-		const copyGame = this.game.clone();
 		this.string = this.game.pieces[this.mainPieceSquareBefore].constructor.makeMoveString(this);
 	}
 	
@@ -55,7 +54,7 @@ class CastleMove extends Move
 {
 	constructor(game, kingBefore, kingAfter, rookBefore, rookAfter)
 	{
-		super(game, kingBefore, kingAfter, kingAfter, game.pieces[rookBefore], rookBefore, rookAfter);
+		super(game, kingBefore, kingAfter, null, game.pieces[rookBefore], rookBefore, rookAfter);
 	}
 	
 	generateString()
@@ -76,7 +75,7 @@ class PromotionMove extends Move
 {
 	constructor(game, mainPieceSquareBefore, mainPieceSquareAfter, promotionPiece)
 	{
-		super(game, mainPieceSquareBefore, mainPieceSquareAfter, mainPieceSquareAfter, promotionPiece, mainPieceSquareBefore, mainPieceSquareAfter)
+		super(game, mainPieceSquareBefore, null, mainPieceSquareAfter, promotionPiece, null, mainPieceSquareAfter)
 	}
 }
 

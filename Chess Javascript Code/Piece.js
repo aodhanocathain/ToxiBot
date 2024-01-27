@@ -45,14 +45,14 @@ class Piece
 		const beforeDetails = 
 		(otherOrigins.length==0)?	//piece is the only possible candidate for the move, needs no clarification
 		"":
-		(sameOriginFiles.length==0)?	//need to uniquely identify piece by its file
+		(sameOriginFiles.length==0)?	//can uniquely identify piece by its file
 		Square.fileString(move.mainPieceSquareBefore) :
-		(sameOriginRanks.length==0)?	//need to uniquely identify piece by its rank
+		(sameOriginRanks.length==0)?	//can uniquely identify piece by its rank
 		Square.rankString(move.mainPieceSquareBefore) :
 		//must fully specify the square the piece starts on
 		Square.fullString(move.mainPieceSquareBefore);
 		
-		const capture = game.pieces[move.mainPieceSquareAfter]? "x" : "";
+		const capture = game.pieces[move.captureTargetSquare]? "x" : "";
 		
 		game.makeMove(move);
 		const checkStatus =
@@ -96,6 +96,7 @@ class Piece
 		this.seesEnemyKing = new Manager(false);
 		
 		this.qualities = {
+			/*
 			ownKingProximity: 
 			{
 				manager: new Manager(Infinity),
@@ -116,6 +117,7 @@ class Piece
 					return 0;
 				}
 			}
+			*/
 		};
 	}
 	
@@ -242,7 +244,7 @@ class RangedPiece extends BlockablePiece
 			{
 				const newSquare = Square.withRankAndFile(newRank,newFile);
 				
-				//checking if the way is blocked AFTER adding the potentially blocked square is important
+				//checking if the way is blocked AFTER adding the potentially blocked square to the list is important
 				//e.g. capturing a piece necessarily involves being able to move to the square that is blocked
 				squaresArray.push(newSquare);
 				squaresBits.set(newSquare);
@@ -305,6 +307,10 @@ class PatternPiece extends Piece
 
 class King extends PatternPiece
 {
+	//King must update castle moves if own pieces move in/out of the way,
+	//or if enemy pieces guarding intermediate squares are blocked etc.
+	//Would be awkward to do with squaresWatchedBitVector,
+	//so for now the King is always fully updated after every move in the game
 	static typeChar = "K";
 	static name = "king";
 	static points = 0;
@@ -657,6 +663,8 @@ class Pawn extends BlockablePiece
 		super.revertSquaresAndMoves();
 		
 		this.squaresWatched.revert();
+		this.squaresWatchedBitVector.revert();
+		
 		this.specialMoves.revert();
 	}
 }

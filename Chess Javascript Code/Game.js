@@ -537,13 +537,23 @@ class Game
 					team.updatePiece(piece);
 					fullUpdatedPieces.push(piece);
 				}
+				else if(piece instanceof King)
+				{
+					//Would be awkward to implement squaresWatchedBitVector for the King's castle moves
+					//For now just fully update the King every move
+					team.updatePiece(piece);
+					fullUpdatedPieces.push(piece);
+				}
 				else
 				{
 					const watchingBits = piece.squaresWatchedBitVector.get();
 					if
 					(
 						watchingBits.read(move.mainPieceSquareBefore) ||
-						watchingBits.read(move.mainPieceSquareAfter)
+						watchingBits.read(move.mainPieceSquareAfter) ||
+						watchingBits.read(move.otherPieceSquareBefore) ||
+						watchingBits.read(move.otherPieceSquareAfter) ||
+						watchingBits.read(move.captureTargetSquare)
 					)
 					{
 						team.updatePiece(piece);
