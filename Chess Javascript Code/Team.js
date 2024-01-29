@@ -1,4 +1,4 @@
-const {NUM_FILES, NUM_RANKS} = require("./Constants.js");
+const {NUM_FILES, NUM_RANKS, MAX_EVALUATION_SCORE, MAX_EVALUATION_DEPTH} = require("./Constants.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
 const {King, Queen, Rook, WINGS} = require("./Piece.js");
@@ -24,6 +24,9 @@ class Team
 	
 	static CASTLE_INTERMEDIATE_SQUARES_BITVECTOR_BY_WING;
 	static CASTLE_REQUIRED_SAFE_SQUARES_BITVECTOR_BY_WING;
+	
+	static BEST_POSSIBLE_SCORE;
+	static INF_SCORE;
 	
 	static charConverter(char)
 	{
@@ -299,6 +302,11 @@ TEAM_CLASSES.forEach((teamClass)=>{
 		accumulator[wing] = requiredSafeSquaresBitVector;
 		return accumulator;
 	}, {});
+});
+
+TEAM_CLASSES.forEach((teamClass)=>{
+	teamClass.BEST_POSSIBLE_SCORE = teamClass.SCORE_MULTIPLIER*(MAX_EVALUATION_SCORE + 1 + MAX_EVALUATION_DEPTH);
+	teamClass.INF_SCORE = Infinity*teamClass.SCORE_MULTIPLIER;
 });
 
 module.exports = {

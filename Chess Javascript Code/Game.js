@@ -11,9 +11,6 @@ const {Worker, isMainThread, parentPort} = require("worker_threads");
 
 const numCPUs = require("os").cpus().length;
 
-const MAX_EVALUATION_SCORE = 1000;
-const MAX_EVALUATION_DEPTH = 10;
-
 const DEFAULT_ANALYSIS_DEPTH = 1;
 
 //fancy analysis time is approximately (branch factor)^(depth + foresight) but foresight is more expensive than depth
@@ -438,6 +435,65 @@ class Game
 			return {
 				score: this.kingChecked()?
 				this.movingTeam.opposition.constructor.SCORE_MULTIPLIER*(MAX_EVALUATION_SCORE + 1 + (MAX_EVALUATION_DEPTH - depth)):
+				0
+			}
+		}
+		
+		const reverseLine = bestEval.reverseLine ?? [];
+		reverseLine.push(bestContinuation);
+		
+		return {
+			score: bestEval.score,
+			bestMove: bestContinuation,
+			reverseLine: reverseLine
+		};
+	}
+	
+	ABevaluate(depth, A=WhiteTeam.INF_SCORE, B=BlackTeam.INF_SCORE)
+	{
+		this.numPositionsAnalysed++;
+		if(this.kingCapturable()){return {score:NaN};}
+		if(depth==0){return {score:this.immediatePositionScore()};}
+		if(this.isDrawByRepetition()){return {score:0};}
+		if(this.isDrawByMoveRule()){return {score:0};}
+		const continuations = this.calculateMoves().flat(2);
+		
+		let bestContinuation;
+		let bestEval = {score:this.movingTeam.opposition.constructor.INF_SCORE};		
+			
+		for(let i=0; i<continuations.length; i++)
+		{
+			const newContinuation = continuations[i];
+			this.makeMove(newContinuation);
+			const newEval = this.ABevaluate(depth-1,A,B);
+			this.undoMove();
+			
+			if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
+			{
+				bestContinuation = newContinuation;
+				bestEval = newEval;
+			}
+			if(this.movingTeam.evalPreferredToEval(bestEval, this.movingTeam instanceof WhiteTeam?B:A))
+			{
+				break;
+			}
+			if(this.movingTeam instanceof WhiteTeam)
+			{
+				A = bestEval;
+			}
+			else
+			{
+				B = bestEval;
+			}
+		}
+		
+		if(!bestContinuation)
+		{
+			//No VALID continuation found, i.e. can't make a move without leaving king vulnerable.
+			//This means the current position is either checkmate or stalemate against movingTeam
+			return {
+				score: this.kingChecked()?
+				this.movingTeam.opposition.constructor.BEST_POSSIBLE_SCORE - (this.movingTeam.opposition.constructor.SCORE_MULTIPLIER*depth):
 				0
 			}
 		}
