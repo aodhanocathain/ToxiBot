@@ -92,16 +92,8 @@ class Team
 		if(piece instanceof King)
 		{
 			this.king = piece;
-			if(piece.square==this.constructor.STARTING_KING_SQUARE)
-			{
-				//assume the king did not move yet
-				piece.canCastle = new Manager(true);
-				//the game castling rights are used to verify this anyway
-			}
-			else
-			{
-				piece.canCastle = new Manager(false);
-			}
+			piece.canCastle = new Manager(piece.square==this.constructor.STARTING_KING_SQUARE)	//assume the king did not move yet
+			//the game castling rights are used to verify this anyway
 		}
 		else if(piece instanceof Rook)
 		{
