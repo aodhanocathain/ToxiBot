@@ -105,24 +105,11 @@ class Team
 		}
 		else if(piece instanceof Rook)
 		{
-			if(piece.square==this.constructor.STARTING_ROOK_SQUARES_BY_WING[Queen.typeChar])
-			{
-				this.rooksInStartSquaresByWing[Queen.typeChar] = piece;
-				//assume it is the original rook and that it never moved
-				piece.canCastle = new Manager(true);
-				//the game castling rights are used to verify this anyway
-			}
-			else if(piece.square==this.constructor.STARTING_ROOK_SQUARES_BY_WING[King.typeChar])
-			{
-				this.rooksInStartSquaresByWing[King.typeChar] = piece;
-				//assume it is the original rook and that it never moved
-				piece.canCastle = new Manager(true);
-				//the game castling rights are used to verify this anyway
-			}
-			else
-			{
-				piece.canCastle = new Manager(false);
-			}
+			const wing = WINGS.find((wing)=>{
+				return piece.square==this.constructor.STARTING_ROOK_SQUARES_BY_WING[wing];
+			});
+			this.rooksInStartSquaresByWing[wing] = piece;
+			piece.canCastle = new Manager(!!wing);
 		}
 	}
 	
