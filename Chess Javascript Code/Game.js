@@ -9,14 +9,9 @@ const {Piece, King, Queen, Rook, Pawn, PieceClassesByTypeChar, WINGS} = require(
 
 const {Worker, isMainThread, parentPort} = require("worker_threads");
 
-const numCPUs = require("os").cpus().length;
+const NUM_CPUs = require("os").cpus().length;
 
 const DEFAULT_ANALYSIS_DEPTH = 1;
-
-//fancy analysis time is approximately (branch factor)^(depth + foresight) but foresight is more expensive than depth
-const FANCY_ANALYSIS_DEPTH = 3;
-const FANCY_ANALYSIS_FORESIGHT = 1;
-const FANCY_ANALYSIS_BRANCH_FACTOR = 4;
 
 const DRAW_AFTER_NO_PROGRESS_HALFMOVES = 100;
 const DRAW_BY_REPETITIONS = 3;
@@ -290,168 +285,9 @@ class Game
 		return (this.teamsByName[WhiteTeam.name].points*WhiteTeam.SCORE_MULTIPLIER) + 
 				(this.teamsByName[BlackTeam.name].points*BlackTeam.SCORE_MULTIPLIER);
 	}
-
-	fancyEvaluate(depth = FANCY_ANALYSIS_DEPTH)
-	{
-		/*
-		Generally, some good continuations are easy to spot early.
-		fancyEvaluate uses a shortsighted evaluation to rate each available move,
-		then it only expands the best continuations.
-		The idea is that this would direct a greater proportion of the
-		search time into worthwhile continuations.
-		*/
-		if(this.kingCapturable()){return;}
-		if(depth==0){
-			return this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
-		}
-		if(this.isDrawByRepetition()){return {score:0};}
-		if(this.isDrawByMoveRule()){return {score:0};}
-		
-		//better to iterate through legals than unverified moves because
-		//1) it is easier
-		//2) if the "best" unverified moves are illegal then this function will return no best move
-		//even if there is a legal move in the position
-		//The above is not a problem in regular evaluate because all moves are checked
-		const legals = this.calculateLegals();
-		//evaluate available continuations and order them by the moving team's preference
-		const evaluations = legals.map((legal, index)=>{
-			this.makeMove(legal);
-			const evaluation = this.evaluate(FANCY_ANALYSIS_FORESIGHT) ?? {};
-			evaluation.move = legal;
-			this.undoMove();
-			return evaluation;
-		})
-		
-		//sort by preference of the moving team
-		mergeSortEvaluations(evaluations, 0, evaluations.length, this.movingTeam);
-		
-		let bestEval;
-		let bestMove;
-		
-		//only expand the few best continuations
-		const numBestEvaluations = Math.min(FANCY_ANALYSIS_BRANCH_FACTOR, legals.length);
-		for(let i=0; i<numBestEvaluations; i++)
-		{
-			const move = evaluations[i].move;
-			if(!move){break;}
-			this.makeMove(move);
-			const deeperEvaluation = this.fancyEvaluate(depth-1);
-			this.undoMove();
-			
-			if(this.movingTeam.evalPreferredToEval(deeperEvaluation, bestEval))
-			{
-				bestEval = deeperEvaluation;
-				bestMove = move;
-			}
-		}
-		
-		if(!bestEval)
-		{
-			//No VALID continuation found, i.e. can't make a move without leaving king vulnerable.
-			//This means the current position is either checkmate or stalemate against movingTeam
-			return (this.kingChecked())?
-			{
-				checkmate_in_halfmoves: 0
-			}:
-			{
-				score: 0
-			};
-		}
-		
-		const reverseLine = bestEval.reverseLine ?? [];
-		reverseLine.push(bestMove);
-		
-		const checkmate = "checkmate_in_halfmoves" in bestEval;
-		return {
-			[checkmate? "checkmate_in_halfmoves" : "score"]: checkmate? bestEval.checkmate_in_halfmoves+1 : bestEval.score,
-			bestMove: bestMove,
-			reverseLine: reverseLine
-		};
-	}
-
-	evaluate(depth = DEFAULT_ANALYSIS_DEPTH)
-	{
-		this.numPositionsAnalysed++;
-		if(this.kingCapturable()){return {score:NaN};}
-		if(depth==0){return {score:this.immediatePositionScore()};}
-		if(this.isDrawByRepetition()){return {score:0};}
-		if(this.isDrawByMoveRule()){return {score:0};}
-		const continuations = this.calculateMoves();
-		
-		let bestContinuation;
-		let bestEval = {score:Infinity*this.movingTeam.opposition.constructor.SCORE_MULTIPLIER};
-		
-		//check for better continuations
-		
-		//basic moves by the same piece are swappable, special moves are not
-		for(const [basicMoves,specialMoves] of continuations)
-		{
-			if(basicMoves?.length>0)
-			{
-				const newContinuation = basicMoves[0];
-				this.makeMove(newContinuation);
-				const newEval = this.evaluate(depth-1);
-				//not undoing move, must use movingTeam.opposition
-				if(this.movingTeam.opposition.evalPreferredToEval(newEval,bestEval))
-				{
-					bestContinuation = newContinuation;
-					bestEval = newEval;
-				}
-				
-				//swap basic moves (faster than undoing and making the next move)
-				for(let i=1; i<basicMoves.length; i++)
-				{
-					const newContinuation = basicMoves[i];
-					this.switchMoveBySamePiece(newContinuation);
-					const newEval = this.evaluate(depth-1);
-					if(this.movingTeam.opposition.evalPreferredToEval(newEval,bestEval))
-					{
-						bestContinuation = newContinuation;
-						bestEval = newEval;
-					}
-				}
-				this.undoMove();
-			}
-			
-			//make and take back individual special moves
-			for(let i=0; i<specialMoves?.length; i++)
-			{
-				const newContinuation = specialMoves[i];
-				this.makeMove(newContinuation);
-				const newEval = this.evaluate(depth-1);
-				this.undoMove();
-				if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
-				{
-					bestContinuation = newContinuation;
-					bestEval = newEval;
-				}
-			}
-		}
-		
-		if(!bestContinuation)
-		{
-			//No VALID continuation found, i.e. can't make a move without leaving king vulnerable.
-			//This means the current position is either checkmate or stalemate against movingTeam
-			return {
-				score: this.kingChecked()?
-				this.movingTeam.opposition.constructor.SCORE_MULTIPLIER*(MAX_EVALUATION_SCORE + 1 + (MAX_EVALUATION_DEPTH - depth)):
-				0
-			}
-		}
-		
-		const reverseLine = bestEval.reverseLine ?? [];
-		reverseLine.push(bestContinuation);
-		
-		return {
-			score: bestEval.score,
-			bestMove: bestContinuation,
-			reverseLine: reverseLine
-		};
-	}
 	
 	ABevaluate(depth, A=WhiteTeam.INF_SCORE, B=BlackTeam.INF_SCORE)
 	{
-		this.numPositionsAnalysed++;
 		if(this.kingCapturable()){return {score:NaN};}
 		if(depth==0){return {score:this.immediatePositionScore()};}
 		if(this.isDrawByRepetition()){return {score:0};}
@@ -508,19 +344,18 @@ class Game
 		};
 	}
 	
-	threadedEvaluate(depth = DEFAULT_ANALYSIS_DEPTH)
+	threadedABEvaluate(depth = DEFAULT_ANALYSIS_DEPTH)
 	{
-		const NUM_THREADS = Math.max(1, numCPUs-1);
-		
-		if(this.kingCapturable()){return;}
-		if(depth==0){
-			return this.immediatePositionEvaluation();
-		}
+		const NUM_THREADS = Math.max(1, NUM_CPUs/2);
+
+		this.numPositionsAnalysed++;
+		if(this.kingCapturable()){return {score:NaN};}
+		if(depth==0){return {score:this.immediatePositionScore()};}
 		if(this.isDrawByRepetition()){return {score:0};}
-		if(this.isDrawByMoveRule()){return {score:0};}		
+		if(this.isDrawByMoveRule()){return {score:0};}
+		const moves = this.calculateMoves().flat(2);
 		
 		const gameString = this.toString();
-		const moves = this.calculateMoves().flat(2);
 		
 		//the available continuations will be divided among a number of threads
 		const workers = Array(NUM_THREADS).fill(null).map((item)=>{return new Worker("./Chess Javascript Code/GameEvaluatorThread.js");});
@@ -528,8 +363,8 @@ class Game
 		const threadStatusPromises = threadStatusObjects.map((statusObject)=>{return statusObject.promise;});
 		
 		const choosingTeam = this.movingTeam;
-		let bestEval;
 		let bestIndex;
+		let bestEval = {score:this.movingTeam.opposition.constructor.INF_SCORE};	
 		
 		workers.forEach((worker, index)=>{
 			worker.on("message", (message)=>{
@@ -541,7 +376,7 @@ class Game
 				if(!isNaN(moveIndex))
 				{
 					this.makeMove(moves[moveIndex]);
-					const evaluation = this.evaluate(depth-1);
+					const evaluation = this.ABevaluate(depth-1);
 					if(choosingTeam.evalPreferredToEval(evaluation, bestEval))
 					{
 						bestEval = evaluation;
@@ -568,9 +403,8 @@ class Game
 			const bestContinuation = moves[bestIndex];
 			reverseLine.push(bestContinuation);
 		
-			const checkmate = "checkmate_in_halfmoves" in bestEval;
 			return {
-				[checkmate? "checkmate_in_halfmoves" : "score"]: checkmate? bestEval.checkmate_in_halfmoves+1 : bestEval.score,
+				score: bestEval.score,
 				bestMove: bestContinuation,
 				reverseLine: reverseLine
 			};

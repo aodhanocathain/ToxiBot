@@ -9,14 +9,14 @@ parentPort.on("message", (objectString)=>{
 	const startIndex = Math.ceil(moves.length*message.threadIndex/message.numThreads);
 	const endIndex = moves.length*(message.threadIndex+1)/message.numThreads;
 	
-	let bestEval;
+	let bestEval = {score:game.movingTeam.opposition.constructor.INF_SCORE};	
 	let bestIndex;
 	const choosingTeam = game.movingTeam;
 	
 	for(let i=startIndex; i<endIndex; i++)
 	{
 		game.makeMove(moves[i]);
-		const evaluation = game.evaluate(message.workerDepth);
+		const evaluation = game.ABevaluate(message.workerDepth);
 		if(choosingTeam.evalPreferredToEval(evaluation, bestEval))
 		{
 			bestEval = evaluation;
