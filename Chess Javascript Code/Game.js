@@ -85,7 +85,6 @@ class Game
 	halfMove;
 	fullMove;
 	
-	castleRights;
 	enPassantable;
 	movingPiece;
 	targetPiece;
@@ -190,18 +189,30 @@ class Game
 			accumulator[teamedChar] = true;
 			return accumulator;
 		},{});
-		//only accept the castle rights characters if the corresponding pieces are in their starting squares
-		//(if they are not in their starting squares, they have moved and could not be able to castle)
-		this.castleRights = new Manager(
-			FENparts[2]==EMPTY_FEN_FIELD? [] : 
-			castleRightsCharacters.filter((teamedChar)=>{
-				const wingChar = Piece.typeCharOfTeamedChar(teamedChar);
-				const teamClass = Team.classOfTeamedChar(teamedChar);
-				const team = this.teamsByName[teamClass.name];
-				return (team.king.canCastle.get()) && (team.rooksInStartSquaresByWing[wingChar]?.canCastle.get());
-			})
-		);
 		
+		if(FENparts[2]!=EMPTY_FEN_FIELD)
+		{
+			//rooks and kings already have canCastle true if they started in the right squares,
+			//but if the castle rights aren't there then must update canCastle to reflect this
+			Object.values(this.teamsByName).forEach((team)=>{
+				let numRooksCanCastle = 0;
+				//check each rook individually, if neither can castle then update the king, too
+				WINGS.forEach((wing)=>{
+					const rook = team.rooksInStartSquaresByWing[wing];
+					if(rook)
+					{
+						const teamedWingChar = team.constructor.charConverter(wing);
+						const hasRight = castleRightsCharacters.includes(teamedWingChar);
+
+						const canCastle = rook.canCastle.get() && hasRight;
+						rook.canCastle.update(canCastle);
+						if(canCastle){numRooksCanCastle++;}
+					}
+				})
+				if(numRooksCanCastle==0){team.king.canCastle.update(false);}
+			})
+		}
+
 		//determine the possible en passant capture from the 4th part of the FEN string
 		if(FENparts[3] != EMPTY_FEN_FIELD)
 		{
@@ -509,14 +520,12 @@ class Game
 		const movingPiece = this.pieces[move.mainPieceSquareBefore];
 		movingPiece.square = move.mainPieceSquareAfter;
 		this.pieces[move.mainPieceSquareAfter] = movingPiece;
-		movingPiece.canCastle?.update(false);
 		
 		this.pieces[move.mainPieceSquareBefore] = null;
 		
 		const otherPiece = move.otherPiece;
 		(otherPiece??{}).square = move.otherPieceSquareAfter;
 		this.pieces[move.otherPieceSquareAfter] = otherPiece;
-		otherPiece?.canCastle?.update(false);
 		
 		this.pieces[move.otherPieceSquareBefore] = null;
 		
@@ -527,19 +536,8 @@ class Game
 		
 		if((movingPiece instanceof King) || (movingPiece instanceof Rook))
 		{
-			this.castleRights.update(
-				this.castleRights.get().filter((teamedChar)=>{
-					const wingChar = Piece.typeCharOfTeamedChar(teamedChar);
-					
-					const teamClass = Team.classOfTeamedChar(teamedChar);
-					const team = this.teamsByName[teamClass.name];
-					
-					const king = team.king;
-					const rook = team.rooksInStartSquaresByWing[wingChar];
-					
-					return (king.canCastle.get()) && (rook?.isActive()) && (rook.canCastle.get());
-				})
-			);
+			movingPiece.canCastle.update(false);
+			otherPiece?.canCastle.update(false);
 		}
 			
 		if(movingPiece instanceof Pawn)
@@ -600,7 +598,10 @@ class Game
 		fullUpdatedPieces.forEach((piece)=>{piece.team.revertPiece(piece);});
 		
 		this.enPassantable.revert();
-		if((movingPiece instanceof King) || (movingPiece instanceof Rook)){this.castleRights.revert();}
+		if((movingPiece instanceof King) || (movingPiece instanceof Rook)){
+			movingPiece.canCastle.revert();
+			otherPiece?.canCastle.revert();
+		}
 		
 		if(move instanceof PromotionMove)
 		{
@@ -747,7 +748,18 @@ class Game
 	toString()	//specifically to a FEN string
 	{
 		const boardString = this.boardString();
-		let castleRightsString = this.castleRights.get().join("");
+		let castleRightsString = Object.values(this.teamsByName).reduce((accumulator, team)=>{
+			if(team.king.canCastle.get())
+			{
+				WINGS.forEach((wing)=>{
+					if(team.rooksInStartSquaresByWing[wing]?.canCastle.get())
+					{
+						accumulator.push(team.constructor.charConverter(wing));
+					}
+				})
+			}
+			return accumulator;
+		}, []).sort().join("");
 		if(castleRightsString==""){castleRightsString="-";}
 		return [boardString, this.movingTeam.constructor.char, castleRightsString, this.enPassantable.get(), this.halfMove.get(), this.fullMove].join(" ");
 	}

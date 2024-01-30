@@ -357,27 +357,19 @@ class King extends PatternPiece
 				//rook must not have moved
 				if(rook?.canCastle.get() && rook?.isActive())
 				{
-					//must have the right to castle
-					if(this.game.castleRights.get().includes(this.team.constructor.charConverter(wingChar)))
+					//must not be any pieces between king and rook
+					const blockingPieceLocationsBitVector = this.team.activePieceLocationsBitVector.clone();
+					blockingPieceLocationsBitVector.or(this.team.opposition.activePieceLocationsBitVector);
+					blockingPieceLocationsBitVector.and(this.team.constructor.CASTLE_INTERMEDIATE_SQUARES_BITVECTOR_BY_WING[wingChar]);
+					const noPiecesBetween = blockingPieceLocationsBitVector.isEmpty();
+					const squaresAreSafe = this.team.opposition.idsSeeingEnemyCastleSafeSquaresBitVectorByWing[wingChar].isEmpty();
+					if(noPiecesBetween && squaresAreSafe)
 					{
-						//must not be any pieces between king and rook
-						const blockingPieceLocationsBitVector = this.team.activePieceLocationsBitVector.clone();
-						blockingPieceLocationsBitVector.or(this.team.opposition.activePieceLocationsBitVector);
-						blockingPieceLocationsBitVector.and(this.team.constructor.CASTLE_INTERMEDIATE_SQUARES_BITVECTOR_BY_WING[wingChar]);
-						const noPiecesBetween = blockingPieceLocationsBitVector.isEmpty();
-						
-						if(noPiecesBetween)
-						{
-							const squaresAreSafe = this.team.opposition.idsSeeingEnemyCastleSafeSquaresBitVectorByWing[wingChar].isEmpty();
-							if(squaresAreSafe)
-							{
-								castleMoves.push(new CastleMove(
-								this.game,
-								this.square, this.team.constructor.CASTLE_KING_SQUARES_BY_WING[wingChar],
-								rook.square, this.team.constructor.CASTLE_ROOK_SQUARES_BY_WING[wingChar]
-								));
-							}
-						}
+						castleMoves.push(new CastleMove(
+						this.game,
+						this.square, this.team.constructor.CASTLE_KING_SQUARES_BY_WING[wingChar],
+						rook.square, this.team.constructor.CASTLE_ROOK_SQUARES_BY_WING[wingChar]
+						));
 					}
 				}
 			});
