@@ -578,21 +578,18 @@ class Pawn extends BlockablePiece
 		
 		this.squaresAttacked.get().forEach((squareAttacked)=>{
 			//only allow moves that capture a piece, from the enemy team
-			if(this.game.pieces[squareAttacked])	//direct capture (enemy piece is on the attacked square)
+			if(this.team.opposition.activePieceLocationsBitVector.read(squareAttacked))
 			{
-				if(this.game.pieces[squareAttacked].team != this.team)
+				if(Square.rank(squareAttacked)==this.team.opposition.constructor.BACK_RANK)
 				{
-					if(Square.rank(squareAttacked)==this.team.opposition.constructor.BACK_RANK)
-					{
-						specialMoves.push(new PromotionMove(this.game, this.square, squareAttacked, new Queen(this.game, this.team, squareAttacked)));
-						specialMoves.push(new PromotionMove(this.game, this.square, squareAttacked, new Rook(this.game, this.team, squareAttacked)));
-						specialMoves.push(new PromotionMove(this.game, this.square, squareAttacked, new Bishop(this.game, this.team, squareAttacked)));
-						specialMoves.push(new PromotionMove(this.game, this.square, squareAttacked, new Knight(this.game, this.team, squareAttacked)));
-					}
-					else
-					{
-						basicMoves.push(new PlainMove(this.game, this.square, squareAttacked));
-					}
+					specialMoves.push(new PromotionMove(this.game, this.square, squareAttacked, new Queen(this.game, this.team, squareAttacked)));
+					specialMoves.push(new PromotionMove(this.game, this.square, squareAttacked, new Rook(this.game, this.team, squareAttacked)));
+					specialMoves.push(new PromotionMove(this.game, this.square, squareAttacked, new Bishop(this.game, this.team, squareAttacked)));
+					specialMoves.push(new PromotionMove(this.game, this.square, squareAttacked, new Knight(this.game, this.team, squareAttacked)));
+				}
+				else
+				{
+					basicMoves.push(new PlainMove(this.game, this.square, squareAttacked));
 				}
 			}
 			else	//could still be en passant capture (enemy piece is not on target square)
