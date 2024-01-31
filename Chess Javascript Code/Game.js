@@ -303,34 +303,66 @@ class Game
 		if(depth==0){return {score:this.immediatePositionScore()};}
 		if(this.isDrawByRepetition()){return {score:0};}
 		if(this.isDrawByMoveRule()){return {score:0};}
-		const continuations = this.calculateMoves().flat(2);
 		
 		let bestContinuation;
 		let bestEval = {score:this.movingTeam.opposition.constructor.INF_SCORE};		
 			
-		for(let i=0; i<continuations.length; i++)
+		const moves = this.calculateMoves();
+
+		mainLoop:
+		for(const [basicMoves, specialMoves] of moves)
 		{
-			const newContinuation = continuations[i];
-			this.makeMove(newContinuation);
-			const newEval = this.ABevaluate(depth-1,A,B);
-			this.undoMove();
-			
-			if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
+			if(basicMoves.length>0)
 			{
-				bestContinuation = newContinuation;
-				bestEval = newEval;
+				const newContinuation = basicMoves[0];
+				this.makeMove(newContinuation);
+				const newEval = this.ABevaluate(depth-1,A,B);
+				
+				if(this.movingTeam.opposition.evalPreferredToEval(newEval,bestEval))
+				{
+					bestContinuation = newContinuation;
+					bestEval = newEval;
+				}
+				if(this.movingTeam.opposition.evalPreferredToEval(bestEval, this.movingTeam.opposition instanceof WhiteTeam?B:A)){
+					this.undoMove();
+					break mainLoop;
+				}
+				if(this.movingTeam.opposition instanceof WhiteTeam){A = bestEval;}else{B = bestEval;}
+
+				for(let i=1; i<basicMoves.length; i++)
+				{
+					const newContinuation = basicMoves[i];
+					this.switchMoveBySamePiece(newContinuation);
+					const newEval = this.ABevaluate(depth-1,A,B);
+				
+					if(this.movingTeam.opposition.evalPreferredToEval(newEval,bestEval))
+					{
+						bestContinuation = newContinuation;
+						bestEval = newEval;
+					}
+					if(this.movingTeam.opposition.evalPreferredToEval(bestEval, this.movingTeam.opposition instanceof WhiteTeam?B:A)){
+						this.undoMove();
+						break mainLoop;
+					}
+					if(this.movingTeam.opposition instanceof WhiteTeam){A = bestEval;}else{B = bestEval;}
+				}
+				this.undoMove();				
 			}
-			if(this.movingTeam.evalPreferredToEval(bestEval, this.movingTeam instanceof WhiteTeam?B:A))
+
+			for(let i=0; i<specialMoves?.length; i++)
 			{
-				break;
-			}
-			if(this.movingTeam instanceof WhiteTeam)
-			{
-				A = bestEval;
-			}
-			else
-			{
-				B = bestEval;
+				const newContinuation = specialMoves[i];
+				this.makeMove(newContinuation);
+				const newEval = this.ABevaluate(depth-1,A,B);
+				this.undoMove();
+				
+				if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
+				{
+					bestContinuation = newContinuation;
+					bestEval = newEval;
+				}
+				if(this.movingTeam.evalPreferredToEval(bestEval, this.movingTeam instanceof WhiteTeam?B:A)){break;}
+				if(this.movingTeam instanceof WhiteTeam){A = bestEval;}else{B = bestEval;}
 			}
 		}
 		
