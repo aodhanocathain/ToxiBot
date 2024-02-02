@@ -3,7 +3,7 @@ const {asciiOffset, asciiDistance, deferredPromise} = require("./Helpers.js");
 const {BitVector64} = require("./BitVector64.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
-const {PromotionMove} = require("./Move.js");
+const {PlainMove, PromotionMove} = require("./Move.js");
 const {Team, WhiteTeam, BlackTeam} = require("./Team.js");
 const {Piece, King, Queen, Rook, Pawn, PieceClassesByTypeChar, WINGS} = require("./Piece.js");
 
@@ -464,39 +464,52 @@ class Game
 		
 		//This saves updating both teams on the last step when only one update is required
 		//but requires also checking the previous move (for which this opposition was not updated)
-		
-		//must update both teams if checking for mate etc
-		[this.movingTeam.opposition, this.movingTeam].forEach((team)=>{
-			team.activePieces.forEach((piece)=>{
-				if((piece==movingPiece) || (piece==move.otherPiece))
+
+		//e.g. white king moves to block white rook, only black pieces update,
+		//then black makes a move which the same white rook does not see, so it does not update
+		//then same white rook still thinks it can go through where the white king now is
+
+		//also update the movingPiece and otherPiece while we know they need updating, in case
+		//they miss the next move (and don't get updated)
+
+		movingPiece.team.updatePiece(movingPiece);
+		fullUpdatedPieces.push(movingPiece);
+		const otherPiece = move.otherPiece;
+		if(otherPiece){
+			otherPiece.team.updatePiece(otherPiece);
+			fullUpdatedPieces.push(otherPiece);
+		}
+
+		const previousMove = this.playedMoves[this.playedMoves.length-1] ?? new PlainMove(null,null,null);
+		this.movingTeam.opposition.activePieces.forEach((piece)=>{
+			if(piece instanceof King)
+			{
+				//Would be awkward to implement squaresWatchedBitVector64 for the King's castle moves
+				//For now just fully update the King every move
+				this.movingTeam.opposition.updatePiece(piece);
+				fullUpdatedPieces.push(piece);
+			}
+			else
+			{
+				const watchingBits = piece.squaresWatchedBitVector.get();
+				if
+				(
+					watchingBits.read(move.mainPieceSquareBefore) ||
+					watchingBits.read(move.mainPieceSquareAfter) ||
+					watchingBits.read(move.otherPieceSquareBefore) ||
+					watchingBits.read(move.otherPieceSquareAfter) ||
+					watchingBits.read(move.captureTargetSquare) ||
+					watchingBits.read(previousMove.mainPieceSquareBefore) ||
+					watchingBits.read(previousMove.mainPieceSquareAfter) ||
+					watchingBits.read(previousMove.otherPieceSquareBefore) ||
+					watchingBits.read(previousMove.otherPieceSquareAfter) ||
+					watchingBits.read(previousMove.captureTargetSquare)
+				)
 				{
-					team.updatePiece(piece);
+					this.movingTeam.opposition.updatePiece(piece);
 					fullUpdatedPieces.push(piece);
 				}
-				else if(piece instanceof King)
-				{
-					//Would be awkward to implement squaresWatchedBitVector64 for the King's castle moves
-					//For now just fully update the King every move
-					team.updatePiece(piece);
-					fullUpdatedPieces.push(piece);
-				}
-				else
-				{
-					const watchingBits = piece.squaresWatchedBitVector.get();
-					if
-					(
-						watchingBits.read(move.mainPieceSquareBefore) ||
-						watchingBits.read(move.mainPieceSquareAfter) ||
-						watchingBits.read(move.otherPieceSquareBefore) ||
-						watchingBits.read(move.otherPieceSquareAfter) ||
-						watchingBits.read(move.captureTargetSquare)
-					)
-					{
-						team.updatePiece(piece);
-						fullUpdatedPieces.push(piece);
-					}
-				}
-			});
+			}
 		});
 		
 		this.fullUpdatedPieces.update(fullUpdatedPieces);
