@@ -459,57 +459,41 @@ class Game
 		
 		const fullUpdatedPieces = [];
 		
-		//When the moving team makes a move, only need to update the opposition's available moves
-		//to be able to expand the game tree search
+		//When the moving team makes a move, only need to update the opposition's available moves AND what those depend on,
+		//e.g. moving team's sight of enemy king, to be able to expand the game tree
 		
-		//This saves updating both teams on the last step when only one update is required
-		//but requires also checking the previous move (for which this opposition was not updated)
-
-		//e.g. white king moves to block white rook, only black pieces update,
-		//then black makes a move which the same white rook does not see, so it does not update
-		//then same white rook still thinks it can go through where the white king now is
-
-		//also update the movingPiece and otherPiece while we know they need updating, in case
-		//they miss the next move (and don't get updated)
-
-		movingPiece.team.updatePiece(movingPiece);
-		fullUpdatedPieces.push(movingPiece);
-		const otherPiece = move.otherPiece;
-		if(otherPiece){
-			otherPiece.team.updatePiece(otherPiece);
-			fullUpdatedPieces.push(otherPiece);
-		}
-
-		const previousMove = this.playedMoves[this.playedMoves.length-1] ?? new PlainMove(null,null,null);
-		this.movingTeam.opposition.activePieces.forEach((piece)=>{
-			if(piece instanceof King)
-			{
-				//Would be awkward to implement squaresWatchedBitVector64 for the King's castle moves
-				//For now just fully update the King every move
-				this.movingTeam.opposition.updatePiece(piece);
-				fullUpdatedPieces.push(piece);
-			}
-			else
-			{
-				const watchingBits = piece.squaresWatchedBitVector.get();
-				if
-				(
-					watchingBits.read(move.mainPieceSquareBefore) ||
-					watchingBits.read(move.mainPieceSquareAfter) ||
-					watchingBits.read(move.otherPieceSquareBefore) ||
-					watchingBits.read(move.otherPieceSquareAfter) ||
-					watchingBits.read(move.captureTargetSquare) ||
-					watchingBits.read(previousMove.mainPieceSquareBefore) ||
-					watchingBits.read(previousMove.mainPieceSquareAfter) ||
-					watchingBits.read(previousMove.otherPieceSquareBefore) ||
-					watchingBits.read(previousMove.otherPieceSquareAfter) ||
-					watchingBits.read(previousMove.captureTargetSquare)
-				)
+		//just update both teams for now
+		[this.movingTeam.opposition, this.movingTeam].forEach((team)=>{
+			team.activePieces.forEach((piece)=>{
+				if((piece==movingPiece) || (piece==move.otherPiece))
 				{
-					this.movingTeam.opposition.updatePiece(piece);
+					team.updatePiece(piece);
 					fullUpdatedPieces.push(piece);
 				}
-			}
+				else if(piece instanceof King)
+				{
+					//Would be awkward to implement squaresWatchedBitVector64 for the King's castle moves
+					//For now just fully update the King every move
+					team.updatePiece(piece);
+					fullUpdatedPieces.push(piece);
+				}
+				else
+				{
+					const watchingBits = piece.squaresWatchedBitVector.get();
+					if
+					(
+						watchingBits.read(move.mainPieceSquareBefore) ||
+						watchingBits.read(move.mainPieceSquareAfter) ||
+						watchingBits.read(move.otherPieceSquareBefore) ||
+						watchingBits.read(move.otherPieceSquareAfter) ||
+						watchingBits.read(move.captureTargetSquare)
+					)
+					{
+						team.updatePiece(piece);
+						fullUpdatedPieces.push(piece);
+					}
+				}
+			});
 		});
 		
 		this.fullUpdatedPieces.update(fullUpdatedPieces);
@@ -655,13 +639,11 @@ class Game
 		
 		this.pieces[move.otherPieceSquareBefore] = otherPiece;
 		
-		otherPiece?.canCastle?.revert();
 		this.pieces[move.otherPieceSquareAfter] = null;
 		(otherPiece??{}).square = move.otherPieceSquareBefore;
 		
 		this.pieces[move.mainPieceSquareBefore] = movingPiece;
 		
-		movingPiece.canCastle?.revert();
 		this.pieces[move.mainPieceSquareAfter] = null;
 		movingPiece.square = move.mainPieceSquareBefore;
 		

@@ -335,6 +335,7 @@ class King extends PatternPiece
 	{
 		super(game, team, square);
 		this.castleMoves = new Manager([]);
+		this.canCastle = new Manager(false);
 	}
 	
 	addMovesToArray(array)
@@ -432,6 +433,12 @@ class Rook extends RangedPiece
 	
 	//assigned by the game upon piece creation
 	canCastle;
+
+	constructor(game, team, square)
+	{
+		super(game, team, square);
+		this.canCastle = new Manager(false);
+	}
 }
 
 class Queen extends RangedPiece
