@@ -553,7 +553,7 @@ class Game
 		this.pieces[move.mainPieceSquareBefore] = null;
 		
 		const otherPiece = move.otherPiece;
-		(otherPiece??{}).square = move.otherPieceSquareAfter;
+		if(otherPiece){otherPiece.square=move.otherPieceSquareAfter;}
 		this.pieces[move.otherPieceSquareAfter] = otherPiece;
 		
 		this.pieces[move.otherPieceSquareBefore] = null;
@@ -692,7 +692,7 @@ class Game
 				const fullMoveCounter = (index+2)/2;
 				accumulator = accumulator.concat(`${fullMoveCounter>1?"\t":""}${fullMoveCounter}.`);
 			}
-			return accumulator.concat(` ${move.toString()}`);
+			return accumulator.concat(` ${move.toString(this)}`);
 		},"");
 	}
 	
@@ -705,8 +705,8 @@ class Game
 			{
 				accumulator = accumulator.concat("\t");
 			}
-			move.generateString();
-			accumulator = accumulator.concat(move.toString());
+			move.generateString(this);
+			accumulator = accumulator.concat(move.toString(this));
 			this.makeMove(move);
 			return accumulator;
 		},"");

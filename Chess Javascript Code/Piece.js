@@ -1,5 +1,5 @@
-const {MIN_FILE} = require("./Constants.js");
-const {asciiDistance} = require("./Helpers.js");
+const {MIN_FILE, NUM_RANKS, NUM_FILES} = require("./Constants.js");
+const {asciiDistance, extractBits} = require("./Helpers.js");
 const {BitVector64} = require("./BitVector64.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
@@ -21,9 +21,8 @@ class Piece
 		throw "squaresAttackedFromSquareInGame called but not implemented";
 	}
 	
-	static makeMoveString(move)
+	static makeMoveString(move, game)
 	{
-		const game = move.game;
 		//See what squares this type of piece could have come from to reach the new square
 		const movingPiece = game.pieces[move.mainPieceSquareBefore]		
 		let otherOrigins =
@@ -147,7 +146,7 @@ class Piece
 			//only allow moves that do not capture pieces from the same team
 			if(this.game.pieces[attackedSquare]?.team != this.team)
 			{
-				accumulator.push(new PlainMove(this.game, this.square, attackedSquare));
+				accumulator.push(new PlainMove(this.square, attackedSquare));
 			}
 			return accumulator;
 		}, []));
@@ -269,7 +268,7 @@ class RangedPiece extends BlockablePiece
 //pieces whose moves are always a fixed pattern around their current square
 class PatternPiece extends Piece
 {
-	static pattern;
+	static patternIncreasing;
 	
 	static squaresAttackedFromSquareInGame(square, game)
 	{
@@ -279,7 +278,7 @@ class PatternPiece extends Piece
 		const rank = Square.rank(square);
 		const file = Square.file(square);
 	
-		for(const [rankOffset,fileOffset] of this.pattern)
+		for(const [rankOffset,fileOffset] of this.patternIncreasing)
 		{
 			const newRank = rank + rankOffset;
 			const newFile = file + fileOffset;
@@ -315,14 +314,14 @@ class King extends PatternPiece
 	static name = "king";
 	static points = 0;
 	
-	static pattern = [
+	static patternIncreasing = [
 		[-1,-1],
-		[0,-1],
-		[1,-1],
 		[-1,0],
-		[1,0],
 		[-1,1],
+		[0,-1],
 		[0,1],
+		[1,-1],
+		[1,0],
 		[1,1]
 	];
 	
@@ -367,9 +366,8 @@ class King extends PatternPiece
 					if(noPiecesBetween && squaresAreSafe)
 					{
 						castleMoves.push(new CastleMove(
-						this.game,
 						this.square, this.team.constructor.CASTLE_KING_SQUARES_BY_WING[wingChar],
-						rook.square, this.team.constructor.CASTLE_ROOK_SQUARES_BY_WING[wingChar]
+						rook, rook.square, this.team.constructor.CASTLE_ROOK_SQUARES_BY_WING[wingChar]
 						));
 					}
 				}
@@ -392,7 +390,7 @@ class Knight extends PatternPiece
 	static name = "knight";
 	static points = 3;
 	
-	static pattern = [
+	static patternIncreasing = [
 		[-2,-1],
 		[-2,1],
 		[-1,-2],
@@ -402,6 +400,43 @@ class Knight extends PatternPiece
 		[2,-1],
 		[2,1]
 	];
+
+	static squaresAttackedFromSquare_lookup =
+	//generate array of consecutive integers, one representing each square
+	Array(NUM_RANKS*NUM_FILES).fill(null).map((item,index)=>{return index;}).map((square)=>{
+		//for each square, generate the set of squares a knight could attack
+		return Knight.squaresAttackedFromSquareInGame(square)
+	});
+
+	static movesFromSquare_lookup = //could have different move sets from same square depending on which squares have friendly pieces on them
+	//for up to 8 knight moves from a given square, have 2^8 possible combinations of friendly pieces in the destination squares
+	this.squaresAttackedFromSquare_lookup.map((squaresAttacked,fromSquare)=>{
+		return Array(1<<8).fill(null).map((item,index)=>{
+			const moves = [];
+			const bits = index;
+			for(let i=0; i<Knight.patternIncreasing.length && i<squaresAttacked.length; i++)
+			{
+				if(!(bits & (1<<i)))
+				{
+					moves.push(new PlainMove(fromSquare, squaresAttacked[i]));
+				}
+			}
+			return moves;
+		})
+	})
+
+	///*
+	updateSquaresAndMoves()
+	{
+		const squaresAttacked = this.constructor.squaresAttackedFromSquare_lookup[this.square];
+		
+		this.squaresAttacked.update(squaresAttacked.squares);
+		this.squaresAttackedBitVector.update(squaresAttacked.bits);
+		
+		const friendlies = extractBits(this.team.activePieceLocationsBitVector, squaresAttacked.squares);
+		this.basicMoves.update(this.constructor.movesFromSquare_lookup[this.square][friendlies]);
+	}
+	//*/
 }
 
 class Bishop extends RangedPiece
@@ -529,10 +564,8 @@ class Pawn extends BlockablePiece
 		};
 	}
 	
-	static makeMoveString(move)
-	{
-		const game = move.game;		
-		
+	static makeMoveString(move, game)
+	{		
 		//if there is a capture, include current file and capture character
 		const beforeDetails = (game.pieces[move.mainPieceSquareAfter] || game.pieces[move.captureTargetSquare] || game.pieces[move.otherPieceSquareAfter])?
 		`${Square.fileString(move.mainPieceSquareBefore)}x` : ``;
@@ -589,14 +622,14 @@ class Pawn extends BlockablePiece
 			{
 				if(Square.rank(squareAttacked)==this.team.opposition.constructor.BACK_RANK)
 				{
-					specialMoves.push(new PromotionMove(this.game, this.square, squareAttacked, new Queen(this.game, this.team, squareAttacked)));
-					specialMoves.push(new PromotionMove(this.game, this.square, squareAttacked, new Rook(this.game, this.team, squareAttacked)));
-					specialMoves.push(new PromotionMove(this.game, this.square, squareAttacked, new Bishop(this.game, this.team, squareAttacked)));
-					specialMoves.push(new PromotionMove(this.game, this.square, squareAttacked, new Knight(this.game, this.team, squareAttacked)));
+					specialMoves.push(new PromotionMove(this.square, squareAttacked, new Queen(this.game, this.team, squareAttacked)));
+					specialMoves.push(new PromotionMove(this.square, squareAttacked, new Rook(this.game, this.team, squareAttacked)));
+					specialMoves.push(new PromotionMove(this.square, squareAttacked, new Bishop(this.game, this.team, squareAttacked)));
+					specialMoves.push(new PromotionMove(this.square, squareAttacked, new Knight(this.game, this.team, squareAttacked)));
 				}
 				else
 				{
-					basicMoves.push(new PlainMove(this.game, this.square, squareAttacked));
+					basicMoves.push(new PlainMove(this.square, squareAttacked));
 				}
 			}
 			else	//could still be en passant capture (enemy piece is not on target square)
@@ -612,7 +645,7 @@ class Pawn extends BlockablePiece
 					if(Square.rank(this.square)==opponentLongMoveRank)
 					{
 						const enPassantSquare = Square.withRankAndFile(opponentLongMoveRank,enPassantFile);
-						specialMoves.push(new EnPassantMove(this.game, this.square, squareAttacked, enPassantSquare));
+						specialMoves.push(new EnPassantMove(this.square, squareAttacked, enPassantSquare));
 					}
 				}
 			}
@@ -624,14 +657,14 @@ class Pawn extends BlockablePiece
 			{
 				if(Square.rank(watchedSquare)==this.team.opposition.constructor.BACK_RANK)
 				{
-					specialMoves.push(new PromotionMove(this.game, this.square, watchedSquare, new Queen(this.game, this.team, watchedSquare)));
-					specialMoves.push(new PromotionMove(this.game, this.square, watchedSquare, new Rook(this.game, this.team, watchedSquare)));
-					specialMoves.push(new PromotionMove(this.game, this.square, watchedSquare, new Bishop(this.game, this.team, watchedSquare)));
-					specialMoves.push(new PromotionMove(this.game, this.square, watchedSquare, new Knight(this.game, this.team, watchedSquare)));
+					specialMoves.push(new PromotionMove(this.square, watchedSquare, new Queen(this.game, this.team, watchedSquare)));
+					specialMoves.push(new PromotionMove(this.square, watchedSquare, new Rook(this.game, this.team, watchedSquare)));
+					specialMoves.push(new PromotionMove(this.square, watchedSquare, new Bishop(this.game, this.team, watchedSquare)));
+					specialMoves.push(new PromotionMove(this.square, watchedSquare, new Knight(this.game, this.team, watchedSquare)));
 				}
 				else
 				{
-					basicMoves.push(new PlainMove(this.game, this.square, watchedSquare));
+					basicMoves.push(new PlainMove(this.square, watchedSquare));
 				}
 			}
 		});

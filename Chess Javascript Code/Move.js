@@ -2,8 +2,6 @@ const {Square} = require("./Square.js");
 
 class Move
 {
-	game;
-	
 	//squares pertaining to the main piece of the move
 	mainPieceSquareBefore;	//the square the piece started at
 	mainPieceSquareAfter;	//the square the piece ended at
@@ -16,10 +14,8 @@ class Move
 	
 	string;
 	
-	constructor(game, mainPieceSquareBefore, mainPieceSquareAfter, captureTargetSquare, otherPiece, otherPieceSquareBefore, otherPieceSquareAfter)
-	{
-		this.game = game;
-		
+	constructor(mainPieceSquareBefore, mainPieceSquareAfter, captureTargetSquare, otherPiece, otherPieceSquareBefore, otherPieceSquareAfter)
+	{		
 		this.mainPieceSquareBefore = mainPieceSquareBefore;
 		this.mainPieceSquareAfter = mainPieceSquareAfter;
 		this.captureTargetSquare = captureTargetSquare;
@@ -30,31 +26,31 @@ class Move
 	
 	//a move involving the same squares could have a different string representation across different positions
 	//this function generates the move's string for the current position
-	generateString()
+	generateString(game)
 	{
-		this.string = this.game.pieces[this.mainPieceSquareBefore].constructor.makeMoveString(this);
+		this.string = game.pieces[this.mainPieceSquareBefore].constructor.makeMoveString(this, game);
 	}
 	
-	toString()
+	toString(game)
 	{
 		//if the string did not already exist, generate it on the spot
-		return this.string ?? ((move)=>{move.generateString(); return move.string;})(this);
+		return this.string ?? ((move)=>{move.generateString(game); return move.string;})(this);
 	}
 }
 
 class PlainMove extends Move
 {
-	constructor(game, mainPieceSquareBefore, mainPieceSquareAfter)
+	constructor(mainPieceSquareBefore, mainPieceSquareAfter)
 	{
-		super(game, mainPieceSquareBefore, mainPieceSquareAfter, mainPieceSquareAfter, null, null, null);
+		super(mainPieceSquareBefore, mainPieceSquareAfter, mainPieceSquareAfter, null, null, null);
 	}
 }
 
 class CastleMove extends Move
 {
-	constructor(game, kingBefore, kingAfter, rookBefore, rookAfter)
+	constructor(kingBefore, kingAfter, rook, rookBefore, rookAfter)
 	{
-		super(game, kingBefore, kingAfter, null, game.pieces[rookBefore], rookBefore, rookAfter);
+		super(kingBefore, kingAfter, null, rook, rookBefore, rookAfter);
 	}
 	
 	generateString()
@@ -65,17 +61,17 @@ class CastleMove extends Move
 
 class EnPassantMove extends Move
 {
-	constructor(game, moveBefore, moveAfter, captureSquare)
+	constructor(moveBefore, moveAfter, captureSquare)
 	{
-		super(game, moveBefore, moveAfter, captureSquare, null, null, null)
+		super(moveBefore, moveAfter, captureSquare, null, null, null)
 	}
 }
 
 class PromotionMove extends Move
 {
-	constructor(game, mainPieceSquareBefore, mainPieceSquareAfter, promotionPiece)
+	constructor(mainPieceSquareBefore, mainPieceSquareAfter, promotionPiece)
 	{
-		super(game, mainPieceSquareBefore, null, mainPieceSquareAfter, promotionPiece, null, mainPieceSquareAfter)
+		super(mainPieceSquareBefore, null, mainPieceSquareAfter, promotionPiece, null, mainPieceSquareAfter)
 	}
 }
 
