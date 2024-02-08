@@ -28,5 +28,21 @@ module.exports = {
 	imageFileName(teamName, pieceName)
 	{
 		return `./images/chess/${teamName}/${pieceName}.png`;
+	},
+
+	extractBits(bitvector64, indices)	//serial version of PEXT
+	{
+		//this function will only ever be used to extract less than 32 bits
+		//therefore the result will fit in a single integer
+		let extractedBits = 0;
+		let i = 0;
+		for(const scan of indices)
+		{
+			if(bitvector64.read(scan))
+			{
+				extractedBits |= (1<<i++);
+			}
+		}
+		return extractedBits;
 	}
 };
