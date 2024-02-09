@@ -312,41 +312,20 @@ class Game
 		mainLoop:
 		for(const [basicMoves, specialMoves] of moves)
 		{
-			if(basicMoves.length>0)
+			for(let i=0; i<basicMoves.length; i++)
 			{
-				const newContinuation = basicMoves[0];
+				const newContinuation = basicMoves[i];
 				this.makeMove(newContinuation);
 				const newEval = this.ABevaluate(depth-1,A,B);
+				this.undoMove();
 				
-				if(this.movingTeam.opposition.evalPreferredToEval(newEval,bestEval))
+				if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
 				{
 					bestContinuation = newContinuation;
 					bestEval = newEval;
 				}
-				if(this.movingTeam.opposition.evalPreferredToEval(bestEval, this.movingTeam.opposition instanceof WhiteTeam?B:A)){
-					this.undoMove();
-					break mainLoop;
-				}
-				if(this.movingTeam.opposition instanceof WhiteTeam){A = bestEval;}else{B = bestEval;}
-
-				for(let i=1; i<basicMoves.length; i++)
-				{
-					const newContinuation = basicMoves[i];
-					this.switchMoveBySamePiece(newContinuation);
-					const newEval = this.ABevaluate(depth-1,A,B);
-				
-					if(this.movingTeam.opposition.evalPreferredToEval(newEval,bestEval))
-					{
-						bestContinuation = newContinuation;
-						bestEval = newEval;
-					}
-					if(this.movingTeam.opposition.evalPreferredToEval(bestEval, this.movingTeam.opposition instanceof WhiteTeam?B:A)){
-						this.undoMove();
-						break mainLoop;
-					}
-					if(this.movingTeam.opposition instanceof WhiteTeam){A = bestEval;}else{B = bestEval;}
-				}
-				this.undoMove();				
+				if(this.movingTeam.evalPreferredToEval(bestEval, this.movingTeam instanceof WhiteTeam?B:A)){break mainLoop;}
+				if(this.movingTeam instanceof WhiteTeam){A = bestEval;}else{B = bestEval;}
 			}
 
 			for(let i=0; i<specialMoves?.length; i++)
@@ -499,47 +478,6 @@ class Game
 		this.fullUpdatedPieces.update(fullUpdatedPieces);
 	}
 	
-	switchMoveBySamePiece(move)
-	{
-		//can skip moving the same piece back and then to a new square, just move to the new square
-		
-		this.positionFrequenciesByBoardString[this.boardString()]--;
-		
-		const lastMove = this.playedMoves.pop();
-		const movingPiece = this.movingPiece.get();
-		const lastTargetPiece = this.targetPiece.pop();
-		
-		this.fullUpdatedPieces.pop().forEach((piece)=>{piece.team.revertPiece(piece);});
-		
-		this.pieces[lastMove.captureTargetSquare] = lastTargetPiece;
-		lastTargetPiece?.activate();
-		
-		const newTargetPiece = this.pieces[move.captureTargetSquare];
-		this.pieces[move.captureTargetSquare] = null;
-		newTargetPiece?.deactivate();
-		
-		movingPiece.square = move.mainPieceSquareAfter;
-		this.pieces[move.mainPieceSquareAfter] = movingPiece;
-		
-		this.targetPiece.update(newTargetPiece);
-		
-		this.changeTurns();
-		this.updateMovingPieceAndOppositionPiecesSeeingMove(movingPiece, move);
-		this.changeTurns();
-		
-		this.playedMoves.push(move);
-		
-		const newBoardString = this.boardString();
-		if(newBoardString in this.positionFrequenciesByBoardString)
-		{
-			this.positionFrequenciesByBoardString[newBoardString]++;
-		}
-		else
-		{
-			this.positionFrequenciesByBoardString[newBoardString] = 1;
-		}
-	}
-	
 	makeMove(move)
 	{
 		const targetPiece = this.pieces[move.captureTargetSquare];
@@ -549,14 +487,19 @@ class Game
 		const movingPiece = this.pieces[move.mainPieceSquareBefore];
 		movingPiece.square = move.mainPieceSquareAfter;
 		this.pieces[move.mainPieceSquareAfter] = movingPiece;
+		movingPiece.team.activePieceLocationsBitVector.set(move.mainPieceSquareAfter);
 		
 		this.pieces[move.mainPieceSquareBefore] = null;
+		movingPiece.team.activePieceLocationsBitVector.clear(move.mainPieceSquareBefore);
 		
 		const otherPiece = move.otherPiece;
-		if(otherPiece){otherPiece.square=move.otherPieceSquareAfter;}
-		this.pieces[move.otherPieceSquareAfter] = otherPiece;
-		
-		this.pieces[move.otherPieceSquareBefore] = null;
+		if(otherPiece){
+			otherPiece.square=move.otherPieceSquareAfter;
+			this.pieces[move.otherPieceSquareAfter] = otherPiece;
+			otherPiece.team.activePieceLocationsBitVector.set(move.otherPieceSquareAfter);
+			this.pieces[move.otherPieceSquareBefore] = null;
+			otherPiece.team.activePieceLocationsBitVector.clear(move.otherPieceSquareBefore);
+		}
 		
 		if(move instanceof PromotionMove)
 		{
@@ -637,15 +580,19 @@ class Game
 			movingPiece.team.swapOldPieceForNewPiece(otherPiece, movingPiece);
 		}
 		
+		(otherPiece??{}).square = move.otherPieceSquareBefore;
 		this.pieces[move.otherPieceSquareBefore] = otherPiece;
+		otherPiece?.team.activePieceLocationsBitVector.set(move.otherPieceSquareBefore);
 		
 		this.pieces[move.otherPieceSquareAfter] = null;
-		(otherPiece??{}).square = move.otherPieceSquareBefore;
+		otherPiece?.team.activePieceLocationsBitVector.clear(move.otherPieceSquareAfter);
 		
+		movingPiece.square = move.mainPieceSquareBefore;
 		this.pieces[move.mainPieceSquareBefore] = movingPiece;
+		movingPiece.team.activePieceLocationsBitVector.set(move.mainPieceSquareBefore);
 		
 		this.pieces[move.mainPieceSquareAfter] = null;
-		movingPiece.square = move.mainPieceSquareBefore;
+		movingPiece.team.activePieceLocationsBitVector.clear(move.mainPieceSquareAfter);
 		
 		this.pieces[move.captureTargetSquare] = targetPiece;
 		targetPiece?.activate();

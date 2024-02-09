@@ -405,20 +405,20 @@ class Knight extends PatternPiece
 	//generate array of consecutive integers, one representing each square
 	Array(NUM_RANKS*NUM_FILES).fill(null).map((item,index)=>{return index;}).map((square)=>{
 		//for each square, generate the set of squares a knight could attack
-		return Knight.squaresAttackedFromSquareInGame(square)
+		return this.squaresAttackedFromSquareInGame(square)
 	});
 
 	static movesFromSquare_lookup = //could have different move sets from same square depending on which squares have friendly pieces on them
 	//for up to 8 knight moves from a given square, have 2^8 possible combinations of friendly pieces in the destination squares
 	this.squaresAttackedFromSquare_lookup.map((squaresAttacked,fromSquare)=>{
-		return Array(1<<8).fill(null).map((item,index)=>{
+		return Array(1<<this.patternIncreasing.length).fill(null).map((item,index)=>{
 			const moves = [];
 			const bits = index;
-			for(let i=0; i<Knight.patternIncreasing.length && i<squaresAttacked.length; i++)
+			for(let i=0; i<squaresAttacked.squares.length; i++)
 			{
-				if(!(bits & (1<<i)))
+				if(((bits >> i) & 1) == 0)
 				{
-					moves.push(new PlainMove(fromSquare, squaresAttacked[i]));
+					moves.push(new PlainMove(fromSquare, squaresAttacked.squares[i]));
 				}
 			}
 			return moves;
@@ -433,8 +433,21 @@ class Knight extends PatternPiece
 		this.squaresAttacked.update(squaresAttacked.squares);
 		this.squaresAttackedBitVector.update(squaresAttacked.bits);
 		
+		///*
 		const friendlies = extractBits(this.team.activePieceLocationsBitVector, squaresAttacked.squares);
 		this.basicMoves.update(this.constructor.movesFromSquare_lookup[this.square][friendlies]);
+		//*/
+
+		/*	
+		this.basicMoves.update(this.squaresAttacked.get().reduce((accumulator, attackedSquare)=>{
+			//only allow moves that do not capture pieces from the same team
+			if(this.game.pieces[attackedSquare]?.team != this.team)
+			{
+				accumulator.push(new PlainMove(this.square, attackedSquare));
+			}
+			return accumulator;
+		}, []));
+		*/
 	}
 	//*/
 }
