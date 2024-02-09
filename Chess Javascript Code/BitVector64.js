@@ -73,6 +73,7 @@ class BitVector64
 	
 	toString()
 	{
+		//least significant bit shows on the left
 		let str = ``;
 		for(let w=0; w<this.words.length; w++)
 		{
