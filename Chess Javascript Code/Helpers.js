@@ -30,19 +30,18 @@ module.exports = {
 		return `./images/chess/${teamName}/${pieceName}.png`;
 	},
 
-	extractBits(bitvector64, indices)	//serial version of PEXT
+	extractBits(bitvector64, extractIndices)	//sequential version of PEXT
 	{
-		//this function will only ever be used to extract less than 32 bits
-		//therefore the result will fit in a single integer
+		//each element in extractIndices is a position to read from in bitvector64
+		//each value read from bitvector64 gets written to consecutive bit positions in extractedBits
+
+		//this function will never extract more than 32 bits, therefore the result fits in a single integer
 		let extractedBits = 0;
-		let i = 0;
-		for(const scan of indices)
+
+		for(let writeIndex=0; writeIndex<extractIndices.length; writeIndex++)	//write to ascending bit positions in extractedBits
 		{
-			if(bitvector64.read(scan))
-			{
-				extractedBits |= (1<<i);
-			}
-			i++;
+			const readIndex = extractIndices[writeIndex];	//the position in bitvector64 to extract a bit from
+			extractedBits |= (bitvector64.read(readIndex)<<writeIndex);
 		}
 		return extractedBits;
 	}
