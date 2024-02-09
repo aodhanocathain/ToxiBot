@@ -40,8 +40,9 @@ module.exports = {
 		{
 			if(bitvector64.read(scan))
 			{
-				extractedBits |= (1<<i++);
+				extractedBits |= (1<<i);
 			}
+			i++;
 		}
 		return extractedBits;
 	}
