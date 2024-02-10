@@ -3,7 +3,7 @@ const {asciiOffset, asciiDistance, deferredPromise} = require("./Helpers.js");
 const {BitVector64} = require("./BitVector64.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
-const {PlainMove, PromotionMove} = require("./Move.js");
+const {PlainMove, PromotionMove, EnPassantMove, CastleMove} = require("./Move.js");
 const {Team, WhiteTeam, BlackTeam} = require("./Team.js");
 const {Piece, King, Queen, Rook, Pawn, PieceClassesByTypeChar, WINGS} = require("./Piece.js");
 
@@ -444,15 +444,8 @@ class Game
 		//just update both teams for now
 		[this.movingTeam.opposition, this.movingTeam].forEach((team)=>{
 			team.activePieces.forEach((piece)=>{
-				if((piece==movingPiece) || (piece==move.otherPiece))
+				if((piece==movingPiece) || (piece instanceof King) || (piece == move.promotionPiece))
 				{
-					team.updatePiece(piece);
-					fullUpdatedPieces.push(piece);
-				}
-				else if(piece instanceof King)
-				{
-					//Would be awkward to implement squaresWatchedBitVector64 for the King's castle moves
-					//For now just fully update the King every move
 					team.updatePiece(piece);
 					fullUpdatedPieces.push(piece);
 				}
@@ -463,9 +456,7 @@ class Game
 					(
 						watchingBits.read(move.mainPieceSquareBefore) ||
 						watchingBits.read(move.mainPieceSquareAfter) ||
-						watchingBits.read(move.otherPieceSquareBefore) ||
-						watchingBits.read(move.otherPieceSquareAfter) ||
-						watchingBits.read(move.captureTargetSquare)
+						watchingBits.read(move.enPassantSquare)
 					)
 					{
 						team.updatePiece(piece);
@@ -480,38 +471,44 @@ class Game
 	
 	makeMove(move)
 	{
-		const targetPiece = this.pieces[move.captureTargetSquare];
+		//remove the captured piece, if any
+		const captureSquare = move.enPassantSquare || move.mainPieceSquareAfter;
+		const targetPiece = this.pieces[captureSquare];
 		targetPiece?.deactivate();
-		this.pieces[move.captureTargetSquare] = null;
+		this.pieces[captureSquare] = null;
 		
+		//move the main piece to new square
 		const movingPiece = this.pieces[move.mainPieceSquareBefore];
 		movingPiece.square = move.mainPieceSquareAfter;
 		this.pieces[move.mainPieceSquareAfter] = movingPiece;
 		movingPiece.team.activePieceLocationsBitVector.set(move.mainPieceSquareAfter);
+
+		movingPiece.canCastle?.update(false);
 		
+		//remove main piece from old square
 		this.pieces[move.mainPieceSquareBefore] = null;
 		movingPiece.team.activePieceLocationsBitVector.clear(move.mainPieceSquareBefore);
 		
-		const otherPiece = move.otherPiece;
-		if(otherPiece){
-			otherPiece.square=move.otherPieceSquareAfter;
-			this.pieces[move.otherPieceSquareAfter] = otherPiece;
-			otherPiece.team.activePieceLocationsBitVector.set(move.otherPieceSquareAfter);
-			this.pieces[move.otherPieceSquareBefore] = null;
-			otherPiece.team.activePieceLocationsBitVector.clear(move.otherPieceSquareBefore);
+		//some types of moves require more work than just moving the main piece
+		if(move instanceof CastleMove)
+		{
+			//move the rook to its new square as well
+			const rook = this.pieces[move.rookBefore];
+			this.pieces[move.rookAfter] = rook;
+			rook.team.activePieceLocationsBitVector.set(move.rookAfter);
+			rook.canCastle.update(false);
+
+			//remove the rook from its old square
+			this.pieces[move.rookBefore] = null;
+			rook.team.activePieceLocationsBitVector.clear(move.rookBefore);
+		}
+		else if(move instanceof PromotionMove)
+		{
+			//promote the pawn
+			movingPiece.team.swapOldPieceForNewPiece(movingPiece, move.promotionPiece);
 		}
 		
-		if(move instanceof PromotionMove)
-		{
-			movingPiece.team.swapOldPieceForNewPiece(movingPiece, otherPiece);
-		}
-		
-		if((movingPiece instanceof King) || (movingPiece instanceof Rook))
-		{
-			movingPiece.canCastle.update(false);
-			otherPiece?.canCastle.update(false);
-		}
-			
+		let enPassantableUpdate = "-";
 		if(movingPiece instanceof Pawn)
 		{
 			const beforeRank = Square.rank(move.mainPieceSquareBefore);
@@ -519,17 +516,10 @@ class Game
 			const distance = afterRank-beforeRank;
 			if((distance/Pawn.LONG_MOVE_RANK_INCREMENT_MULTIPLIER)==movingPiece.team.constructor.PAWN_RANK_INCREMENT)
 			{
-				this.enPassantable.update(asciiOffset(MIN_FILE, Square.file(move.mainPieceSquareAfter)));	//could have used move.before too
-			}
-			else
-			{
-				this.enPassantable.update("-");
+				enPassantableUpdate = asciiOffset(MIN_FILE, Square.file(move.mainPieceSquareAfter))	//could have used mainPieceSquareBefore instead
 			}
 		}
-		else
-		{
-			this.enPassantable.update("-");
-		}
+		this.enPassantable.update(enPassantableUpdate);
 		
 		this.movingPiece.update(movingPiece);
 		this.targetPiece.update(targetPiece);
@@ -564,37 +554,43 @@ class Game
 		
 		const movingPiece = this.movingPiece.pop();
 		const targetPiece = this.targetPiece.pop();
-		const otherPiece = move.otherPiece;
 		
 		const fullUpdatedPieces = this.fullUpdatedPieces.pop();
 		fullUpdatedPieces.forEach((piece)=>{piece.team.revertPiece(piece);});
 		
 		this.enPassantable.revert();
-		if((movingPiece instanceof King) || (movingPiece instanceof Rook)){
-			movingPiece.canCastle.revert();
-			otherPiece?.canCastle.revert();
-		}
 		
-		if(move instanceof PromotionMove)
+		if(move instanceof CastleMove)
 		{
-			movingPiece.team.swapOldPieceForNewPiece(otherPiece, movingPiece);
+			//move the rook back to its old square
+			const rook = this.pieces[move.rookAfter];
+			this.pieces[move.rookBefore] = rook;
+			rook.team.activePieceLocationsBitVector.set(move.rookBefore);
+			rook.canCastle.revert();
+
+			//remove the rook from its new square
+			this.pieces[move.rookAfter] = null;
+			rook.team.activePieceLocationsBitVector.clear(move.rookAfter);
 		}
-		
-		(otherPiece??{}).square = move.otherPieceSquareBefore;
-		this.pieces[move.otherPieceSquareBefore] = otherPiece;
-		otherPiece?.team.activePieceLocationsBitVector.set(move.otherPieceSquareBefore);
-		
-		this.pieces[move.otherPieceSquareAfter] = null;
-		otherPiece?.team.activePieceLocationsBitVector.clear(move.otherPieceSquareAfter);
-		
+		else if(move instanceof PromotionMove)
+		{
+			//deomote the pawn
+			movingPiece.team.swapOldPieceForNewPiece(move.promotionPiece, movingPiece);
+		}
+
+		//move main piece back to old square
 		movingPiece.square = move.mainPieceSquareBefore;
 		this.pieces[move.mainPieceSquareBefore] = movingPiece;
 		movingPiece.team.activePieceLocationsBitVector.set(move.mainPieceSquareBefore);
-		
+		movingPiece.canCastle?.revert();
+
+		//remove main piece from new square
 		this.pieces[move.mainPieceSquareAfter] = null;
 		movingPiece.team.activePieceLocationsBitVector.clear(move.mainPieceSquareAfter);
-		
-		this.pieces[move.captureTargetSquare] = targetPiece;
+
+		//restore captured piece, if any
+		const captureSquare = move.enPassantSquare || move.mainPieceSquareAfter;;
+		this.pieces[captureSquare] = targetPiece;
 		targetPiece?.activate();
 	}
 	

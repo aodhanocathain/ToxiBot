@@ -51,7 +51,8 @@ class Piece
 		//must fully specify the square the piece starts on
 		Square.fullString(move.mainPieceSquareBefore);
 		
-		const capture = game.pieces[move.captureTargetSquare]? "x" : "";
+		const captureSquare = (move instanceof EnPassantMove)? move.enPassantSquare : move.mainPieceSquareAfter;
+		const capture = game.pieces[captureSquare]? "x" : "";
 		
 		game.makeMove(move);
 		const checkStatus =
@@ -367,7 +368,7 @@ class King extends PatternPiece
 					{
 						castleMoves.push(new CastleMove(
 						this.square, this.team.constructor.CASTLE_KING_SQUARES_BY_WING[wingChar],
-						rook, rook.square, this.team.constructor.CASTLE_ROOK_SQUARES_BY_WING[wingChar]
+						rook.square, this.team.constructor.CASTLE_ROOK_SQUARES_BY_WING[wingChar]
 						));
 					}
 				}
@@ -433,21 +434,8 @@ class Knight extends PatternPiece
 		this.squaresAttacked.update(squaresAttacked.squares);
 		this.squaresAttackedBitVector.update(squaresAttacked.bits);
 		
-		///*
 		const friendlies = extractBits(this.team.activePieceLocationsBitVector, squaresAttacked.squares);
 		this.basicMoves.update(this.constructor.movesFromSquare_lookup[this.square][friendlies]);
-		//*/
-
-		/*	
-		this.basicMoves.update(this.squaresAttacked.get().reduce((accumulator, attackedSquare)=>{
-			//only allow moves that do not capture pieces from the same team
-			if(this.game.pieces[attackedSquare]?.team != this.team)
-			{
-				accumulator.push(new PlainMove(this.square, attackedSquare));
-			}
-			return accumulator;
-		}, []));
-		*/
 	}
 	//*/
 }
@@ -578,9 +566,9 @@ class Pawn extends BlockablePiece
 	}
 	
 	static makeMoveString(move, game)
-	{		
+	{
 		//if there is a capture, include current file and capture character
-		const beforeDetails = (game.pieces[move.mainPieceSquareAfter] || game.pieces[move.captureTargetSquare] || game.pieces[move.otherPieceSquareAfter])?
+		const beforeDetails = ((move instanceof EnPassantMove) || (game.pieces[move.mainPieceSquareAfter]))?
 		`${Square.fileString(move.mainPieceSquareBefore)}x` : ``;
 		
 		game.makeMove(move);
@@ -590,9 +578,9 @@ class Pawn extends BlockablePiece
 		"";
 		game.undoMove();
 		
-		const afterDetails = `${Square.fullString(move.mainPieceSquareAfter || move.otherPieceSquareAfter)}`;
+		const afterDetails = `${Square.fullString(move.mainPieceSquareAfter)}`;
 		
-		const promotionString = (move instanceof PromotionMove)? `=${move.otherPiece.constructor.typeChar}`:"";
+		const promotionString = (move instanceof PromotionMove)? `=${move.promotionPiece.constructor.typeChar}`:"";
 		
 		return `${beforeDetails}${afterDetails}${promotionString}${checkStatus}`;
 	}
