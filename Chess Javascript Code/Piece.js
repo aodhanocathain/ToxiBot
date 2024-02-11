@@ -1,4 +1,4 @@
-const {MIN_FILE, NUM_RANKS, NUM_FILES} = require("./Constants.js");
+const {MIN_FILE, NUM_RANKS, NUM_FILES, CAPTURE_CHAR, CHECK_CHAR, CHECKMATE_CHAR} = require("./Constants.js");
 const {asciiDistance, extractBits} = require("./Helpers.js");
 const {BitVector64} = require("./BitVector64.js");
 const {Manager} = require("./Manager.js");
@@ -52,12 +52,12 @@ class Piece
 		Square.fullString(move.mainPieceSquareBefore);
 		
 		const captureSquare = (move instanceof EnPassantMove)? move.enPassantSquare : move.mainPieceSquareAfter;
-		const capture = game.pieces[captureSquare]? "x" : "";
+		const capture = game.pieces[captureSquare]? CAPTURE_CHAR : "";
 		
 		game.makeMove(move);
 		const checkStatus =
-		game.isCheckmate()? "#":
-		game.kingChecked()? "+":
+		game.isCheckmate()? CHECKMATE_CHAR:
+		game.kingChecked()? CHECK_CHAR:
 		"";
 		game.undoMove();
 		
@@ -570,12 +570,12 @@ class Pawn extends BlockablePiece
 	{
 		//if there is a capture, include current file and capture character
 		const beforeDetails = ((move instanceof EnPassantMove) || (game.pieces[move.mainPieceSquareAfter]))?
-		`${Square.fileString(move.mainPieceSquareBefore)}x` : ``;
+		`${Square.fileString(move.mainPieceSquareBefore)}${CAPTURE_CHAR}` : ``;
 		
 		game.makeMove(move);
 		const checkStatus = 
-		game.isCheckmate()? "#":
-		game.kingChecked()? "+":
+		game.isCheckmate()? CHECKMATE_CHAR:
+		game.kingChecked()? CHECK_CHAR:
 		"";
 		game.undoMove();
 		
