@@ -5,7 +5,7 @@ const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
 const {PlainMove, PromotionMove, EnPassantMove, CastleMove} = require("./Move.js");
 const {Team, WhiteTeam, BlackTeam} = require("./Team.js");
-const {Piece, King, Queen, Rook, Pawn, PieceClassesByTypeChar, WINGS} = require("./Piece.js");
+const {Piece, King, Queen, Rook, Pawn, PieceClassesByTypeChar, WINGS, BlockablePiece} = require("./Piece.js");
 
 const {Worker, isMainThread, parentPort} = require("worker_threads");
 
@@ -422,18 +422,39 @@ class Game
 		
 		const fullUpdatedPieces = [];
 		
-		//When the moving team makes a move, only need to update the opposition's available moves AND what those depend on,
-		//e.g. moving team's sight of enemy king, to be able to expand the game tree
-		
-		//just update both teams for now
-		[this.movingTeam.opposition, this.movingTeam].forEach((team)=>{
-			team.activePieces.forEach((piece)=>{
-				if((piece==movingPiece) || (piece instanceof King) || (piece == move.promotionPiece))
-				{
-					team.updatePiece(piece);
-					fullUpdatedPieces.push(piece);
-				}
-				else
+		//potentially update all pieces on the moving team
+		//because they all are able to gain/lose moves if friendly pieces get in/out of the way
+		this.movingTeam.activePieces.forEach((piece)=>{
+			const watchingBits = piece.squaresWatchedBitVector.get();
+			if
+			(
+				watchingBits.read(move.mainPieceSquareBefore) ||
+				watchingBits.read(move.mainPieceSquareAfter) ||
+				watchingBits.read(move.enPassantSquare)
+			)
+			{
+				piece.team.updatePiece(piece);
+				fullUpdatedPieces.push(piece);
+			}
+		});
+		//the above condition would not rule out a promotion piece, because the piece would not have calculated any properties
+		if(move.promotionPiece){move.promotionPiece.team.updatePiece(move.promotionPiece);}	//manually update any promotion piece
+
+		//potentially update all opposition's blockable pieces because they may have been blocked/unblocked, which would affect their moves
+		//also update the opposition's king, since the castle legality may have changed if the move blocked/unblocked safe squares from attack
+		//AND
+		//if the moving piece was a king, must also update opposition's pattern pieces,
+		//to determine if the king has just walked into check (not allowed)
+
+		//i.e.
+		//if moving piece was king, then update entire opposition
+		//else just update opposition blockable pieces and king
+		if(!(movingPiece instanceof King))
+		{
+			this.movingTeam.opposition.updatePiece(this.movingTeam.opposition.king);
+			fullUpdatedPieces.push(this.movingTeam.opposition.king);
+			this.movingTeam.opposition.activePieces.forEach((piece)=>{
+				if(piece instanceof BlockablePiece)
 				{
 					const watchingBits = piece.squaresWatchedBitVector.get();
 					if
@@ -443,12 +464,28 @@ class Game
 						watchingBits.read(move.enPassantSquare)
 					)
 					{
-						team.updatePiece(piece);
+						piece.team.updatePiece(piece);
 						fullUpdatedPieces.push(piece);
 					}
 				}
 			});
-		});
+		}
+		else
+		{
+			this.movingTeam.opposition.activePieces.forEach((piece)=>{
+				const watchingBits = piece.squaresWatchedBitVector.get();
+				if
+				(
+					watchingBits.read(move.mainPieceSquareBefore) ||
+					watchingBits.read(move.mainPieceSquareAfter) ||
+					watchingBits.read(move.enPassantSquare)
+				)
+				{
+					piece.team.updatePiece(piece);
+					fullUpdatedPieces.push(piece);
+				}
+			});
+		}
 		
 		this.fullUpdatedPieces.update(fullUpdatedPieces);
 	}
@@ -585,13 +622,14 @@ class Game
 		this.movingTeam.activePieces.forEach((piece)=>{
 			piece.addMovesToArray(moves);
 		});
+
 		return moves;
 	}
 	
 	calculateLegals()
 	{
 		//moves are illegal if they leave the team's king vulnerable to capture
-		return this.calculateMoves().flat(2).filter((move)=>{
+		return this.calculateMoves().flat(1).filter((move)=>{
 			this.makeMove(move);
 			const condition = !(this.kingCapturable());
 			this.undoMove();

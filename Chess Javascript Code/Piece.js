@@ -344,12 +344,9 @@ class King extends PatternPiece
 		array.push(this.castleMoves.get());
 	}
 	
-	updateSquaresAndMoves()
+	updateCastleMoves()
 	{
-		super.updateSquaresAndMoves();
-		
 		const castleMoves = [];
-		///*
 		//add castle moves if allowed
 		//king must not have moved, can't castle to get out of check
 		if(this.canCastle.get() && this.team.opposition.numEnemyKingSeers==0)
@@ -375,8 +372,13 @@ class King extends PatternPiece
 				}
 			});
 		}
-		//*/
 		this.castleMoves.update(castleMoves);
+	}
+
+	updateSquaresAndMoves()
+	{
+		super.updateSquaresAndMoves();
+		this.updateCastleMoves();
 	}
 	
 	revertSquaresAndMoves()
