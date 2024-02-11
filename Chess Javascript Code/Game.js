@@ -310,11 +310,11 @@ class Game
 		const moves = this.calculateMoves();
 
 		mainLoop:
-		for(const [basicMoves, specialMoves] of moves)
+		for(const movesList of moves)
 		{
-			for(let i=0; i<basicMoves.length; i++)
+			for(let i=0; i<movesList.length; i++)
 			{
-				const newContinuation = basicMoves[i];
+				const newContinuation = movesList[i];
 				this.makeMove(newContinuation);
 				const newEval = this.ABevaluate(depth-1,A,B);
 				this.undoMove();
@@ -325,22 +325,6 @@ class Game
 					bestEval = newEval;
 				}
 				if(this.movingTeam.evalPreferredToEval(bestEval, this.movingTeam instanceof WhiteTeam?B:A)){break mainLoop;}
-				if(this.movingTeam instanceof WhiteTeam){A = bestEval;}else{B = bestEval;}
-			}
-
-			for(let i=0; i<specialMoves?.length; i++)
-			{
-				const newContinuation = specialMoves[i];
-				this.makeMove(newContinuation);
-				const newEval = this.ABevaluate(depth-1,A,B);
-				this.undoMove();
-				
-				if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
-				{
-					bestContinuation = newContinuation;
-					bestEval = newEval;
-				}
-				if(this.movingTeam.evalPreferredToEval(bestEval, this.movingTeam instanceof WhiteTeam?B:A)){break;}
 				if(this.movingTeam instanceof WhiteTeam){A = bestEval;}else{B = bestEval;}
 			}
 		}

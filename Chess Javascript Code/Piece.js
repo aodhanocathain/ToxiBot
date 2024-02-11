@@ -201,7 +201,7 @@ class Piece
 	
 	addAttackingMovesToArray(array)
 	{
-		array.push([this.basicMoves.get()]);
+		array.push(this.basicMoves.get());
 	}
 	
 	addMovesToArray(array)
@@ -340,7 +340,8 @@ class King extends PatternPiece
 	
 	addMovesToArray(array)
 	{
-		array.push([this.basicMoves.get(),this.castleMoves.get()]);
+		array.push(this.basicMoves.get());
+		array.push(this.castleMoves.get());
 	}
 	
 	updateSquaresAndMoves()
@@ -601,7 +602,8 @@ class Pawn extends BlockablePiece
 	
 	addMovesToArray(array)
 	{
-		array.push([this.basicMoves.get(), this.specialMoves.get()]);
+		array.push(this.basicMoves.get());
+		array.push(this.specialMoves.get());
 	}
 	
 	updateSquaresAndMoves()
