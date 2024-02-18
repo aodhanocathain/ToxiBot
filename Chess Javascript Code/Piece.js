@@ -225,8 +225,43 @@ class RangedPiece extends BlockablePiece
 {
 	static directions;
 	
+	static squaresAttackedFromSquareUnblocked(square)
+	{
+		const squaresArrays = [];
+		const squaresBits = new BitVector64();
+		
+		const rank = Square.rank(square);
+		const file = Square.file(square);
+		
+		for(const [rankOffset,fileOffset] of this.directions)
+		{
+			const array = [];
+			let newRank = rank+rankOffset;
+			let newFile = file+fileOffset;
+			
+			//keep stepping further in the given direction until reaching the edge of the board or another piece
+			while(Square.validRankAndFile(newRank,newFile))
+			{
+				const newSquare = Square.withRankAndFile(newRank,newFile);
+				
+				//checking if the way is blocked AFTER adding the potentially blocked square to the list is important
+				//e.g. capturing a piece necessarily involves being able to move to the square that is blocked
+				array.push(newSquare);
+				squaresBits.set(newSquare);
+				newRank += rankOffset;
+				newFile += fileOffset;
+			}
+			squaresArrays.push(array);
+		}
+		return {
+			squares: squaresArrays,
+			bits: squaresBits
+		};
+	}
+
 	static squaresAttackedFromSquareInGame(square, game)
 	{
+		/*
 		const squaresArray = [];
 		const squaresBits = new BitVector64();
 		
@@ -258,8 +293,36 @@ class RangedPiece extends BlockablePiece
 			squares: squaresArray,
 			bits: squaresBits
 		};
+		*/
+
+		const squaresAttacked = this.squaresAttackedFromSquareUnblocked(square);
+
+		const squaresArrays = [];
+		const squaresBits = new BitVector64();
+
+		for(const unblockedArray of squaresAttacked.squares)
+		{
+			const blockedArray = [];
+			for(const square of unblockedArray)
+			{				
+				blockedArray.push(square);
+				squaresBits.set(square);
+				
+				if(game.pieces[square]){break;}
+			}
+
+			squaresArrays.push(blockedArray);
+		}
+
+		return {
+			squares: squaresArrays.flat(2),
+			bits: squaresBits
+		};
 	}
 	
+	static squaresAttackedFromSquare_lookup;
+	static movesFromSquare_lookup;
+
 	constructor(game, team, square)
 	{
 		super(game, team, square);
@@ -298,10 +361,51 @@ class PatternPiece extends Piece
 			bits: squaresBits
 		};
 	}
-	
+
+	static squaresAttackedFromSquare_lookup;
+	static movesFromSquare_lookup;
+
+	static initClassLookups()
+	{
+		this.squaresAttackedFromSquare_lookup =
+		//generate array of consecutive integers, one representing each square
+		Array(NUM_RANKS*NUM_FILES).fill(null).map((item,index)=>{return index;}).map((square)=>{
+			//for each square, generate the set of squares this piece could attack
+			return this.squaresAttackedFromSquareInGame(square)
+		});
+
+		this.movesFromSquare_lookup = //could have different move sets from same square depending on which squares have friendly pieces on them
+		//for n destinations from a given square, have 2^n possible combinations of friendly pieces in the destination squares
+		this.squaresAttackedFromSquare_lookup.map((squaresAttacked,fromSquare)=>{
+			return Array(1<<this.patternIncreasing.length).fill(null).map((item,index)=>{
+				const moves = [];
+				const bits = index;
+				for(let i=0; i<squaresAttacked.squares.length; i++)
+				{
+					if(((bits >> i) & 1) == 0)
+					{
+						moves.push(new PlainMove(fromSquare, squaresAttacked.squares[i]));
+					}
+				}
+				return moves;
+			})
+		})
+	}
+
 	constructor(game, team, square)
 	{
 		super(game, team, square);
+	}
+
+	updateSquaresAndMoves()
+	{
+		const squaresAttacked = this.constructor.squaresAttackedFromSquare_lookup[this.square];
+		
+		this.squaresAttacked.update(squaresAttacked.squares);
+		this.squaresAttackedBitVector.update(squaresAttacked.bits);
+		
+		const friendlies = extractBits(this.team.activePieceLocationsBitVector, squaresAttacked.squares);
+		this.basicMoves.update(this.constructor.movesFromSquare_lookup[this.square][friendlies]);
 	}
 }
 
@@ -309,8 +413,8 @@ class King extends PatternPiece
 {
 	//King must update castle moves if own pieces move in/out of the way,
 	//or if enemy pieces guarding intermediate squares are blocked etc.
-	//Would be awkward to do with squaresWatchedBitVector64,
-	//so for now the King is always fully updated after every move in the game
+	
+	//for now the King is always fully updated after every move in the game
 	static typeChar = "K";
 	static name = "king";
 	static points = 0;
@@ -387,6 +491,7 @@ class King extends PatternPiece
 		this.castleMoves.revert();
 	}
 }
+King.initClassLookups();
 
 class Knight extends PatternPiece
 {
@@ -404,44 +509,8 @@ class Knight extends PatternPiece
 		[2,-1],
 		[2,1]
 	];
-
-	static squaresAttackedFromSquare_lookup =
-	//generate array of consecutive integers, one representing each square
-	Array(NUM_RANKS*NUM_FILES).fill(null).map((item,index)=>{return index;}).map((square)=>{
-		//for each square, generate the set of squares a knight could attack
-		return this.squaresAttackedFromSquareInGame(square)
-	});
-
-	static movesFromSquare_lookup = //could have different move sets from same square depending on which squares have friendly pieces on them
-	//for up to 8 knight moves from a given square, have 2^8 possible combinations of friendly pieces in the destination squares
-	this.squaresAttackedFromSquare_lookup.map((squaresAttacked,fromSquare)=>{
-		return Array(1<<this.patternIncreasing.length).fill(null).map((item,index)=>{
-			const moves = [];
-			const bits = index;
-			for(let i=0; i<squaresAttacked.squares.length; i++)
-			{
-				if(((bits >> i) & 1) == 0)
-				{
-					moves.push(new PlainMove(fromSquare, squaresAttacked.squares[i]));
-				}
-			}
-			return moves;
-		})
-	})
-
-	///*
-	updateSquaresAndMoves()
-	{
-		const squaresAttacked = this.constructor.squaresAttackedFromSquare_lookup[this.square];
-		
-		this.squaresAttacked.update(squaresAttacked.squares);
-		this.squaresAttackedBitVector.update(squaresAttacked.bits);
-		
-		const friendlies = extractBits(this.team.activePieceLocationsBitVector, squaresAttacked.squares);
-		this.basicMoves.update(this.constructor.movesFromSquare_lookup[this.square][friendlies]);
-	}
-	//*/
 }
+Knight.initClassLookups();
 
 class Bishop extends RangedPiece
 {
