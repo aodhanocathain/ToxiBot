@@ -1,3 +1,5 @@
+const {} = require("./Constants.js");
+
 module.exports = {
 	asciiOffset(character, offset)	
 	//the character whose ascii code is *offset* greater than the ascii code of *character*
@@ -44,5 +46,30 @@ module.exports = {
 			extractedBits |= (bitvector64.read(readIndex)<<writeIndex);
 		}
 		return extractedBits;
+	},
+
+	countTrailingZeroesInBits(bits, numBits=32)
+	{
+		let i=0;
+		while((i<numBits) && (((1<<i)&bits)==0))
+		{
+			i++;
+		}
+		return i;
+	},
+
+	countLeadingZeroesInBits(bits, numBits=32)
+	{
+		let i=0;
+		while((i<numBits) && (((bits>>(31-i))&1)==0))
+		{
+			i++;
+		}
+		return i;
+	},
+
+	intsUpTo(n)
+	{
+		return Array(n).fill(null).map((item,index)=>{return index;});
 	}
 };
