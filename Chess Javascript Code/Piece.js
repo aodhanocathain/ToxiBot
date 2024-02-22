@@ -1,5 +1,5 @@
 const {MIN_FILE, NUM_RANKS, NUM_FILES, CAPTURE_CHAR, CHECK_CHAR, CHECKMATE_CHAR} = require("./Constants.js");
-const {asciiDistance, extractBits} = require("./Helpers.js");
+const {asciiDistance, extractBits, countTrailingZeroesInBits, countTrailingZeroesInBitsPlus1IfNonzero, intsUpTo} = require("./Helpers.js");
 const {BitVector64} = require("./BitVector64.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
@@ -225,107 +225,160 @@ class RangedPiece extends BlockablePiece
 {
 	static directions;
 	
-	static squaresAttackedFromSquareUnblocked(square)
-	{
-		const squaresArrays = [];
-		const squaresBits = new BitVector64();
-		
-		const rank = Square.rank(square);
-		const file = Square.file(square);
-		
-		for(const [rankOffset,fileOffset] of this.directions)
-		{
-			const array = [];
-			let newRank = rank+rankOffset;
-			let newFile = file+fileOffset;
-			
-			//keep stepping further in the given direction until reaching the edge of the board or another piece
-			while(Square.validRankAndFile(newRank,newFile))
-			{
-				const newSquare = Square.withRankAndFile(newRank,newFile);
-				
-				//checking if the way is blocked AFTER adding the potentially blocked square to the list is important
-				//e.g. capturing a piece necessarily involves being able to move to the square that is blocked
-				array.push(newSquare);
-				squaresBits.set(newSquare);
-				newRank += rankOffset;
-				newFile += fileOffset;
-			}
-			squaresArrays.push(array);
-		}
-		return {
-			squares: squaresArrays,
-			bits: squaresBits
-		};
-	}
-
 	static squaresAttackedFromSquareInGame(square, game)
 	{
-		/*
-		const squaresArray = [];
+		const friendlyBits = game.movingTeam.activePieceLocationsBitVector;
+		const opposingBits = game.movingTeam.opposition.activePieceLocationsBitVector;
+		const bothBits = new BitVector64();
+		bothBits.or(friendlyBits);
+		bothBits.or(opposingBits);
+
+		const unblocked = this.squaresAttackedFromSquareInDirectionUnblocked_lookup[square];
+
+		let squaresArray = [];
 		const squaresBits = new BitVector64();
-		
-		const rank = Square.rank(square);
-		const file = Square.file(square);
-		
-		for(const [rankOffset,fileOffset] of this.directions)
+
+		for(let d=0; d<this.directions.length; d++)
 		{
-			let newRank = rank+rankOffset;
-			let newFile = file+fileOffset;
-			let blocked = false;
-			
-			//keep stepping further in the given direction until reaching the edge of the board or another piece
-			while(Square.validRankAndFile(newRank,newFile) && !blocked)
-			{
-				const newSquare = Square.withRankAndFile(newRank,newFile);
-				
-				//checking if the way is blocked AFTER adding the potentially blocked square to the list is important
-				//e.g. capturing a piece necessarily involves being able to move to the square that is blocked
-				squaresArray.push(newSquare);
-				squaresBits.set(newSquare);
-				
-				blocked = game.pieces[newSquare]
-				newRank += rankOffset;
-				newFile += fileOffset;
-			}
+			const unblockedSquares = unblocked[d].squares;
+			const anyblockers = extractBits(bothBits, unblockedSquares);
+			const attackDistance = countTrailingZeroesInBitsPlus1IfNonzero(anyblockers, NUM_RANKS-1);
+			const blocked = this.squaresAttackedFromSquareInDirectionBlocked_lookup[square][d][attackDistance];
+			squaresArray = squaresArray.concat(blocked.squares)
+			squaresBits.or(blocked.bits);
 		}
+
 		return {
 			squares: squaresArray,
 			bits: squaresBits
 		};
-		*/
+	}
 
-		const squaresAttacked = this.squaresAttackedFromSquareUnblocked(square);
-
-		const squaresArrays = [];
-		const squaresBits = new BitVector64();
-
-		for(const unblockedArray of squaresAttacked.squares)
+	static squaresAttackedFromSquareInDirectionUnblocked(square, direction)
+	{
+		const squares = [];
+		const bits = new BitVector64();
+		
+		const rank = Square.rank(square);
+		const file = Square.file(square);
+		
+		const [rankOffset, fileOffset] = direction;
+		let newRank = rank+rankOffset;
+		let newFile = file+fileOffset;
+		
+		//keep stepping further in the given direction until reaching the edge of the board
+		while(Square.validRankAndFile(newRank,newFile))
 		{
-			const blockedArray = [];
-			for(const square of unblockedArray)
-			{				
-				blockedArray.push(square);
-				squaresBits.set(square);
-				
-				if(game.pieces[square]){break;}
-			}
-
-			squaresArrays.push(blockedArray);
+			const newSquare = Square.withRankAndFile(newRank,newFile);
+			
+			squares.push(newSquare);
+			bits.set(newSquare);
+			newRank += rankOffset;
+			newFile += fileOffset;
 		}
 
 		return {
-			squares: squaresArrays.flat(2),
-			bits: squaresBits
+			squares: squares,
+			bits: bits
 		};
 	}
-	
-	static squaresAttackedFromSquare_lookup;
+
+	static squaresAttackedFromSquareInDirectionBlocked(square, direction, distance)
+	{
+		const unblocked = this.squaresAttackedFromSquareInDirectionUnblocked(square, direction);
+		const blockedSquares = unblocked.squares.slice(0, distance);
+		const blockedBits = blockedSquares.reduce((accumulator, square)=>{
+			accumulator.set(square)
+			return accumulator;
+		}, new BitVector64());
+
+		return {
+			squares: blockedSquares,
+			bits: blockedBits
+		};
+	}
+
+	static squaresAttackedFromSquareInDirectionUnblocked_lookup;
+	static squaresAttackedFromSquareInDirectionBlocked_lookup;
 	static movesFromSquare_lookup;
+
+	static initClassLookups()
+	{
+		this.squaresAttackedFromSquareInDirectionUnblocked_lookup = Square.increasingFullArray().map((square)=>{
+			return this.directions.map((direction)=>{
+				return this.squaresAttackedFromSquareInDirectionUnblocked(square, direction);
+			});
+		});
+
+		this.squaresAttackedFromSquareInDirectionBlocked_lookup = Square.increasingFullArray().map((square)=>{
+			return this.directions.map((direction)=>{
+				return intsUpTo(NUM_RANKS).map((distance)=>{
+					const unblocked = this.squaresAttackedFromSquareInDirectionUnblocked(square, direction);
+					const blockedSquares = unblocked.squares.slice(0, distance);
+					const blockedBits = blockedSquares.reduce((accumulator, square)=>{
+						accumulator.set(square)
+						return accumulator;
+					}, new BitVector64());
+
+					return {
+						squares: blockedSquares,
+						bits: blockedBits
+					};
+				});
+			});
+		});
+
+		this.movesFromSquare_lookup = Square.increasingFullArray().map((fromSquare)=>{
+			return this.directions.map((direction)=>{
+				return intsUpTo(NUM_RANKS).map((distance)=>{
+					return this.squaresAttackedFromSquareInDirectionUnblocked(fromSquare, direction).squares.slice(0, distance).map((toSquare)=>{
+						return new PlainMove(fromSquare, toSquare);
+					})
+				});
+			});
+		});
+	}
 
 	constructor(game, team, square)
 	{
 		super(game, team, square);
+	}
+
+	updateSquaresAndMoves()
+	{
+		const friendlyBits = this.team.activePieceLocationsBitVector;
+		const opposingBits = this.team.opposition.activePieceLocationsBitVector;
+		const bothBits = new BitVector64();
+		bothBits.or(friendlyBits);
+		bothBits.or(opposingBits);
+
+		const unblocked = this.constructor.squaresAttackedFromSquareInDirectionUnblocked_lookup[this.square];
+
+		let squaresArray = [];
+		const squaresBits = new BitVector64();
+		let movesArray = [];
+
+		for(let d=0; d<this.constructor.directions.length; d++)
+		{
+			const unblockedSquares = unblocked[d].squares;
+			const anyblockers = extractBits(bothBits, unblockedSquares);
+			const attackDistance = countTrailingZeroesInBitsPlus1IfNonzero(anyblockers, NUM_RANKS-1);
+			const blocked = this.constructor.squaresAttackedFromSquareInDirectionBlocked_lookup[this.square][d][attackDistance];
+			squaresArray = squaresArray.concat(blocked.squares)
+			squaresBits.or(blocked.bits);
+
+			const friendlyBlockers = extractBits(friendlyBits, unblockedSquares);
+			const friendlyDistance = countTrailingZeroesInBits(friendlyBlockers, NUM_RANKS-1);
+			const opposingBlockers = extractBits(opposingBits, unblockedSquares);
+			const opposingDistance = countTrailingZeroesInBitsPlus1IfNonzero(opposingBlockers, NUM_RANKS-1);
+			const moveDistance = Math.min(opposingDistance, friendlyDistance);
+			const moves = this.constructor.movesFromSquare_lookup[this.square][d][moveDistance];
+			movesArray = movesArray.concat(moves);
+		}
+
+		this.squaresAttacked.update(squaresArray);
+		this.squaresAttackedBitVector.update(squaresBits);
+		this.basicMoves.update(movesArray);
 	}
 }
 
@@ -369,7 +422,7 @@ class PatternPiece extends Piece
 	{
 		this.squaresAttackedFromSquare_lookup =
 		//generate array of consecutive integers, one representing each square
-		Array(NUM_RANKS*NUM_FILES).fill(null).map((item,index)=>{return index;}).map((square)=>{
+		Square.increasingFullArray().map((square)=>{
 			//for each square, generate the set of squares this piece could attack
 			return this.squaresAttackedFromSquareInGame(square)
 		});
@@ -377,9 +430,8 @@ class PatternPiece extends Piece
 		this.movesFromSquare_lookup = //could have different move sets from same square depending on which squares have friendly pieces on them
 		//for n destinations from a given square, have 2^n possible combinations of friendly pieces in the destination squares
 		this.squaresAttackedFromSquare_lookup.map((squaresAttacked,fromSquare)=>{
-			return Array(1<<this.patternIncreasing.length).fill(null).map((item,index)=>{
+			return intsUpTo(1<<this.patternIncreasing.length).map((bits)=>{
 				const moves = [];
-				const bits = index;
 				for(let i=0; i<squaresAttacked.squares.length; i++)
 				{
 					if(((bits >> i) & 1) == 0)
@@ -413,7 +465,7 @@ class King extends PatternPiece
 {
 	//King must update castle moves if own pieces move in/out of the way,
 	//or if enemy pieces guarding intermediate squares are blocked etc.
-	
+
 	//for now the King is always fully updated after every move in the game
 	static typeChar = "K";
 	static name = "king";
@@ -525,6 +577,7 @@ class Bishop extends RangedPiece
 		[1,1]
 	];
 }
+Bishop.initClassLookups();
 
 class Rook extends RangedPiece
 {
@@ -548,6 +601,7 @@ class Rook extends RangedPiece
 		this.canCastle = new Manager(false);
 	}
 }
+Rook.initClassLookups();
 
 class Queen extends RangedPiece
 {
@@ -566,6 +620,7 @@ class Queen extends RangedPiece
 		[1,1]
 	];
 }
+Queen.initClassLookups();
 
 class Pawn extends BlockablePiece
 {

@@ -51,8 +51,20 @@ module.exports = {
 	countTrailingZeroesInBits(bits, numBits=32)
 	{
 		let i=0;
-		while((i<numBits) && (((1<<i)&bits)==0))
+		while(i<numBits)
 		{
+			if(((1<<i)&bits)!=0){return i;}
+			i++;
+		}
+		return i;
+	},
+
+	countTrailingZeroesInBitsPlus1IfNonzero(bits, numBits=32)
+	{
+		let i=0;
+		while(i<numBits)
+		{
+			if(((1<<i)&bits)!=0){return i+1;}
 			i++;
 		}
 		return i;
@@ -61,14 +73,27 @@ module.exports = {
 	countLeadingZeroesInBits(bits, numBits=32)
 	{
 		let i=0;
-		while((i<numBits) && (((bits>>(31-i))&1)==0))
+		while(i<numBits)
 		{
+			if(((bits>>(31-i))&1)!=0){return i;}
 			i++;
 		}
 		return i;
 	},
 
-	intsUpTo(n)
+
+	countLeadingZeroesInBitsPlus1IfNonzero(bits, numBits=32)
+	{
+		let i=0;
+		while(i<numBits)
+		{
+			if(((bits>>(31-i))&1)!=0){return i+1;}
+			i++;
+		}
+		return i;
+	},
+
+	intsUpTo(n)	//excludes n itself
 	{
 		return Array(n).fill(null).map((item,index)=>{return index;});
 	}

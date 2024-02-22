@@ -1,5 +1,5 @@
 const {MIN_FILE, MIN_RANK, NUM_FILES, NUM_RANKS} = require("./Constants.js");
-const {asciiOffset} = require("./Helpers.js");
+const {asciiOffset, intsUpTo} = require("./Helpers.js");
 
 //represent a square as a single integer
 class Square
@@ -39,6 +39,11 @@ class Square
 		const fileDistance = Square.file(square1) - Square.file(square2);
 		const rankDistance = Square.rank(square1) - Square.rank(square2);
 		return Math.sqrt((fileDistance*fileDistance)+(rankDistance*rankDistance));
+	}
+
+	static increasingFullArray()
+	{
+		return intsUpTo(NUM_RANKS*NUM_FILES);
 	}
 	
 	static rankString(square)
