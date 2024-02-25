@@ -74,7 +74,7 @@ class Piece
 	
 	basicMoves;
 	
-	seesEnemyKing;
+	seesOpposingKing;
 	
 	qualities;
 	
@@ -93,7 +93,7 @@ class Piece
 		
 		this.basicMoves = new Manager([]);
 		
-		this.seesEnemyKing = new Manager(false);
+		this.seesOpposingKing = new Manager(false);
 		
 		this.qualities = {
 			/*
@@ -104,7 +104,7 @@ class Piece
 					return Infinity;
 				}
 			},
-			enemyKingProximity: {
+			opposingKingProximity: {
 				manager: new Manager(Infinity),
 				measure: (piece) => {
 					return Infinity;
@@ -161,14 +161,14 @@ class Piece
 		this.basicMoves.revert();
 	}
 	
-	updateSightOfEnemyKing()
+	updateSightOfOpposingKing()
 	{
-		this.seesEnemyKing.update(this.squaresAttackedBitVector.get().read(this.team.opposition.king.square));
+		this.seesOpposingKing.update(this.squaresAttackedBitVector.get().read(this.team.opposition.king.square));
 	}
 	
-	revertSightOfEnemyKing()
+	revertSightOfOpposingKing()
 	{
-		this.seesEnemyKing.revert();
+		this.seesOpposingKing.revert();
 	}
 	
 	updateQualities()
@@ -188,14 +188,14 @@ class Piece
 	updateAllProperties()
 	{
 		this.updateSquaresAndMoves();
-		this.updateSightOfEnemyKing();
+		this.updateSightOfOpposingKing();
 		this.updateQualities();
 	}
 	
 	revertAllProperties()
 	{
 		this.revertSquaresAndMoves();
-		this.revertSightOfEnemyKing();
+		this.revertSightOfOpposingKing();
 		this.revertQualities();
 	}
 	
@@ -464,7 +464,7 @@ class PatternPiece extends Piece
 class King extends PatternPiece
 {
 	//King must update castle moves if own pieces move in/out of the way,
-	//or if enemy pieces guarding intermediate squares are blocked etc.
+	//or if opposing pieces guarding intermediate squares are blocked etc.
 
 	//for now the King is always fully updated after every move in the game
 	static typeChar = "K";
@@ -505,7 +505,7 @@ class King extends PatternPiece
 		const castleMoves = [];
 		//add castle moves if allowed
 		//king must not have moved, can't castle to get out of check
-		if(this.canCastle.get() && this.team.opposition.numEnemyKingSeers==0)
+		if(this.canCastle.get() && this.team.opposition.idsSeeingOpposingKingBitVector.isEmpty())
 		{
 			WINGS.forEach((wingChar)=>{
 				const rook = this.team.rooksInStartSquaresByWing[wingChar];
@@ -517,7 +517,7 @@ class King extends PatternPiece
 					blockingPieceLocationsBitVector.or(this.team.opposition.activePieceLocationsBitVector);
 					blockingPieceLocationsBitVector.and(this.team.constructor.CASTLE_INTERMEDIATE_SQUARES_BITVECTOR_BY_WING[wingChar]);
 					const noPiecesBetween = blockingPieceLocationsBitVector.isEmpty();
-					const squaresAreSafe = this.team.opposition.idsSeeingEnemyCastleSafeSquaresBitVectorByWing[wingChar].isEmpty();
+					const squaresAreSafe = this.team.opposition.idsSeeingOpposingCastleSafeSquaresBitVectorByWing[wingChar].isEmpty();
 					if(noPiecesBetween && squaresAreSafe)
 					{
 						castleMoves.push(new CastleMove(
@@ -746,7 +746,7 @@ class Pawn extends BlockablePiece
 		const specialMoves = [];
 		
 		this.squaresAttacked.get().forEach((squareAttacked)=>{
-			//only allow moves that capture a piece, from the enemy team
+			//only allow moves that capture a piece, from the opposing team
 			if(this.team.opposition.activePieceLocationsBitVector.read(squareAttacked))
 			{
 				if(Square.rank(squareAttacked)==this.team.opposition.constructor.BACK_RANK)
@@ -761,7 +761,7 @@ class Pawn extends BlockablePiece
 					basicMoves.push(new PlainMove(this.square, squareAttacked));
 				}
 			}
-			else	//could still be en passant capture (enemy piece is not on target square)
+			else	//could still be en passant capture (opposing piece is not on target square)
 			{
 				const enPassantFile = asciiDistance(this.game.enPassantable.get(), MIN_FILE);
 				//if enPassantFile is adjacent to current file

@@ -244,7 +244,7 @@ class Game
 		this.teamsByName[WhiteTeam.name].init();
 		this.teamsByName[BlackTeam.name].init();
 		//the white king was updated before the black pieces had any moves
-		//therefore, must update white king again to rule out moves based on enemy attacks
+		//therefore, must update white king again to rule out moves based on opposing attacks
 		this.teamsByName[WhiteTeam.name].updatePiece(this.teamsByName[WhiteTeam.name].king);
 		
 		this.movingPiece = new Manager();
@@ -639,12 +639,12 @@ class Game
 	
 	kingCapturable()
 	{	
-		return this.movingTeam.numEnemyKingSeers > 0;
+		return this.movingTeam.idsSeeingOpposingKingBitVector.isEmpty()==false;
 	}
 	
 	kingChecked()
 	{
-		return this.movingTeam.opposition.numEnemyKingSeers > 0;
+		return this.movingTeam.opposition.idsSeeingOpposingKingBitVector.isEmpty()==false;
 	}
 	
 	moveHistoryString()

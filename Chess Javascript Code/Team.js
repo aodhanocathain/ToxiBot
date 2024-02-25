@@ -46,9 +46,9 @@ class Team
 	activePieceLocationsBitVector;
 	
 	points;
-	numEnemyKingSeers;
 	
-	idsSeeingEnemyCastleSafeSquaresBitVectorByWing;
+	idsSeeingOpposingCastleSafeSquaresBitVectorByWing;
+	idsSeeingOpposingKingBitVector;
 	
 	king;
 	rooksInStartSquaresByWing;
@@ -66,13 +66,13 @@ class Team
 		
 		this.activePieceLocationsBitVector = new BitVector64();
 		
-		this.idsSeeingEnemyCastleSafeSquaresBitVectorByWing = WINGS.reduce((accumulator, wing)=>{
+		this.idsSeeingOpposingCastleSafeSquaresBitVectorByWing = WINGS.reduce((accumulator, wing)=>{
 			accumulator[wing] = new BitVector64();
 			return accumulator;
 		}, {});
+		this.idsSeeingOpposingKingBitVector = new BitVector64();
 		
 		this.points = 0;
-		this.numEnemyKingSeers = 0;
 		
 		this.rooksInStartSquaresByWing = {};
 	}
@@ -111,7 +111,7 @@ class Team
 		delete this.inactivePieces[piece.id];
 		this.activePieceLocationsBitVector.set(piece.square);
 		this.points += piece.constructor.points;
-		this.numEnemyKingSeers += piece.seesEnemyKing.get();
+		this.idsSeeingOpposingKingBitVector.write(piece.seesOpposingKing.get(), piece.id);
 	}
 	
 	deactivatePiece(piece)
@@ -120,36 +120,31 @@ class Team
 		delete this.activePieces[piece.id];
 		this.activePieceLocationsBitVector.clear(piece.square);
 		this.points -= piece.constructor.points;
-		this.numEnemyKingSeers -= piece.seesEnemyKing.get();
+		this.idsSeeingOpposingKingBitVector.clear(piece.id);
 	}
 	
 	updatePiece(piece)
 	{
-		const oldKingSight = piece.seesEnemyKing.get();
 		piece.updateAllProperties();
 		WINGS.forEach((wing)=>{
 			const seenSquares = piece.squaresAttackedBitVector.get().clone();
 			seenSquares.and(this.opposition.constructor.CASTLE_REQUIRED_SAFE_SQUARES_BITVECTOR_BY_WING[wing]);
 			const seesSquare = !(seenSquares.isEmpty());
-			this.idsSeeingEnemyCastleSafeSquaresBitVectorByWing[wing].write(seesSquare, piece.id);
+			this.idsSeeingOpposingCastleSafeSquaresBitVectorByWing[wing].write(seesSquare, piece.id);
 		});
-		const newKingSight = piece.seesEnemyKing.get();
-		this.numEnemyKingSeers += newKingSight - oldKingSight;
+		this.idsSeeingOpposingKingBitVector.write(piece.seesOpposingKing.get(), piece.id);
 	}
 	
 	revertPiece(piece)
 	{
-		const oldKingSight = piece.seesEnemyKing.get();
 		piece.revertAllProperties();
 		WINGS.forEach((wing)=>{
 			const seenSquares = piece.squaresAttackedBitVector.get().clone();
 			seenSquares.and(this.opposition.constructor.CASTLE_REQUIRED_SAFE_SQUARES_BITVECTOR_BY_WING[wing]);
 			const seesSquare = !(seenSquares.isEmpty());
-			this.idsSeeingEnemyCastleSafeSquaresBitVectorByWing[wing].write(seesSquare, piece.id);
+			this.idsSeeingOpposingCastleSafeSquaresBitVectorByWing[wing].write(seesSquare, piece.id);
 		});
-		const newKingSight = piece.seesEnemyKing.get();
-		this.numEnemyKingSeers += newKingSight - oldKingSight;
-		
+		this.idsSeeingOpposingKingBitVector.write(piece.seesOpposingKing.get(), piece.id);	
 	}
 	
 	swapOldPieceForNewPiece(oldPiece, newPiece)
