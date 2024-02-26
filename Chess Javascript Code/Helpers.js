@@ -1,4 +1,13 @@
-const {} = require("./Constants.js");
+function countTrailingZeroesInBits(bits, numBits=32)
+{
+	let i=0;
+	while(i<numBits)
+	{
+		if(((1<<i)&bits)!=0){return i;}
+		i++;
+	}
+	return i;
+}
 
 module.exports = {
 	asciiOffset(character, offset)	
@@ -48,16 +57,7 @@ module.exports = {
 		return extractedBits;
 	},
 
-	countTrailingZeroesInBits(bits, numBits=32)
-	{
-		let i=0;
-		while(i<numBits)
-		{
-			if(((1<<i)&bits)!=0){return i;}
-			i++;
-		}
-		return i;
-	},
+	countTrailingZeroesInBits:countTrailingZeroesInBits,
 
 	countTrailingZeroesInBitsPlus1IfNonzero(bits, numBits=32)
 	{
@@ -91,6 +91,13 @@ module.exports = {
 			i++;
 		}
 		return i;
+	},
+
+	popLSB(bitsObj)
+	{
+		const index = countTrailingZeroesInBits(bitsObj.bits);
+		bitsObj.bits &= ~(1<<index);
+		return index;
 	},
 
 	intsUpTo(n)	//excludes n itself
