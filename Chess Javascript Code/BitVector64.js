@@ -4,6 +4,8 @@
 //bit 32 is [1][0]
 //bit 33 is [1][1]
 
+const {countTrailingZeroesInBits} = require("./Helpers.js")
+
 const WORD_WIDTH = 32;	//assuming 32-bit integers in javascript
 class BitVector64
 {
@@ -69,6 +71,20 @@ class BitVector64
 	isEmpty()
 	{
 		return (this.words[0] | this.words[1]) == 0;
+	}
+
+	countTrailingZeroes()
+	{
+		const firstWordCount = countTrailingZeroesInBits(this.words[0]);
+		if(firstWordCount<32){return firstWordCount};
+		return firstWordCount + countTrailingZeroesInBits(this.words[1]);
+	}
+
+	popLSB()
+	{
+		const index = this.countTrailingZeroes();
+		this.clear(index);
+		return index;
 	}
 	
 	toString()

@@ -71,3 +71,23 @@ test("popLSB works as expected", ()=>{
     expect(popLSB(obj)).toEqual(32);
     expect(obj.bits).toEqual(0);
 })
+
+test("bitvector count trailing zeroes works as expected", ()=>{
+    const bv = new BitVector64();
+    bv.set(12);
+    expect(bv.countTrailingZeroes()).toEqual(12);
+    bv.clear(12);
+    bv.set(53);
+    expect(bv.countTrailingZeroes()).toEqual(53);
+    bv.clear(53);
+    expect(bv.countTrailingZeroes()).toEqual(64);
+})
+
+test("bitvector popLSB works as expected", ()=>{
+    const bv = new BitVector64();
+    bv.set(12);
+    bv.set(53);
+    expect(bv.popLSB()).toEqual(12);
+    expect(bv.popLSB()).toEqual(53);
+    expect(bv.popLSB()).toEqual(64);
+})
