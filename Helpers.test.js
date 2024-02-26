@@ -1,3 +1,4 @@
+const {SquareList} = require("./Chess Javascript Code/Square.js")
 const {BitVector64} = require("./Chess Javascript Code/BitVector64.js");
 const {extractBits, countTrailingZeroesInBits, countTrailingZeroesInBitsPlus1IfNonzero, countLeadingZeroesInBits, countLeadingZeroesInBitsPlus1IfNonzero, popLSB} = require("./Chess Javascript Code/Helpers.js");
 
@@ -91,3 +92,20 @@ test("bitvector popLSB works as expected", ()=>{
     expect(bv.popLSB()).toEqual(53);
     expect(bv.popLSB()).toEqual(64);
 })
+
+test("square list iterator works as expected", ()=>{
+    const list = new SquareList();
+    let squares = [12,53];
+
+    for(const square of squares)
+    {
+        list.add(square);
+    }
+
+    let i=0;
+    for(const square of list)
+    {
+        expect(square).toEqual(squares[i]);
+        i++;
+    }
+});

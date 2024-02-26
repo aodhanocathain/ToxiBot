@@ -1,3 +1,4 @@
+const {BitVector64} = require("./BitVector64.js");
 const {MIN_FILE, MIN_RANK, NUM_FILES, NUM_RANKS} = require("./Constants.js");
 const {asciiOffset, intsUpTo} = require("./Helpers.js");
 
@@ -62,6 +63,39 @@ class Square
 	}
 }
 
+class SquareList
+{
+	bits;
+	constructor()
+	{
+		this.bits = new BitVector64();
+	}
+
+	add(square)
+	{
+		this.bits.set(square);
+	}
+
+	remove(square)
+	{
+		this.bits.clear(square);
+	}
+
+	[Symbol.iterator](){
+		const bits = this.bits;
+		return {
+			next: function(){
+				const nextSquare = bits.popLSB();
+				return {
+					done: (nextSquare==64),
+					value: nextSquare
+				}
+			}
+		}
+	}
+}
+
 module.exports = {
-	Square:Square
+	Square:Square,
+	SquareList:SquareList
 };
