@@ -65,24 +65,44 @@ class Square
 
 class SquareList
 {
-	bits;
+	bitvector;
 	constructor()
 	{
-		this.bits = new BitVector64();
+		this.bitvector = new BitVector64();
 	}
 
 	add(square)
 	{
-		this.bits.set(square);
+		this.bitvector.set(square);
 	}
 
 	remove(square)
 	{
-		this.bits.clear(square);
+		this.bitvector.clear(square);
+	}
+
+	combine(squarelist)
+	{
+		this.bitvector.or(squarelist.bitvector);
+	}
+
+	has(square)
+	{
+		return this.bitvector.read(square);
+	}
+
+	bits()
+	{
+		return this.bitvector;
+	}
+
+	squares()
+	{
+		return Array.from(this);
 	}
 
 	[Symbol.iterator](){
-		const bits = this.bits;
+		const bits = this.bitvector;
 		return {
 			next: function(){
 				const nextSquare = bits.popLSB();
