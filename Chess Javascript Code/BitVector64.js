@@ -80,6 +80,22 @@ class BitVector64
 		return firstWordCount + countTrailingZeroesInBits(this.words[1]);
 	}
 
+	extractBits(extractIndices)	//sequential version of PEXT
+	{
+		//each element in extractIndices is a position to read from
+		//each value read gets written to consecutive bit positions in extractedBits
+
+		//this function will never be called to extract more than 32 bits, therefore the result fits in a single integer
+		let extractedBits = 0;
+
+		for(let writeIndex=0; writeIndex<extractIndices.length; writeIndex++)	//write to ascending bit positions in extractedBits
+		{
+			const readIndex = extractIndices[writeIndex];	//the position to extract a bit from
+			extractedBits |= (this.read(readIndex)<<writeIndex);
+		}
+		return extractedBits;
+	}
+
 	popLSB()
 	{
 		const index = this.countTrailingZeroes();

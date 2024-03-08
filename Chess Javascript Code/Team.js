@@ -127,7 +127,7 @@ class Team
 	{
 		piece.updateAllProperties();
 		WINGS.forEach((wing)=>{
-			const seenSquares = piece.squaresAttackedBitVector.get().clone();
+			const seenSquares = piece.squaresAttacked.get().bits();
 			seenSquares.and(this.opposition.constructor.CASTLE_REQUIRED_SAFE_SQUARES_BITVECTOR_BY_WING[wing]);
 			const seesSquare = !(seenSquares.isEmpty());
 			this.idsSeeingOpposingCastleSafeSquaresBitVectorByWing[wing].write(seesSquare, piece.id);
@@ -139,7 +139,7 @@ class Team
 	{
 		piece.revertAllProperties();
 		WINGS.forEach((wing)=>{
-			const seenSquares = piece.squaresAttackedBitVector.get().clone();
+			const seenSquares = piece.squaresAttacked.get().bits();
 			seenSquares.and(this.opposition.constructor.CASTLE_REQUIRED_SAFE_SQUARES_BITVECTOR_BY_WING[wing]);
 			const seesSquare = !(seenSquares.isEmpty());
 			this.idsSeeingOpposingCastleSafeSquaresBitVectorByWing[wing].write(seesSquare, piece.id);

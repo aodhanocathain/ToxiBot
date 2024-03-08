@@ -93,16 +93,24 @@ class SquareList
 
 	bits()
 	{
-		return this.bitvector;
+		return this.bitvector.clone();
 	}
 
 	squares()
 	{
 		return Array.from(this);
+		/*
+		const array = [];
+		for(let i=0; i<64; i++)
+		{
+			if(this.bitvector.read(i)){array.push(i);}
+		}
+		return array;
+		*/
 	}
 
 	[Symbol.iterator](){
-		const bits = this.bitvector;
+		const bits = this.bitvector.clone();
 		return {
 			next: function(){
 				const nextSquare = bits.popLSB();

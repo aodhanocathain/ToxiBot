@@ -425,7 +425,7 @@ class Game
 		//potentially update all pieces on the moving team
 		//because they all are able to gain/lose moves if friendly pieces get in/out of the way
 		this.movingTeam.activePieces.forEach((piece)=>{
-			const watchingBits = piece.squaresWatchedBitVector.get();
+			const watchingBits = piece.squaresWatched.get().bits();
 			if
 			(
 				watchingBits.read(move.mainPieceSquareBefore) ||
@@ -456,7 +456,7 @@ class Game
 			this.movingTeam.opposition.activePieces.forEach((piece)=>{
 				if(piece instanceof BlockablePiece)
 				{
-					const watchingBits = piece.squaresWatchedBitVector.get();
+					const watchingBits = piece.squaresWatched.get().bits();
 					if
 					(
 						watchingBits.read(move.mainPieceSquareBefore) ||
@@ -473,7 +473,7 @@ class Game
 		else
 		{
 			this.movingTeam.opposition.activePieces.forEach((piece)=>{
-				const watchingBits = piece.squaresWatchedBitVector.get();
+				const watchingBits = piece.squaresWatched.get().bits();
 				if
 				(
 					watchingBits.read(move.mainPieceSquareBefore) ||
