@@ -24,19 +24,15 @@ class Piece
 	static makeMoveString(move, game)
 	{
 		//See what squares this type of piece could have come from to reach the new square
+		//(assumes this type of piece can move back to previous squares in the same way that it moved away from them)
 		const movingPiece = game.pieces[move.mainPieceSquareBefore]		
-		let otherOrigins =
-		this.squaresAttackedFromSquareInGame(move.mainPieceSquareAfter,game).squares().filter((otherOrigin)=>{
+		const otherOrigins = [];
+		for(const otherOrigin of this.squaresAttackedFromSquareInGame(move.mainPieceSquareAfter, game))
+		{
 			const otherPiece = game.pieces[otherOrigin];
-			//ignore the square the moving piece came from
-			if(movingPiece==otherPiece){return false;}
-			//piece teams must match
-			if(movingPiece.team!=otherPiece?.team){return false;}
-			//piece types must match
-			if(movingPiece.constructor!=otherPiece?.constructor){return false;}
-			
-			return true;
-		})
+			const legitimate = (movingPiece!=otherPiece) && (movingPiece.team==otherPiece?.team) && (movingPiece.constructor==otherPiece?.constructor);
+			if(legitimate){otherOrigins.push(otherOrigin);}
+		}
 		
 		const sameOriginFiles = otherOrigins.filter((square)=>{return Square.file(move.mainPieceSquareBefore)==Square.file(square);});
 		const sameOriginRanks = otherOrigins.filter((square)=>{return Square.rank(move.mainPieceSquareBefore)==Square.rank(square);});
@@ -140,14 +136,14 @@ class Piece
 		
 		this.squaresAttacked.update(squaresAttacked);
 		
-		this.basicMoves.update(this.squaresAttacked.get().squares().reduce((accumulator, attackedSquare)=>{
-			//only allow moves that do not capture pieces from the same team
+		const basicMoves = [];
+		for(const attackedSquare of squaresAttacked)
+		{
 			if(this.game.pieces[attackedSquare]?.team != this.team)
 			{
-				accumulator.push(new PlainMove(this.square, attackedSquare));
+				basicMoves.push(new PlainMove(this.square, attackedSquare));
 			}
-			return accumulator;
-		}, []));
+		}
 	}
 	
 	revertSquaresAndMoves()
@@ -249,7 +245,14 @@ class RangedPiece extends BlockablePiece
 	static squaresAttackedFromSquareInDirectionIncreasingBlocked(square, direction, distance)
 	{
 		const unblocked = this.squaresAttackedFromSquareInDirectionUnblocked(square, direction);
-		const blockedSquares = unblocked.squares().slice(0, distance);
+		const blockedSquares = [];
+		let i=0;
+		for(const square of unblocked)
+		{
+			if(i==distance){break;}
+			blockedSquares.push(square);
+			i++;
+		}
 		const squareList = blockedSquares.reduce((accumulator, square)=>{
 			accumulator.add(square)
 			return accumulator;
@@ -284,8 +287,7 @@ class RangedPiece extends BlockablePiece
 		{
 			const direction = this.directionsIncreasing[d];
 			const unblocked = this.squaresAttackedFromSquareInDirectionUnblocked(square, direction);
-			const unblockedSquares = unblocked.squares();
-			const anyblockers = bothBits.extractBits(unblockedSquares);
+			const anyblockers = bothBits.extractBitsUsingSquareList(unblocked);
 			const attackDistance = countTrailingZeroesInBitsPlus1IfNonzero(anyblockers, NUM_RANKS-1);
 			const blocked = this.squaresAttackedFromSquareInDirectionIncreasingBlocked(square, direction, attackDistance);
 			squareList.combine(blocked);
@@ -295,8 +297,7 @@ class RangedPiece extends BlockablePiece
 		{
 			const direction = this.directionsDecreasing[d];
 			const unblocked = this.squaresAttackedFromSquareInDirectionUnblocked(square, direction);
-			const unblockedSquares = unblocked.squares().reverse();
-			const anyblockers = bothBits.extractBits(unblockedSquares);
+			const anyblockers = bothBits.extractBitsUsingSquareList(unblocked);
 			const attackDistance = countTrailingZeroesInBitsPlus1IfNonzero(anyblockers, NUM_RANKS-1);
 			const blocked = this.squaresAttackedFromSquareInDirectionDecreasingBlocked(square, direction, attackDistance);
 			squareList.combine(blocked);
@@ -383,15 +384,14 @@ class RangedPiece extends BlockablePiece
 		{
 			const direction = this.constructor.directionsIncreasing[d];
 			const unblocked = this.constructor.squaresAttackedFromSquareInDirectionUnblocked(this.square, direction);
-			const unblockedSquares = unblocked.squares();
 
-			const eitherBlockers = bothBits.extractBits(unblockedSquares);
+			const eitherBlockers = bothBits.extractBitsUsingSquareList(unblocked);
 			const attackDistance = countTrailingZeroesInBitsPlus1IfNonzero(eitherBlockers, NUM_RANKS-1);
 			squares.combine(this.constructor.squaresAttackedFromSquareInDirectionIncreasingBlocked_lookup[this.square][d][attackDistance]);
 
-			const friendlyBlockers = friendlyBits.extractBits(unblockedSquares);
+			const friendlyBlockers = friendlyBits.extractBitsUsingSquareList(unblocked);
 			const friendlyDistance = countTrailingZeroesInBits(friendlyBlockers, NUM_RANKS-1);
-			const opposingBlockers = opposingBits.extractBits(unblockedSquares);
+			const opposingBlockers = opposingBits.extractBitsUsingSquareList(unblocked);
 			const opposingDistance = countTrailingZeroesInBitsPlus1IfNonzero(opposingBlockers, NUM_RANKS-1);
 			const moveDistance = Math.min(friendlyDistance, opposingDistance);
 			moves.push(this.constructor.movesFromSquareInDirectionIncreasing_lookup[this.square][d][moveDistance]);
@@ -402,15 +402,14 @@ class RangedPiece extends BlockablePiece
 		{
 			const direction = this.constructor.directionsDecreasing[d];
 			const unblocked = this.constructor.squaresAttackedFromSquareInDirectionUnblocked(this.square, direction);
-			const unblockedSquares = unblocked.squares().reverse();
-
-			const eitherBlockers = bothBits.extractBits(unblockedSquares);
+			const unblockedSquares = Array.from(unblocked).reverse();
+			const eitherBlockers = bothBits.extractBitsUsingArray(unblockedSquares);
 			const attackDistance = countTrailingZeroesInBitsPlus1IfNonzero(eitherBlockers, NUM_RANKS-1);
 			squares.combine(this.constructor.squaresAttackedFromSquareInDirectionDecreasingBlocked_lookup[this.square][d][attackDistance]);
 
-			const friendlyBlockers = friendlyBits.extractBits(unblockedSquares);
+			const friendlyBlockers = friendlyBits.extractBitsUsingArray(unblockedSquares);
 			const friendlyDistance = countTrailingZeroesInBits(friendlyBlockers, NUM_RANKS-1);
-			const opposingBlockers = opposingBits.extractBits(unblockedSquares);
+			const opposingBlockers = opposingBits.extractBitsUsingArray(unblockedSquares);
 			const opposingDistance = countTrailingZeroesInBitsPlus1IfNonzero(opposingBlockers, NUM_RANKS-1);
 			const moveDistance = Math.min(friendlyDistance, opposingDistance);
 			moves.push(this.constructor.movesFromSquareInDirectionDecreasing_lookup[this.square][d][moveDistance]);
@@ -490,7 +489,7 @@ class PatternPiece extends Piece
 		const squaresAttacked = this.constructor.squaresAttackedFromSquare_lookup[this.square];
 		this.squaresAttacked.update(squaresAttacked);
 		
-		const friendlyBlockers = this.team.activePieceLocationsBitVector.extractBits(squaresAttacked.squares());
+		const friendlyBlockers = this.team.activePieceLocationsBitVector.extractBitsUsingSquareList(squaresAttacked);
 
 		const basicMoves = this.constructor.movesFromSquare_lookup[this.square][friendlyBlockers];
 		this.basicMoves.update(basicMoves);
