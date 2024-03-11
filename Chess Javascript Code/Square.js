@@ -5,7 +5,7 @@ const {asciiOffset, intsUpTo} = require("./Helpers.js");
 //represent a square as a single integer
 class Square
 {
-	static withRankAndFile(rank,file)
+	static withRankAndFile(rank,file)	//compute the index of the square that has a certain rank and file
 	{
 		return (rank*NUM_FILES) + file;
 	}
@@ -99,14 +99,6 @@ class SquareList
 	squares()
 	{
 		return Array.from(this);
-		/*
-		const array = [];
-		for(let i=0; i<64; i++)
-		{
-			if(this.bitvector.read(i)){array.push(i);}
-		}
-		return array;
-		*/
 	}
 
 	[Symbol.iterator](){
