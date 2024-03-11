@@ -368,7 +368,6 @@ class RangedPiece extends BlockablePiece
 		super(game, team, square);
 	}
 
-	///*
 	updateSquaresAndMoves()
 	{
 		const moves = [];
@@ -403,7 +402,6 @@ class RangedPiece extends BlockablePiece
 		{
 			const direction = this.constructor.directionsDecreasing[d];
 			const unblocked = this.constructor.squaresAttackedFromSquareInDirectionUnblocked(this.square, direction);
-			//const unblockedSquares = unblocked.squares();
 			const unblockedSquares = unblocked.squares().reverse();
 
 			const eitherBlockers = bothBits.extractBits(unblockedSquares);
@@ -429,13 +427,15 @@ class RangedPiece extends BlockablePiece
 			array.push(list);
 		}
 	}
-	//*/
 }
 
 //pieces whose moves are always a fixed pattern around their current square
 class PatternPiece extends Piece
 {
 	static patternIncreasing;
+
+	static squaresAttackedFromSquare_lookup;
+	static movesFromSquare_lookup;
 	
 	static squaresAttackedFromSquareInGame(square, game)
 	{
@@ -462,11 +462,38 @@ class PatternPiece extends Piece
 
 	static initClassLookups()
 	{
+		this.squaresAttackedFromSquare_lookup = Square.increasingFullArray().map((fromSquare)=>{
+			return this.squaresAttackedFromSquareInGame(fromSquare);
+		});
+
+		this.movesFromSquare_lookup = Square.increasingFullArray().map((fromSquare)=>{
+			return intsUpTo(1<<this.patternIncreasing.length).map((bits)=>{
+				return this.squaresAttackedFromSquareInGame(fromSquare).squares().reduce((accumulator,toSquare,index)=>{
+					const friendlyBlocking = ((bits>>index) & 1);
+					if(!friendlyBlocking)
+					{
+						accumulator.push(new PlainMove(fromSquare, toSquare));
+					}
+					return accumulator;
+				}, []);
+			});
+		});
 	}
 
 	constructor(game, team, square)
 	{
 		super(game, team, square);
+	}
+
+	updateSquaresAndMoves()
+	{
+		const squaresAttacked = this.constructor.squaresAttackedFromSquare_lookup[this.square];
+		this.squaresAttacked.update(squaresAttacked);
+		
+		const friendlyBlockers = this.team.activePieceLocationsBitVector.extractBits(squaresAttacked.squares());
+
+		const basicMoves = this.constructor.movesFromSquare_lookup[this.square][friendlyBlockers];
+		this.basicMoves.update(basicMoves);
 	}
 }
 
