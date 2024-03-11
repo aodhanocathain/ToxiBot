@@ -76,7 +76,7 @@ class BitVector64
 	countTrailingZeroes()
 	{
 		const firstWordCount = countTrailingZeroesInBits(this.words[0]);
-		if(firstWordCount<32){return firstWordCount};
+		if(firstWordCount<WORD_WIDTH){return firstWordCount};
 		return firstWordCount + countTrailingZeroesInBits(this.words[1]);
 	}
 
