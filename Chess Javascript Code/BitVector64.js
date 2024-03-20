@@ -26,6 +26,12 @@ class BitVector64
 		return clone;
 	}
 	
+	invert()
+	{
+		this.words[0] = ~this.words[0];
+		this.words[1] = ~this.words[1];
+	}
+
 	set(index)
 	{
 		const wordIndex = Math.floor(index / WORD_WIDTH);

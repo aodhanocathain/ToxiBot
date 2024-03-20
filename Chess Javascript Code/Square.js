@@ -101,6 +101,13 @@ class SquareList
 		return Array.from(this);
 	}
 
+	withoutFriendlies(friendlies)
+	{
+		const clone = friendlies.clone();
+		clone.invert();
+		this.bitvector.and(clone);
+	}
+
 	[Symbol.iterator](){
 		const bits = this.bitvector.clone();
 		return {

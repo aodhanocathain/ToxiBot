@@ -136,14 +136,12 @@ class Piece
 		
 		this.squaresAttacked.update(squaresAttacked);
 		
-		const basicMoves = [];
-		for(const attackedSquare of squaresAttacked)
-		{
-			if(this.game.pieces[attackedSquare]?.team != this.team)
-			{
-				basicMoves.push(new PlainMove(this.square, attackedSquare));
-			}
-		}
+		const destinationsPossible = squaresAttacked.withoutFriendlies(this.team.activePieceLocationsBitVector);
+
+		const basicMoves = Array.from(destinationsPossible).map((attackedSquare)=>{
+			basicMoves.push(new PlainMove(this.square, attackedSquare));
+		})
+		this.basicMoves.update(basicMoves);
 	}
 	
 	revertSquaresAndMoves()
@@ -553,14 +551,6 @@ class Bishop extends RangedPiece
 	static name = "bishop";
 	static points = 3;
 	
-	/*
-	static directions = [
-		[-1,-1],
-		[1,-1],
-		[-1,1],
-		[1,1]
-	];
-	*/
 	static directionsIncreasing = [
 		[1,-1],
 		[1,1]
