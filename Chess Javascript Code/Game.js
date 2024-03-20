@@ -617,13 +617,7 @@ class Game
 	
 	calculateMoves()
 	{
-		const moves = [];
-		
-		this.movingTeam.activePieces.forEach((piece)=>{
-			piece.addMovesToArray(moves);
-		});
-
-		return moves;
+		return this.movingTeam.gatherMoves();
 	}
 	
 	calculateLegals()

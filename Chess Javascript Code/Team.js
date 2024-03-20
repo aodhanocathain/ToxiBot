@@ -1,8 +1,10 @@
 const {NUM_FILES, NUM_RANKS, MAX_EVALUATION_SCORE, MAX_EVALUATION_DEPTH} = require("./Constants.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
+const {CastleMove} = require("./Move.js");
 const {King, Queen, Rook, WINGS} = require("./Piece.js");
 const {BitVector64} = require("./BitVector64.js");
+const { intsUpTo } = require("./Helpers.js");
 
 class Team
 {
@@ -24,6 +26,8 @@ class Team
 	
 	static CASTLE_INTERMEDIATE_SQUARES_BITVECTOR_BY_WING;
 	static CASTLE_REQUIRED_SAFE_SQUARES_BITVECTOR_BY_WING;
+
+	static CASTLE_MOVES_LOOKUP;
 	
 	static BEST_POSSIBLE_SCORE;
 	static INF_SCORE;
@@ -155,6 +159,42 @@ class Team
 		this.activatePiece(newPiece);
 	}
 	
+	gatherMoves()
+	{
+		const moves = [];
+		
+		this.activePieces.forEach((piece)=>{
+			piece.addMovesToArray(moves);
+		});
+
+		const kingCanCastle = this.king.canCastle.get() && this.opposition.idsSeeingOpposingKingBitVector.isEmpty();
+		let bits = WINGS.reduce((accumulator, wing, wingIndex)=>{
+			if(kingCanCastle)
+			{
+				const rook = this.rooksInStartSquaresByWing[wing];
+				//rook must not have moved
+				if(rook?.canCastle.get() && rook?.isActive())
+				{
+					//must not be any pieces between king and rook
+					const blockingPieceLocationsBitVector = this.activePieceLocationsBitVector.clone();
+					blockingPieceLocationsBitVector.or(this.opposition.activePieceLocationsBitVector);
+					blockingPieceLocationsBitVector.and(this.constructor.CASTLE_INTERMEDIATE_SQUARES_BITVECTOR_BY_WING[wing]);
+					const noPiecesBetween = blockingPieceLocationsBitVector.isEmpty();
+					const squaresAreSafe = this.opposition.idsSeeingOpposingCastleSafeSquaresBitVectorByWing[wing].isEmpty();
+					if(noPiecesBetween && squaresAreSafe)
+					{
+						accumulator |= (1<<wingIndex);
+					}
+				}
+			}
+			return accumulator;
+		}, 0);
+
+		moves.push(this.constructor.CASTLE_MOVES_LOOKUP[bits]);
+
+		return moves;
+	}
+
 	init()
 	{
 		this.activePieces.forEach((piece)=>{
@@ -277,6 +317,23 @@ TEAM_CLASSES.forEach((teamClass)=>{
 		return accumulator;
 	}, {});
 });
+
+TEAM_CLASSES.forEach((teamClass)=>{
+	//lookup by sequence of bits where each bit indicates ability to castle in some wing
+	teamClass.CASTLE_MOVES_LOOKUP = intsUpTo(1<<WINGS.length).map((bits)=>{
+		return WINGS.reduce((accumulator, wing, wingIndex)=>{
+			const canCastleThisWing = !!((bits>>wingIndex)&1);
+			if(canCastleThisWing)
+			{
+				accumulator.push(new CastleMove(
+					teamClass.STARTING_KING_SQUARE, teamClass.CASTLE_KING_SQUARES_BY_WING[wing],
+					teamClass.STARTING_ROOK_SQUARES_BY_WING[wing], teamClass.CASTLE_ROOK_SQUARES_BY_WING[wing]
+				));
+			}
+			return accumulator;
+		}, []);
+	});
+})
 
 TEAM_CLASSES.forEach((teamClass)=>{
 	teamClass.BEST_POSSIBLE_SCORE = teamClass.SCORE_MULTIPLIER*(MAX_EVALUATION_SCORE + 1 + MAX_EVALUATION_DEPTH);

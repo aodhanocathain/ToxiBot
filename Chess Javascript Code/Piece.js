@@ -517,65 +517,13 @@ class King extends PatternPiece
 		[1,1]
 	];
 	
-	castleMoves;
-	
 	//assigned by the game upon piece creation
 	canCastle;
 	
 	constructor(game, team, square)
 	{
 		super(game, team, square);
-		this.castleMoves = new Manager([]);
 		this.canCastle = new Manager(false);
-	}
-	
-	addMovesToArray(array)
-	{
-		array.push(this.basicMoves.get());
-		array.push(this.castleMoves.get());
-	}
-	
-	updateCastleMoves()
-	{
-		const castleMoves = [];
-		//add castle moves if allowed
-		//king must not have moved, can't castle to get out of check
-		if(this.canCastle.get() && this.team.opposition.idsSeeingOpposingKingBitVector.isEmpty())
-		{
-			WINGS.forEach((wingChar)=>{
-				const rook = this.team.rooksInStartSquaresByWing[wingChar];
-				//rook must not have moved
-				if(rook?.canCastle.get() && rook?.isActive())
-				{
-					//must not be any pieces between king and rook
-					const blockingPieceLocationsBitVector = this.team.activePieceLocationsBitVector.clone();
-					blockingPieceLocationsBitVector.or(this.team.opposition.activePieceLocationsBitVector);
-					blockingPieceLocationsBitVector.and(this.team.constructor.CASTLE_INTERMEDIATE_SQUARES_BITVECTOR_BY_WING[wingChar]);
-					const noPiecesBetween = blockingPieceLocationsBitVector.isEmpty();
-					const squaresAreSafe = this.team.opposition.idsSeeingOpposingCastleSafeSquaresBitVectorByWing[wingChar].isEmpty();
-					if(noPiecesBetween && squaresAreSafe)
-					{
-						castleMoves.push(new CastleMove(
-						this.square, this.team.constructor.CASTLE_KING_SQUARES_BY_WING[wingChar],
-						rook.square, this.team.constructor.CASTLE_ROOK_SQUARES_BY_WING[wingChar]
-						));
-					}
-				}
-			});
-		}
-		this.castleMoves.update(castleMoves);
-	}
-
-	updateSquaresAndMoves()
-	{
-		super.updateSquaresAndMoves();
-		this.updateCastleMoves();
-	}
-	
-	revertSquaresAndMoves()
-	{
-		super.revertSquaresAndMoves();
-		this.castleMoves.revert();
 	}
 }
 King.initClassLookups();
