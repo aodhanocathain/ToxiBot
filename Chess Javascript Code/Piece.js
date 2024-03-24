@@ -73,6 +73,8 @@ class Piece
 	
 	qualities;
 	
+	castleRightsMask;
+
 	//set by the piece's team
 	id;
 	
@@ -113,6 +115,8 @@ class Piece
 			}
 			*/
 		};
+
+		this.castleRightsMask = -1;	//overwritten by king and rook constructors
 	}
 	
 	isActive()
@@ -133,7 +137,6 @@ class Piece
 	updateSquaresAndMoves()
 	{
 		const squaresAttacked = this.constructor.squaresAttackedFromSquareInGame(this.square, this.game);
-		
 		this.squaresAttacked.update(squaresAttacked);
 		
 		const destinationsPossible = squaresAttacked.withoutFriendlies(this.team.activePieceLocationsBitVector);
@@ -372,8 +375,8 @@ class RangedPiece extends BlockablePiece
 		const moves = [];
 		const squares = new SquareList();
 
-		const friendlyBits = this.game.movingTeam.activePieceLocationsBitVector;
-		const opposingBits = this.game.movingTeam.opposition.activePieceLocationsBitVector;
+		const friendlyBits = this.team.activePieceLocationsBitVector;
+		const opposingBits = this.team.opposition.activePieceLocationsBitVector;
 		const bothBits = new BitVector64();
 		bothBits.or(friendlyBits);
 		bothBits.or(opposingBits);
@@ -515,13 +518,10 @@ class King extends PatternPiece
 		[1,1]
 	];
 	
-	//assigned by the game upon piece creation
-	canCastle;
-	
 	constructor(game, team, square)
 	{
 		super(game, team, square);
-		this.canCastle = new Manager(false);
+		this.castleRightsMask = 0;
 	}
 }
 King.initClassLookups();
@@ -567,15 +567,7 @@ class Rook extends RangedPiece
 	static typeChar = "R";
 	static name = "rook";
 	static points = 5;
-	
-	/*
-	static directions = [
-		[0,-1],
-		[-1,0],
-		[1,0],
-		[0,1]
-	];
-	*/
+
 	static directionsIncreasing = [
 		[0,1],
 		[1,0]
@@ -584,14 +576,11 @@ class Rook extends RangedPiece
 		[-1,0],
 		[0,-1],
 	];
-	
-	//assigned by the game upon piece creation
-	canCastle;
 
-	constructor(game, team, square)
+	constructor(game, team, square, castleRightsMask=-1)
 	{
 		super(game, team, square);
-		this.canCastle = new Manager(false);
+		this.castleRightsMask = castleRightsMask;
 	}
 }
 Rook.initClassLookups();
@@ -601,19 +590,7 @@ class Queen extends RangedPiece
 	static typeChar = "Q";
 	static name = "queen";
 	static points = 9;
-	
-	/*
-	static directions = [
-		[-1,-1],
-		[0,-1],
-		[1,-1],
-		[-1,0],
-		[1,0],
-		[-1,1],
-		[0,1],
-		[1,1]
-	];
-	*/
+
 	static directionsIncreasing = [
 		[0,1],
 		[1,-1],
@@ -636,7 +613,7 @@ class Pawn extends BlockablePiece
 	static points = 1;
 	
 	static LONG_MOVE_RANK_INCREMENT_MULTIPLIER = 2;
-	
+
 	static squaresAttackedFromSquareInGameForTeam(square, game, team)
 	{
 		const squareList = new SquareList();
@@ -835,7 +812,5 @@ module.exports = {
 	
 	PieceClassesByTypeChar: PieceClassesByTypeChar,
 	
-	WINGS: WINGS
+	WINGS: WINGS,
 }
-
-//console.log(Bishop.movesFromSquare_lookup[Square.withRankAndFile(3,5)]);

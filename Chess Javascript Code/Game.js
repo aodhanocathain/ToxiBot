@@ -5,7 +5,7 @@ const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
 const {PlainMove, PromotionMove, EnPassantMove, CastleMove} = require("./Move.js");
 const {Team, WhiteTeam, BlackTeam} = require("./Team.js");
-const {Piece, King, Queen, Rook, Pawn, PieceClassesByTypeChar, WINGS, BlockablePiece} = require("./Piece.js");
+const {Piece, King, Queen, Rook, Pawn, PieceClassesByTypeChar, WINGS, WING_BIT_INDICES, BlockablePiece} = require("./Piece.js");
 
 const {Worker, isMainThread, parentPort} = require("worker_threads");
 
@@ -17,52 +17,6 @@ const DRAW_AFTER_NO_PROGRESS_HALFMOVES = 100;
 const DRAW_BY_REPETITIONS = 3;
 
 const EMPTY_FEN_FIELD = "-";
-
-function mergeSortEvaluations(evaluations, start, end, team)
-{	
-	const range = end-start;
-	if(range==1){return;}
-	
-	const leftStart = start;
-	const leftEnd = start + Math.floor(range/2);
-	const rightStart = leftEnd;
-	const rightEnd = end;
-	
-	mergeSortEvaluations(evaluations, leftStart, leftEnd, team);
-	mergeSortEvaluations(evaluations, rightStart, rightEnd, team);
-	
-	let leftIndex = leftStart;
-	let rightIndex = rightStart;
-	let sortedIndex = 0;
-	
-	const sortedSub = Array(range);
-	while((leftIndex<leftEnd) && (rightIndex<rightEnd))
-	{
-		if(team.evalPreferredToEval(evaluations[leftIndex],evaluations[rightIndex]))
-		{
-			sortedSub[sortedIndex++] = evaluations[leftIndex++];
-		}
-		else
-		{
-			sortedSub[sortedIndex++] = evaluations[rightIndex++];
-		}
-	}
-	
-	while(leftIndex<leftEnd)
-	{
-		sortedSub[sortedIndex++] = evaluations[leftIndex++];
-	}
-	
-	while(rightIndex<rightEnd)
-	{
-		sortedSub[sortedIndex++] = evaluations[rightIndex++];
-	}
-	
-	for(let i=0; i<sortedSub.length; i++)
-	{
-		evaluations[start + i] = sortedSub[i];
-	}
-}
 
 class Game
 {	
@@ -144,7 +98,19 @@ class Game
 					const team = this.teamsByName[teamClass.name];
 					
 					const square = Square.withRankAndFile(rank,file);
-					const piece = new pieceClass(this,team,square);
+					let piece;
+					if(pieceClass==Rook)
+					{
+						const bitPosition = WINGS.findIndex((wing)=>{
+							return (square==teamClass.STARTING_ROOK_SQUARES_BY_WING[wing]);
+						});
+						const castleRightsMask = (bitPosition<0)? -1 : ~(1<<bitPosition);
+						piece = new pieceClass(this,team,square,castleRightsMask);
+					}
+					else
+					{
+						piece = new pieceClass(this,team,square);
+					}
 					
 					//current square is occupied
 					this.pieces[square] = piece;
@@ -174,42 +140,44 @@ class Game
 		{
 			throw "invalid team's turn in FEN string";
 		}
-		
-		//determine the castling rights from the 3rd part of the FEN string
-		const castleRightsCharacters = FENparts[2].split("");
-		//check for invalid castle rights characters
-		if(castleRightsCharacters.some((teamedChar)=>{
-			if(teamedChar==EMPTY_FEN_FIELD){return false;}
-			const wingChar = Piece.typeCharOfTeamedChar(teamedChar);
-			return !(WINGS.includes(wingChar));
-		})){throw "invalid castle right in FEN string";}
-		//check for duplicate castle rights characters
-		const differentRights = castleRightsCharacters.reduce((accumulator, teamedChar)=>{
-			if(teamedChar in accumulator){throw "duplicate castle rights in FEN string";}
-			accumulator[teamedChar] = true;
-			return accumulator;
-		},{});
-		
-		if(FENparts[2]!=EMPTY_FEN_FIELD)
-		{
-			//rooks and kings already have canCastle true if they started in the right squares,
-			//but if the castle rights aren't there then must update canCastle to reflect this
-			Object.values(this.teamsByName).forEach((team)=>{
-				let numRooksCanCastle = 0;
-				//check each rook individually, if neither can castle then update the king, too
-				WINGS.forEach((wing)=>{
-					const rook = team.rooksInStartSquaresByWing[wing];
-					if(rook)
-					{
-						const teamedWingChar = team.constructor.charConverter(wing);
-						const hasRight = castleRightsCharacters.includes(teamedWingChar);
 
-						const canCastle = rook.canCastle.get() && hasRight;
-						rook.canCastle.update(canCastle);
-						if(canCastle){numRooksCanCastle++;}
+		//determine the castling rights from the 3rd part of the FEN string
+		if(FENparts[2]==EMPTY_FEN_FIELD)
+		{
+			Object.values(this.teamsByName).forEach((team)=>{
+				team.castleRights = new Manager(0);
+			});
+		}
+		else
+		{
+			const castleRightsCharacters = FENparts[2].split("");
+			//check for invalid or duplicate castle rights characters
+			const differentRights = castleRightsCharacters.reduce((accumulator, teamedChar)=>{
+				const wingChar = Piece.typeCharOfTeamedChar(teamedChar);
+				if(!(WINGS.includes(wingChar))){throw "invalid castle right in FEN string";}
+				if(teamedChar in accumulator){throw "duplicate castle rights in FEN string";}
+				accumulator[teamedChar] = true;
+				return accumulator;
+			},{});
+
+			Object.values(this.teamsByName).forEach((team)=>{
+				let castleRights = 0;
+				WINGS.forEach((wing, wingIndex)=>{
+					const teamedChar = team.constructor.charConverter(wing);
+					if(teamedChar in differentRights)
+					{
+						if(!team.rooksInStartSquaresByWing[wing])
+						{
+							//throw "impossible castle rights in FEN string";
+						}
+						else
+						{
+							castleRights |= (1<<wingIndex);
+						}
 					}
+
+					team.castleRights = new Manager(castleRights);
 				})
-				if(numRooksCanCastle==0){team.king.canCastle.update(false);}
 			})
 		}
 
@@ -225,7 +193,6 @@ class Game
 			}
 		}
 		this.enPassantable = new Manager(FENparts[3]);
-		
 		
 		//determine the halfmove and fullmove clocks from the 5th and 6th parts of the FEN string respectively
 		this.halfMove = new Manager(parseInt(FENparts[4]));
@@ -497,14 +464,17 @@ class Game
 		const targetPiece = this.pieces[captureSquare];
 		targetPiece?.deactivate();
 		this.pieces[captureSquare] = null;
+		if(targetPiece)
+		{
+			targetPiece.team.castleRights.update(targetPiece.team.castleRights.get() & targetPiece.castleRightsMask);
+		}
 		
 		//move the main piece to new square
 		const movingPiece = this.pieces[move.mainPieceSquareBefore];
 		movingPiece.square = move.mainPieceSquareAfter;
 		this.pieces[move.mainPieceSquareAfter] = movingPiece;
 		movingPiece.team.activePieceLocationsBitVector.set(move.mainPieceSquareAfter);
-
-		movingPiece.canCastle?.update(false);
+		movingPiece.team.castleRights.update(movingPiece.team.castleRights.get() & movingPiece.castleRightsMask);
 		
 		//remove main piece from old square
 		this.pieces[move.mainPieceSquareBefore] = null;
@@ -513,11 +483,12 @@ class Game
 		//some types of moves require more work than just moving the main piece
 		if(move instanceof CastleMove)
 		{
+			//castlerights already set to 0 by the king' share of the move
+
 			//move the rook to its new square as well
 			const rook = this.pieces[move.rookBefore];
 			this.pieces[move.rookAfter] = rook;
 			rook.team.activePieceLocationsBitVector.set(move.rookAfter);
-			rook.canCastle.update(false);
 
 			//remove the rook from its old square
 			this.pieces[move.rookBefore] = null;
@@ -587,7 +558,6 @@ class Game
 			const rook = this.pieces[move.rookAfter];
 			this.pieces[move.rookBefore] = rook;
 			rook.team.activePieceLocationsBitVector.set(move.rookBefore);
-			rook.canCastle.revert();
 
 			//remove the rook from its new square
 			this.pieces[move.rookAfter] = null;
@@ -603,7 +573,7 @@ class Game
 		movingPiece.square = move.mainPieceSquareBefore;
 		this.pieces[move.mainPieceSquareBefore] = movingPiece;
 		movingPiece.team.activePieceLocationsBitVector.set(move.mainPieceSquareBefore);
-		movingPiece.canCastle?.revert();
+		movingPiece.team.castleRights.revert();
 
 		//remove main piece from new square
 		this.pieces[move.mainPieceSquareAfter] = null;
@@ -613,6 +583,7 @@ class Game
 		const captureSquare = move.enPassantSquare || move.mainPieceSquareAfter;;
 		this.pieces[captureSquare] = targetPiece;
 		targetPiece?.activate();
+		targetPiece?.team.castleRights.revert();
 	}
 	
 	calculateMoves()
@@ -735,15 +706,12 @@ class Game
 	{
 		const boardString = this.boardString();
 		let castleRightsString = Object.values(this.teamsByName).reduce((accumulator, team)=>{
-			if(team.king.canCastle.get())
-			{
-				WINGS.forEach((wing)=>{
-					if(team.rooksInStartSquaresByWing[wing]?.canCastle.get())
-					{
-						accumulator.push(team.constructor.charConverter(wing));
-					}
-				})
-			}
+			WINGS.forEach((wing, wingIndex)=>{
+				if(team.castleRights.get() & (1<<wingIndex))
+				{
+					accumulator.push(team.constructor.charConverter(wing));
+				}
+			})
 			return accumulator;
 		}, []).sort().join("");
 		if(castleRightsString==""){castleRightsString="-";}

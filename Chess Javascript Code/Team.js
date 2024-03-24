@@ -2,7 +2,7 @@ const {NUM_FILES, NUM_RANKS, MAX_EVALUATION_SCORE, MAX_EVALUATION_DEPTH} = requi
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
 const {CastleMove} = require("./Move.js");
-const {King, Queen, Rook, WINGS} = require("./Piece.js");
+const {King, Queen, Rook, WINGS, WING_BIT_INDICES} = require("./Piece.js");
 const {BitVector64} = require("./BitVector64.js");
 const { intsUpTo } = require("./Helpers.js");
 
@@ -59,6 +59,7 @@ class Team
 	
 	//assigned by the team's game
 	opposition;
+	castleRights;
 	
 	constructor(game)
 	{
@@ -96,8 +97,6 @@ class Team
 		if(piece instanceof King)
 		{
 			this.king = piece;
-			piece.canCastle = new Manager(piece.square==this.constructor.STARTING_KING_SQUARE)	//assume the king did not move yet
-			//the game castling rights are used to verify this anyway
 		}
 		else if(piece instanceof Rook)
 		{
@@ -105,7 +104,6 @@ class Team
 				return piece.square==this.constructor.STARTING_ROOK_SQUARES_BY_WING[wing];
 			});
 			this.rooksInStartSquaresByWing[wing] = piece;
-			piece.canCastle = new Manager(!!wing);
 		}
 	}
 	
@@ -167,29 +165,22 @@ class Team
 			piece.addMovesToArray(moves);
 		});
 
-		const kingCanCastle = this.king.canCastle.get() && this.opposition.idsSeeingOpposingKingBitVector.isEmpty();
-		let bits = WINGS.reduce((accumulator, wing, wingIndex)=>{
-			if(kingCanCastle)
+		const castleRightsBits = this.castleRights.get();
+		let castleLegalityBits = WINGS.reduce((accumulator, wing, wingIndex)=>{
+			//must not be any pieces between king and rook
+			const blockingPieceLocationsBitVector = this.activePieceLocationsBitVector.clone();
+			blockingPieceLocationsBitVector.or(this.opposition.activePieceLocationsBitVector);
+			blockingPieceLocationsBitVector.and(this.constructor.CASTLE_INTERMEDIATE_SQUARES_BITVECTOR_BY_WING[wing]);
+			const noPiecesBetween = blockingPieceLocationsBitVector.isEmpty();
+			const squaresAreSafe = this.opposition.idsSeeingOpposingCastleSafeSquaresBitVectorByWing[wing].isEmpty();
+			if(noPiecesBetween && squaresAreSafe)
 			{
-				const rook = this.rooksInStartSquaresByWing[wing];
-				//rook must not have moved
-				if(rook?.canCastle.get() && rook?.isActive())
-				{
-					//must not be any pieces between king and rook
-					const blockingPieceLocationsBitVector = this.activePieceLocationsBitVector.clone();
-					blockingPieceLocationsBitVector.or(this.opposition.activePieceLocationsBitVector);
-					blockingPieceLocationsBitVector.and(this.constructor.CASTLE_INTERMEDIATE_SQUARES_BITVECTOR_BY_WING[wing]);
-					const noPiecesBetween = blockingPieceLocationsBitVector.isEmpty();
-					const squaresAreSafe = this.opposition.idsSeeingOpposingCastleSafeSquaresBitVectorByWing[wing].isEmpty();
-					if(noPiecesBetween && squaresAreSafe)
-					{
-						accumulator |= (1<<wingIndex);
-					}
-				}
+				accumulator |= (1<<wingIndex);
 			}
 			return accumulator;
 		}, 0);
 
+		const bits = castleRightsBits & castleLegalityBits;
 		moves.push(this.constructor.CASTLE_MOVES_LOOKUP[bits]);
 
 		return moves;
