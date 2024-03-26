@@ -8,7 +8,7 @@ const commandName = "chess";
 const playersById = {};
 const doNotReplyWithOK = true;
 
-const evaluateFunctionName = "evaluate";
+const evaluateFunctionName = "ABevaluate";
 //const evaluateFunctionName = "fancyEvaluate";
 //const evaluateFunctionName = "threadedEvaluate";
 
@@ -55,7 +55,7 @@ class DiscordGame
 	
 	makeMoveAndEditInteraction(move)
 	{
-		move.generateString();
+		move.generateString(this.chessGame);
 		this.chessGame.makeMove(move);
 		return this.editInteraction();
 	}
@@ -96,8 +96,8 @@ class DiscordGame
 		
 		this.availableMoves = this.chessGame.calculateLegals();
 		this.availableStrings = this.availableMoves.map((move)=>{
-			move.generateString();
-			return move.toString();
+			move.generateString(this.chessGame);
+			return move.toString(this.chessGame);
 		});
 		const availableMovesString = this.availableStrings.join("\t");
 		

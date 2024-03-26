@@ -26,13 +26,9 @@ module.exports = {
 		//need to know which squares are part of the move so that they can be coloured differently
 		//mainPieceSquareBefore is a given,
 		//need to know where the main piece ended up
-		const lastMovePieceEndSquare =
-			lastMove.mainPieceSquareAfter //either the piece moved to a square
-			|| lastMove.otherPieceSquareAfter	//or promoted to a new piece which ended on its own square
+		const lastMovePieceEndSquare = lastMove.mainPieceSquareAfter;
 			
-		const lastLastMovePieceEndSquare = 
-			lastLastMove.mainPieceSquareAfter
-			|| lastLastMove.otherPieceSquareAfter
+		const lastLastMovePieceEndSquare = lastLastMove.mainPieceSquareAfter;
 			
 		//draw the board bottom up so that higher squares' text does not get blocked by lower squares
 		//start at the highest drawing rank, because highest coordinate is lowest on the display

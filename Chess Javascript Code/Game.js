@@ -11,7 +11,7 @@ const {Worker, isMainThread, parentPort} = require("worker_threads");
 
 const NUM_CPUs = require("os").cpus().length;
 
-const DEFAULT_ANALYSIS_DEPTH = 1;
+const DEFAULT_ANALYSIS_DEPTH = 2;
 
 const DRAW_AFTER_NO_PROGRESS_HALFMOVES = 100;
 const DRAW_BY_REPETITIONS = 3;
@@ -264,7 +264,7 @@ class Game
 				(this.teamsByName[BlackTeam.name].points*BlackTeam.SCORE_MULTIPLIER);
 	}
 	
-	ABevaluate(depth, A=WhiteTeam.INF_SCORE, B=BlackTeam.INF_SCORE)
+	ABevaluate(depth=DEFAULT_ANALYSIS_DEPTH, A=WhiteTeam.INF_SCORE, B=BlackTeam.INF_SCORE)
 	{
 		if(this.kingCapturable()){return {score:NaN};}
 		if(depth==0){return {score:this.immediatePositionScore()};}
