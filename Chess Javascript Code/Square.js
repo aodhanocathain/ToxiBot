@@ -70,6 +70,13 @@ class SquareList
 	{
 		this.bitvector = new BitVector64();
 	}
+	
+	clone()
+	{
+		const clone = new SquareList();
+		clone.bitvector = this.bitvector.clone();
+		return clone;
+	}
 
 	add(square)
 	{
@@ -84,6 +91,13 @@ class SquareList
 	combine(squarelist)
 	{
 		this.bitvector.or(squarelist.bitvector);
+	}
+	
+	andNot(squareList)
+	{
+		const mask = squareList.clone();
+		mask.invert();
+		this.bitvector.and(mask);
 	}
 
 	has(square)
@@ -101,21 +115,20 @@ class SquareList
 		return Array.from(this);
 	}
 
-	withoutFriendlies(friendlies)
-	{
-		const clone = friendlies.clone();
-		clone.invert();
-		this.bitvector.and(clone);
-	}
-
 	[Symbol.iterator](){
-		const bits = this.bitvector.clone();
+		const bits = this.bitvector;
+		let prevIndex = -1;
 		return {
 			next: function(){
-				const nextSquare = bits.popLSB();
+				let nextIndex = prevIndex+1;
+				while(nextIndex<64 && bits.read(nextIndex)!=1)
+				{
+					nextIndex++;
+				}
+				prevIndex = nextIndex;
 				return {
-					done: (nextSquare==64),
-					value: nextSquare
+					done: (nextIndex==64),
+					value: nextIndex
 				}
 			}
 		}
