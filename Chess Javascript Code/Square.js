@@ -63,7 +63,7 @@ class Square
 	}
 }
 
-class SquareList
+class SquareSet
 {
 	bitvector;
 	constructor()
@@ -73,7 +73,7 @@ class SquareList
 	
 	clone()
 	{
-		const clone = new SquareList();
+		const clone = new SquareSet();
 		clone.bitvector = this.bitvector.clone();
 		return clone;
 	}
@@ -88,14 +88,14 @@ class SquareList
 		this.bitvector.clear(square);
 	}
 
-	combine(squarelist)
+	combine(squareSet)
 	{
-		this.bitvector.or(squarelist.bitvector);
+		this.bitvector.or(squareSet.bitvector);
 	}
 	
-	andNot(squareList)
+	andNot(squareSet)
 	{
-		const mask = squareList.clone();
+		const mask = squareSet.clone();
 		mask.invert();
 		this.bitvector.and(mask);
 	}
@@ -137,5 +137,5 @@ class SquareList
 
 module.exports = {
 	Square:Square,
-	SquareList:SquareList
+	SquareSet:SquareSet
 };

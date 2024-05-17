@@ -2,7 +2,7 @@ const {MIN_FILE, NUM_RANKS, NUM_FILES, CAPTURE_CHAR, CHECK_CHAR, CHECKMATE_CHAR}
 const {asciiDistance, countTrailingZeroesInBits, countTrailingZeroesInBitsPlus1IfNonzero, intsUpTo} = require("./Helpers.js");
 const {BitVector64} = require("./BitVector64.js");
 const {Manager} = require("./Manager.js");
-const {Square, SquareList} = require("./Square.js");
+const {Square, SquareSet} = require("./Square.js");
 const {PlainMove, CastleMove, EnPassantMove, PromotionMove} = require("./Move.js");
 
 class Piece
@@ -84,7 +84,7 @@ class Piece
 		this.team = team;
 		this.square = square;
 		
-		this.squaresAttacked = new Manager(new SquareList());
+		this.squaresAttacked = new Manager(new SquareSet());
 		this.squaresWatched = this.squaresAttacked;
 		
 		this.basicMoves = new Manager([]);
@@ -223,7 +223,7 @@ class RangedPiece extends BlockablePiece
 	
 	static squaresAttackedFromSquareInGameInDirection(square, game, direction)
 	{
-		const squares = new SquareList();		
+		const squares = new SquareSet();		
 		const [rankOffset, fileOffset] = direction;
 		
 		let rank = Square.rank(square) + rankOffset;
@@ -247,7 +247,7 @@ class RangedPiece extends BlockablePiece
 
 	static squaresAttackedFromSquareInGame(square, game)
 	{
-		const squares = new SquareList();
+		const squares = new SquareSet();
 		for(const direction of this.directions)
 		{
 			squares.combine(this.squaresAttackedFromSquareInGameInDirection(square, game, direction));
@@ -270,7 +270,7 @@ class PatternPiece extends Piece
 	
 	static squaresAttackedFromSquareInGame(square, game)
 	{
-		const squareList = new SquareList();
+		const squareSet = new SquareSet();
 	
 		const rank = Square.rank(square);
 		const file = Square.file(square);
@@ -284,11 +284,11 @@ class PatternPiece extends Piece
 			if(Square.validRankAndFile(newRank,newFile))
 			{
 				const newSquare = Square.withRankAndFile(newRank,newFile);
-				squareList.add(newSquare);
+				squareSet.add(newSquare);
 			}
 		}
 	
-		return squareList;
+		return squareSet;
 	}
 	
 	static initClassLookups()
@@ -432,7 +432,7 @@ class Pawn extends BlockablePiece
 
 	static squaresAttackedFromSquareInGameForTeam(square, game, team)
 	{
-		const squareList = new SquareList();
+		const squareSet = new SquareSet();
 		
 		const rank = Square.rank(square);
 		const file = Square.file(square);
@@ -443,19 +443,19 @@ class Pawn extends BlockablePiece
 		if(Square.validRankAndFile(nextRank,lessFile))
 		{
 			const captureSquare = Square.withRankAndFile(nextRank, lessFile);
-			squareList.add(captureSquare);
+			squareSet.add(captureSquare);
 		}
 		if(Square.validRankAndFile(nextRank,moreFile))
 		{
 			const captureSquare = Square.withRankAndFile(nextRank, moreFile);
-			squareList.add(captureSquare);
+			squareSet.add(captureSquare);
 		}
-		return squareList;
+		return squareSet;
 	}
 	
 	static squaresWatchedFromSquareInGameForTeam(square, game, team)
 	{
-		const squareList = new SquareList();
+		const squareSet = new SquareSet();
 		const rank = Square.rank(square);
 		const file = Square.file(square);
 		
@@ -464,19 +464,19 @@ class Pawn extends BlockablePiece
 		if(Square.validRankAndFile(nextRank, file))
 		{
 			const nextSquare = Square.withRankAndFile(nextRank, file);
-			squareList.add(nextSquare);
+			squareSet.add(nextSquare);
 			if(!(game.pieces[nextSquare]))
 			{
 				if(rank==team.constructor.PAWN_START_RANK)
 				{
 					const nextNextRank = rank+(this.LONG_MOVE_RANK_INCREMENT_MULTIPLIER*team.constructor.PAWN_RANK_INCREMENT);
 					const nextNextSquare = Square.withRankAndFile(nextNextRank, file);
-					squareList.add(nextNextSquare);
+					squareSet.add(nextNextSquare);
 				}
 			}
 		}
 		
-		return squareList;
+		return squareSet;
 	}
 	
 	static makeMoveString(move, game)
@@ -507,7 +507,7 @@ class Pawn extends BlockablePiece
 	{
 		super(game, team, square);
 		
-		this.squaresWatched = new Manager(new SquareList());
+		this.squaresWatched = new Manager(new SquareSet());
 		
 		this.specialMoves = new Manager([]);
 	}
