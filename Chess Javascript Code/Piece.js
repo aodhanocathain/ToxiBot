@@ -140,7 +140,7 @@ class Piece
 		this.squaresAttacked.update(squaresAttacked);
 		
 		const squaresMoveable = squaresAttacked.clone();
-		squaresMoveable.andNot(this.team.activePieceLocationsBitVector);
+		squaresMoveable.difference(this.team.activePieceLocations);
 
 		const basicMoves = [];
 		for(const squareMoveable of squaresMoveable)
@@ -250,7 +250,7 @@ class RangedPiece extends BlockablePiece
 		const squares = new SquareSet();
 		for(const direction of this.directions)
 		{
-			squares.combine(this.squaresAttackedFromSquareInGameInDirection(square, game, direction));
+			squares.union(this.squaresAttackedFromSquareInGameInDirection(square, game, direction));
 		}
 		return squares;
 	}
@@ -266,7 +266,7 @@ class PatternPiece extends Piece
 {
 	static pattern;
 	
-	static squaresAttackedFromSquare_lookup;
+	//static squaresAttackedFromSquare_lookup;
 	
 	static squaresAttackedFromSquareInGame(square, game)
 	{
@@ -310,7 +310,7 @@ class PatternPiece extends Piece
 		this.squaresAttacked.update(squaresAttacked);
 		
 		const squaresMoveable = squaresAttacked.clone();
-		squaresMoveable.andNot(this.team.activePieceLocationsBitVector);
+		squaresMoveable.difference(this.team.activePieceLocationsBitVector);
 
 		const basicMoves = [];
 		for(const squareMoveable of squaresMoveable)
@@ -531,7 +531,7 @@ class Pawn extends BlockablePiece
 		
 		this.squaresAttacked.get().squares().forEach((squareAttacked)=>{
 			//only allow moves that capture a piece, from the opposing team
-			if(this.team.opposition.activePieceLocationsBitVector.read(squareAttacked))
+			if(this.team.opposition.activePieceLocations.has(squareAttacked))
 			{
 				if(Square.rank(squareAttacked)==this.team.opposition.constructor.BACK_RANK)
 				{

@@ -392,12 +392,12 @@ class Game
 		//potentially update all pieces on the moving team
 		//because they all are able to gain/lose moves if friendly pieces get in/out of the way
 		this.movingTeam.activePieces.forEach((piece)=>{
-			const watchingBits = piece.squaresWatched.get().bits();
+			const watchedSquares = piece.squaresWatched.get();
 			if
 			(
-				watchingBits.read(move.mainPieceSquareBefore) ||
-				watchingBits.read(move.mainPieceSquareAfter) ||
-				watchingBits.read(move.enPassantSquare)
+				watchedSquares.has(move.mainPieceSquareBefore) ||
+				watchedSquares.has(move.mainPieceSquareAfter) ||
+				watchedSquares.has(move.enPassantSquare)
 			)
 			{
 				piece.team.updatePiece(piece);
@@ -423,12 +423,12 @@ class Game
 			this.movingTeam.opposition.activePieces.forEach((piece)=>{
 				if(piece instanceof BlockablePiece)
 				{
-					const watchingBits = piece.squaresWatched.get().bits();
+					const watchedSquares = piece.squaresWatched.get();
 					if
 					(
-						watchingBits.read(move.mainPieceSquareBefore) ||
-						watchingBits.read(move.mainPieceSquareAfter) ||
-						watchingBits.read(move.enPassantSquare)
+						watchedSquares.has(move.mainPieceSquareBefore) ||
+						watchedSquares.has(move.mainPieceSquareAfter) ||
+						watchedSquares.has(move.enPassantSquare)
 					)
 					{
 						piece.team.updatePiece(piece);
@@ -440,12 +440,12 @@ class Game
 		else
 		{
 			this.movingTeam.opposition.activePieces.forEach((piece)=>{
-				const watchingBits = piece.squaresWatched.get().bits();
+				const watchedSquares = piece.squaresWatched.get();
 				if
 				(
-					watchingBits.read(move.mainPieceSquareBefore) ||
-					watchingBits.read(move.mainPieceSquareAfter) ||
-					watchingBits.read(move.enPassantSquare)
+					watchedSquares.has(move.mainPieceSquareBefore) ||
+					watchedSquares.has(move.mainPieceSquareAfter) ||
+					watchedSquares.has(move.enPassantSquare)
 				)
 				{
 					piece.team.updatePiece(piece);
@@ -473,12 +473,12 @@ class Game
 		const movingPiece = this.pieces[move.mainPieceSquareBefore];
 		movingPiece.square = move.mainPieceSquareAfter;
 		this.pieces[move.mainPieceSquareAfter] = movingPiece;
-		movingPiece.team.activePieceLocationsBitVector.set(move.mainPieceSquareAfter);
+		movingPiece.team.activePieceLocations.add(move.mainPieceSquareAfter);
 		movingPiece.team.castleRights.update(movingPiece.team.castleRights.get() & movingPiece.castleRightsMask);
 		
 		//remove main piece from old square
 		this.pieces[move.mainPieceSquareBefore] = null;
-		movingPiece.team.activePieceLocationsBitVector.clear(move.mainPieceSquareBefore);
+		movingPiece.team.activePieceLocations.remove(move.mainPieceSquareBefore);
 		
 		//some types of moves require more work than just moving the main piece
 		if(move instanceof CastleMove)
@@ -488,11 +488,11 @@ class Game
 			//move the rook to its new square as well
 			const rook = this.pieces[move.rookBefore];
 			this.pieces[move.rookAfter] = rook;
-			rook.team.activePieceLocationsBitVector.set(move.rookAfter);
+			rook.team.activePieceLocations.add(move.rookAfter);
 
 			//remove the rook from its old square
 			this.pieces[move.rookBefore] = null;
-			rook.team.activePieceLocationsBitVector.clear(move.rookBefore);
+			rook.team.activePieceLocations.remove(move.rookBefore);
 		}
 		else if(move instanceof PromotionMove)
 		{
@@ -557,11 +557,11 @@ class Game
 			//move the rook back to its old square
 			const rook = this.pieces[move.rookAfter];
 			this.pieces[move.rookBefore] = rook;
-			rook.team.activePieceLocationsBitVector.set(move.rookBefore);
+			rook.team.activePieceLocations.add(move.rookBefore);
 
 			//remove the rook from its new square
 			this.pieces[move.rookAfter] = null;
-			rook.team.activePieceLocationsBitVector.clear(move.rookAfter);
+			rook.team.activePieceLocations.remove(move.rookAfter);
 		}
 		else if(move instanceof PromotionMove)
 		{
@@ -572,12 +572,12 @@ class Game
 		//move main piece back to old square
 		movingPiece.square = move.mainPieceSquareBefore;
 		this.pieces[move.mainPieceSquareBefore] = movingPiece;
-		movingPiece.team.activePieceLocationsBitVector.set(move.mainPieceSquareBefore);
+		movingPiece.team.activePieceLocations.add(move.mainPieceSquareBefore);
 		movingPiece.team.castleRights.revert();
 
 		//remove main piece from new square
 		this.pieces[move.mainPieceSquareAfter] = null;
-		movingPiece.team.activePieceLocationsBitVector.clear(move.mainPieceSquareAfter);
+		movingPiece.team.activePieceLocations.remove(move.mainPieceSquareAfter);
 
 		//restore captured piece, if any
 		const captureSquare = move.enPassantSquare || move.mainPieceSquareAfter;;

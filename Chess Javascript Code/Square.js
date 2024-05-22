@@ -88,16 +88,21 @@ class SquareSet
 		this.bitvector.clear(square);
 	}
 
-	combine(squareSet)
+	union(squareSet)
 	{
 		this.bitvector.or(squareSet.bitvector);
 	}
 	
-	andNot(squareSet)
+	difference(squareSet)
 	{
-		const mask = squareSet.clone();
+		const mask = squareSet.bitvector.clone();
 		mask.invert();
 		this.bitvector.and(mask);
+	}
+
+	intersection(squareSet)
+	{
+		this.bitvector.and(squareSet.bitvector);
 	}
 
 	has(square)
@@ -105,9 +110,9 @@ class SquareSet
 		return this.bitvector.read(square);
 	}
 
-	bits()
+	isEmpty()
 	{
-		return this.bitvector.clone();
+		return this.bitvector.isEmpty();
 	}
 
 	squares()
