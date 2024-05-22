@@ -1,4 +1,4 @@
-const {SquareSet} = require("./Chess Javascript Code/Square.js")
+const {SquareSet} = require("./Chess Javascript Code/SquareSet.js")
 
 test("square set iterator works as expected", ()=>{
     const set = new SquareSet();

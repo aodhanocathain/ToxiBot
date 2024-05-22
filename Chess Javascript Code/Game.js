@@ -3,6 +3,7 @@ const {asciiOffset, asciiDistance, deferredPromise} = require("./Helpers.js");
 const {BitVector64} = require("./BitVector64.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
+const {SquareSet} = require("./SquareSet.js");
 const {PlainMove, PromotionMove, EnPassantMove, CastleMove} = require("./Move.js");
 const {Team, WhiteTeam, BlackTeam} = require("./Team.js");
 const {Piece, King, Queen, Rook, Pawn, PieceClassesByTypeChar, WINGS, WING_BIT_INDICES, BlockablePiece} = require("./Piece.js");

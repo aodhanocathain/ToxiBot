@@ -1,6 +1,7 @@
 const {NUM_FILES, NUM_RANKS, MAX_EVALUATION_SCORE, MAX_EVALUATION_DEPTH} = require("./Constants.js");
 const {Manager} = require("./Manager.js");
-const {Square, SquareSet} = require("./Square.js");
+const {Square} = require("./Square.js");
+const {SquareSet} = require("./SquareSet.js");
 const {CastleMove} = require("./Move.js");
 const {King, Queen, Rook, WINGS, WING_BIT_INDICES} = require("./Piece.js");
 const {BitVector64} = require("./BitVector64.js");
