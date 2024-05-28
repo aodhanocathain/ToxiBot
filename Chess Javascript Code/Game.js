@@ -47,24 +47,77 @@ class Game
 	fullUpdatedPieces;
 	
 	numPositionsAnalysed;
-		
-	static validFENString(FENString)
+
+	validateFENString(FENString)
 	{
-		//FEN string validity is checked in the Game constructor already
-		try
+		const FENparts = FENString.split(" ");
+		const boardString = FENparts[0];
+		const rankStrings = boardString.split("/");	//ranks are delimitted by "/" in FEN strings
+		if(rankStrings.length!=NUM_RANKS){return "invalid number of ranks";}
+		this.pieces = Array(NUM_RANKS*NUM_FILES).fill(null);
+		rankStrings.reverse()	//ranks are in descending order in FEN strings, .reverse() for ascending order
+		.forEach((rankString)=>{
+			let file=0;
+			rankString.split("").forEach((character)=>{
+				if(isNaN(character))	//character denotes a piece
+				{
+					const typeChar = Piece.typeCharOfTeamedChar(character);
+					const pieceClass = PieceClassesByTypeChar[typeChar];
+					if(!pieceClass)
+					{
+						return "invalid piece type character";
+					}					
+					file += 1;
+				}
+				else	//character denotes a number of empty squares
+				{
+					file += parseInt(character);
+				}
+			})
+			if(file!=NUM_FILES){return "invalid number of files";}
+		})
+		
+		if(!((FENparts[1]==BlackTeam.char)||(FENparts[1]==WhiteTeam.char)))
 		{
-			new Game(FENString);
-			return true;
+			return "invalid team's turn";
 		}
-		catch(error)
+
+		if(FENparts[2]!=EMPTY_FEN_FIELD)
 		{
-			console.log(error);
-			return false;
+			const castleRightsCharacters = FENparts[2].split("");
+			//check for invalid castle rights characters
+			castleRightsCharacters.forEach((teamedChar)=>{
+				const wingChar = Piece.typeCharOfTeamedChar(teamedChar);
+				if(!(WINGS.includes(wingChar))){return "invalid castle right ";}
+			});
 		}
+
+		if(FENparts[3] != EMPTY_FEN_FIELD)
+		{
+			const distance = asciiDistance(FENparts[3], MIN_FILE);
+			if((distance < 0) || (distance >= NUM_FILES))
+			{
+				return "invalid en passant file";
+			}
+		}
+		
+		const halfMove = parseInt(FENparts[4]);
+		if((!Number.isInteger(halfMove)) || (halfMove < 0) || (halfMove > DRAW_AFTER_NO_PROGRESS_HALFMOVES) || isNaN(halfMove))
+		{
+			return "invalid halfmove clock";
+		}
+
+		const fullMove = parseInt(FENparts[5]);
+		if((!Number.isInteger(fullMove)) || (fullMove <= 0) || isNaN(fullMove))
+		{
+			return "invalid fullmove clock";
+		}
+
+		return null;
 	}
 	
 	constructor(FENString = this.constructor.DEFAULT_FEN_STRING)
-	{		
+	{
 		this.teamsByName = {
 			[WhiteTeam.name]: new WhiteTeam(this),
 			[BlackTeam.name]: new BlackTeam(this),
@@ -79,7 +132,6 @@ class Game
 		const boardString = FENparts[0];
 		
 		const rankStrings = boardString.split("/");	//ranks are delimitted by "/" in FEN strings
-		if(rankStrings.length!=NUM_RANKS){throw "invalid number of ranks in FEN string";}
 		this.pieces = Array(NUM_RANKS*NUM_FILES).fill(null);
 		rankStrings.reverse()	//ranks are in descending order in FEN strings, .reverse() for ascending order
 		.forEach((rankString,rank)=>{
@@ -89,11 +141,6 @@ class Game
 				{
 					const typeChar = Piece.typeCharOfTeamedChar(character);
 					const pieceClass = PieceClassesByTypeChar[typeChar];
-					
-					if(!pieceClass)
-					{
-						throw "invalid piece type character in FEN string";
-					}
 					
 					const teamClass = Team.classOfTeamedChar(character);
 					const team = this.teamsByName[teamClass.name];
@@ -125,7 +172,6 @@ class Game
 					file += parseInt(character);
 				}
 			})
-			if(file!=NUM_FILES){throw "invalid number of files in FEN string";}
 		})
 		
 		//determine the moving team from the 2nd part of the FEN string
@@ -136,10 +182,6 @@ class Game
 		else if(FENparts[1]==BlackTeam.char)
 		{
 			this.movingTeam = this.teamsByName[BlackTeam.name];
-		}
-		else
-		{
-			throw "invalid team's turn in FEN string";
 		}
 
 		//determine the castling rights from the 3rd part of the FEN string
@@ -152,11 +194,7 @@ class Game
 		else
 		{
 			const castleRightsCharacters = FENparts[2].split("");
-			//check for invalid or duplicate castle rights characters
 			const differentRights = castleRightsCharacters.reduce((accumulator, teamedChar)=>{
-				const wingChar = Piece.typeCharOfTeamedChar(teamedChar);
-				if(!(WINGS.includes(wingChar))){throw "invalid castle right in FEN string";}
-				if(teamedChar in accumulator){throw "duplicate castle rights in FEN string";}
 				accumulator[teamedChar] = true;
 				return accumulator;
 			},{});
@@ -167,11 +205,7 @@ class Game
 					const teamedChar = team.constructor.charConverter(wing);
 					if(teamedChar in differentRights)
 					{
-						if(!team.rooksInStartSquaresByWing[wing])
-						{
-							//throw "impossible castle rights in FEN string";
-						}
-						else
+						if(team.rooksInStartSquaresByWing[wing])
 						{
 							castleRights |= (1<<wingIndex);
 						}
@@ -183,34 +217,14 @@ class Game
 		}
 
 		//determine the possible en passant capture from the 4th part of the FEN string
-		if(FENparts[3] != EMPTY_FEN_FIELD)
-		{
-			const distance = asciiDistance(FENparts[3], MIN_FILE);
-			if((distance < 0) || (distance >= NUM_FILES))
-			{
-				console.log("en passant file:")
-				console.log(FENparts[3]);
-				throw "invalid en passant file in FEN string";
-			}
-		}
 		this.enPassantable = new Manager(FENparts[3]);
 		
 		//determine the halfmove and fullmove clocks from the 5th and 6th parts of the FEN string respectively
 		this.halfMove = new Manager(parseInt(FENparts[4]));
-		if((this.halfMove.get() < 0) || (this.halfMove.get() > DRAW_AFTER_NO_PROGRESS_HALFMOVES) || isNaN(this.halfMove.get()))
-		{
-			throw "invalid halfmove clock in FEN string";
-		}
 		this.fullMove = parseInt(FENparts[5]);
-		//calculating the fullmove clock's upper bound in a given position would be WAY too difficult
-		//for not enough reward, so I am willing to allow impossible fullmove clocks
-		if((this.fullMove <= 0) || isNaN(this.fullMove))
-		{
-			throw "invalid fullmove clock in FEN string";
-		}
-		
 		this.teamsByName[WhiteTeam.name].init();
 		this.teamsByName[BlackTeam.name].init();
+		
 		//the white king was updated before the black pieces had any moves
 		//therefore, must update white king again to rule out moves based on opposing attacks
 		this.teamsByName[WhiteTeam.name].updatePiece(this.teamsByName[WhiteTeam.name].king);
