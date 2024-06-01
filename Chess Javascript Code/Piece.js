@@ -1,10 +1,9 @@
-const {MIN_FILE, NUM_RANKS, NUM_FILES, CAPTURE_CHAR, CHECK_CHAR, CHECKMATE_CHAR} = require("./Constants.js");
-const {asciiDistance, countTrailingZeroesInBits, countTrailingZeroesInBitsPlus1IfNonzero, intsUpTo} = require("./Helpers.js");
-const {BitVector64} = require("./BitVector64.js");
+const {MIN_FILE, CAPTURE_CHAR, CHECK_CHAR, CHECKMATE_CHAR} = require("./Constants.js");
+const {asciiDistance} = require("./Helpers.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
 const {SquareSet} = require("./SquareSet.js");
-const {PlainMove, CastleMove, EnPassantMove, PromotionMove} = require("./Move.js");
+const {PlainMove, EnPassantMove, PromotionMove} = require("./Move.js");
 
 class Piece
 {
