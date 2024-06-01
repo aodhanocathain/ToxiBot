@@ -1,4 +1,3 @@
-const {BitVector64} = require("./BitVector64.js");
 const {MIN_FILE, MIN_RANK, NUM_FILES, NUM_RANKS} = require("./Constants.js");
 const {asciiOffset, intsUpTo} = require("./Helpers.js");
 
@@ -63,66 +62,6 @@ class Square
 	}
 }
 
-class SquareList
-{
-	bitvector;
-	constructor()
-	{
-		this.bitvector = new BitVector64();
-	}
-
-	add(square)
-	{
-		this.bitvector.set(square);
-	}
-
-	remove(square)
-	{
-		this.bitvector.clear(square);
-	}
-
-	combine(squarelist)
-	{
-		this.bitvector.or(squarelist.bitvector);
-	}
-
-	has(square)
-	{
-		return this.bitvector.read(square);
-	}
-
-	bits()
-	{
-		return this.bitvector.clone();
-	}
-
-	squares()
-	{
-		return Array.from(this);
-	}
-
-	withoutFriendlies(friendlies)
-	{
-		const clone = friendlies.clone();
-		clone.invert();
-		this.bitvector.and(clone);
-	}
-
-	[Symbol.iterator](){
-		const bits = this.bitvector.clone();
-		return {
-			next: function(){
-				const nextSquare = bits.popLSB();
-				return {
-					done: (nextSquare==64),
-					value: nextSquare
-				}
-			}
-		}
-	}
-}
-
 module.exports = {
-	Square:Square,
-	SquareList:SquareList
+	Square:Square
 };

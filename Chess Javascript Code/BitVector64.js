@@ -4,8 +4,6 @@
 //bit 32 is [1][0]
 //bit 33 is [1][1]
 
-const {countTrailingZeroesInBits} = require("./Helpers.js")
-
 const WORD_WIDTH = 32;	//assuming 32-bit integers in javascript
 class BitVector64
 {
@@ -77,52 +75,6 @@ class BitVector64
 	isEmpty()
 	{
 		return (this.words[0] | this.words[1]) == 0;
-	}
-
-	countTrailingZeroes()
-	{
-		const firstWordCount = countTrailingZeroesInBits(this.words[0]);
-		if(firstWordCount<WORD_WIDTH){return firstWordCount};
-		return firstWordCount + countTrailingZeroesInBits(this.words[1]);
-	}
-
-	extractBitsUsingSquareList(squareList)	//sequential version of PEXT
-	{
-		//each element in extractIndices is a position to read from
-		//each value read gets written to consecutive bit positions in extractedBits
-
-		//this function will never be called to extract more than 32 bits, therefore the result fits in a single integer
-		let extractedBits = 0;
-
-		let writeIndex=0;
-		for(const readIndex of squareList)	//write to ascending bit positions in extractedBits
-		{
-			extractedBits |= (this.read(readIndex)<<writeIndex);
-
-			writeIndex++;
-		}
-		return extractedBits;
-	}
-
-	extractBitsUsingArray(indices)
-	{
-		let extractedBits = 0;
-
-		let writeIndex=0;
-		for(const readIndex of indices)	//write to ascending bit positions in extractedBits
-		{
-			extractedBits |= (this.read(readIndex)<<writeIndex);
-
-			writeIndex++;
-		}
-		return extractedBits;
-	}
-
-	popLSB()
-	{
-		const index = this.countTrailingZeroes();
-		this.clear(index);
-		return index;
 	}
 	
 	toString()

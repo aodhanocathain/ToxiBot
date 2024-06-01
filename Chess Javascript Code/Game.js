@@ -1,11 +1,10 @@
 const {NUM_RANKS, NUM_FILES, MIN_FILE} = require("./Constants.js");
 const {asciiOffset, asciiDistance, deferredPromise} = require("./Helpers.js");
-const {BitVector64} = require("./BitVector64.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
-const {PlainMove, PromotionMove, EnPassantMove, CastleMove} = require("./Move.js");
+const {PromotionMove, CastleMove} = require("./Move.js");
 const {Team, WhiteTeam, BlackTeam} = require("./Team.js");
-const {Piece, King, Queen, Rook, Pawn, PieceClassesByTypeChar, WINGS, WING_BIT_INDICES, BlockablePiece} = require("./Piece.js");
+const {Piece, King, Rook, Pawn, PieceClassesByTypeChar, WINGS, BlockablePiece} = require("./Piece.js");
 
 const {Worker, isMainThread, parentPort} = require("worker_threads");
 
@@ -30,9 +29,9 @@ class Game
 	
 	pieces;	//indexed by a square on the board
 	
-	positionFrequenciesByBoardString;
+	positionCounts;
 	
-	teamsByName;
+	teams;
 	movingTeam;
 	
 	playedMoves;
@@ -43,34 +42,84 @@ class Game
 	movingPiece;
 	targetPiece;
 	
-	fullUpdatedPieces;
-	
-	numPositionsAnalysed;
-		
-	static validFENString(FENString)
+	piecesUpdatedPrevMove;
+
+	static validateFENString(FENString)
 	{
-		//FEN string validity is checked in the Game constructor already
-		try
+		const FENparts = FENString.split(" ");
+		const boardString = FENparts[0];
+		const rankStrings = boardString.split("/");	//ranks are delimitted by "/" in FEN strings
+		if(rankStrings.length!=NUM_RANKS){return "invalid number of ranks";}
+		rankStrings.reverse()	//ranks are in descending order in FEN strings, .reverse() for ascending order
+		.forEach((rankString)=>{
+			let file=0;
+			rankString.split("").forEach((character)=>{
+				if(isNaN(character))	//character denotes a piece
+				{
+					const typeChar = Piece.typeCharOfTeamedChar(character);
+					const pieceClass = PieceClassesByTypeChar[typeChar];
+					if(!pieceClass)
+					{
+						return "invalid piece type character";
+					}					
+					file += 1;
+				}
+				else	//character denotes a number of empty squares
+				{
+					file += parseInt(character);
+				}
+			})
+			if(file!=NUM_FILES){return "invalid number of files";}
+		})
+		
+		if(!((FENparts[1]==BlackTeam.char)||(FENparts[1]==WhiteTeam.char)))
 		{
-			new Game(FENString);
-			return true;
+			return "invalid team's turn";
 		}
-		catch(error)
+
+		if(FENparts[2]!=EMPTY_FEN_FIELD)
 		{
-			console.log(error);
-			return false;
+			const castleRightsCharacters = FENparts[2].split("");
+			//check for invalid castle rights characters
+			castleRightsCharacters.forEach((teamedChar)=>{
+				const wingChar = Piece.typeCharOfTeamedChar(teamedChar);
+				if(!(WINGS.includes(wingChar))){return "invalid castle right ";}
+			});
 		}
+
+		if(FENparts[3] != EMPTY_FEN_FIELD)
+		{
+			const distance = asciiDistance(FENparts[3], MIN_FILE);
+			if((distance < 0) || (distance >= NUM_FILES))
+			{
+				return "invalid en passant file";
+			}
+		}
+		
+		const halfMove = parseInt(FENparts[4]);
+		if((!Number.isInteger(halfMove)) || (halfMove < 0) || (halfMove > DRAW_AFTER_NO_PROGRESS_HALFMOVES) || isNaN(halfMove))
+		{
+			return "invalid halfmove clock";
+		}
+
+		const fullMove = parseInt(FENparts[5]);
+		if((!Number.isInteger(fullMove)) || (fullMove <= 0) || isNaN(fullMove))
+		{
+			return "invalid fullmove clock";
+		}
+
+		return null;
 	}
 	
 	constructor(FENString = this.constructor.DEFAULT_FEN_STRING)
-	{		
-		this.teamsByName = {
+	{
+		this.teams = {
 			[WhiteTeam.name]: new WhiteTeam(this),
 			[BlackTeam.name]: new BlackTeam(this),
 		};
 		
-		this.teamsByName[WhiteTeam.name].opposition = this.teamsByName[BlackTeam.name];
-		this.teamsByName[BlackTeam.name].opposition = this.teamsByName[WhiteTeam.name];
+		this.teams[WhiteTeam.name].opposition = this.teams[BlackTeam.name];
+		this.teams[BlackTeam.name].opposition = this.teams[WhiteTeam.name];
 		
 		const FENparts = FENString.split(" ");
 		
@@ -78,7 +127,6 @@ class Game
 		const boardString = FENparts[0];
 		
 		const rankStrings = boardString.split("/");	//ranks are delimitted by "/" in FEN strings
-		if(rankStrings.length!=NUM_RANKS){throw "invalid number of ranks in FEN string";}
 		this.pieces = Array(NUM_RANKS*NUM_FILES).fill(null);
 		rankStrings.reverse()	//ranks are in descending order in FEN strings, .reverse() for ascending order
 		.forEach((rankString,rank)=>{
@@ -89,13 +137,8 @@ class Game
 					const typeChar = Piece.typeCharOfTeamedChar(character);
 					const pieceClass = PieceClassesByTypeChar[typeChar];
 					
-					if(!pieceClass)
-					{
-						throw "invalid piece type character in FEN string";
-					}
-					
 					const teamClass = Team.classOfTeamedChar(character);
-					const team = this.teamsByName[teamClass.name];
+					const team = this.teams[teamClass.name];
 					
 					const square = Square.withRankAndFile(rank,file);
 					let piece;
@@ -124,53 +167,40 @@ class Game
 					file += parseInt(character);
 				}
 			})
-			if(file!=NUM_FILES){throw "invalid number of files in FEN string";}
 		})
 		
 		//determine the moving team from the 2nd part of the FEN string
 		if(FENparts[1]==WhiteTeam.char)
 		{
-			this.movingTeam = this.teamsByName[WhiteTeam.name];
+			this.movingTeam = this.teams[WhiteTeam.name];
 		}
 		else if(FENparts[1]==BlackTeam.char)
 		{
-			this.movingTeam = this.teamsByName[BlackTeam.name];
-		}
-		else
-		{
-			throw "invalid team's turn in FEN string";
+			this.movingTeam = this.teams[BlackTeam.name];
 		}
 
 		//determine the castling rights from the 3rd part of the FEN string
 		if(FENparts[2]==EMPTY_FEN_FIELD)
 		{
-			Object.values(this.teamsByName).forEach((team)=>{
+			Object.values(this.teams).forEach((team)=>{
 				team.castleRights = new Manager(0);
 			});
 		}
 		else
 		{
 			const castleRightsCharacters = FENparts[2].split("");
-			//check for invalid or duplicate castle rights characters
 			const differentRights = castleRightsCharacters.reduce((accumulator, teamedChar)=>{
-				const wingChar = Piece.typeCharOfTeamedChar(teamedChar);
-				if(!(WINGS.includes(wingChar))){throw "invalid castle right in FEN string";}
-				if(teamedChar in accumulator){throw "duplicate castle rights in FEN string";}
 				accumulator[teamedChar] = true;
 				return accumulator;
 			},{});
 
-			Object.values(this.teamsByName).forEach((team)=>{
+			Object.values(this.teams).forEach((team)=>{
 				let castleRights = 0;
 				WINGS.forEach((wing, wingIndex)=>{
 					const teamedChar = team.constructor.charConverter(wing);
 					if(teamedChar in differentRights)
 					{
-						if(!team.rooksInStartSquaresByWing[wing])
-						{
-							//throw "impossible castle rights in FEN string";
-						}
-						else
+						if(team.rooksInStartSquaresByWing[wing])
 						{
 							castleRights |= (1<<wingIndex);
 						}
@@ -182,45 +212,25 @@ class Game
 		}
 
 		//determine the possible en passant capture from the 4th part of the FEN string
-		if(FENparts[3] != EMPTY_FEN_FIELD)
-		{
-			const distance = asciiDistance(FENparts[3], MIN_FILE);
-			if((distance < 0) || (distance >= NUM_FILES))
-			{
-				console.log("en passant file:")
-				console.log(FENparts[3]);
-				throw "invalid en passant file in FEN string";
-			}
-		}
 		this.enPassantable = new Manager(FENparts[3]);
 		
 		//determine the halfmove and fullmove clocks from the 5th and 6th parts of the FEN string respectively
 		this.halfMove = new Manager(parseInt(FENparts[4]));
-		if((this.halfMove.get() < 0) || (this.halfMove.get() > DRAW_AFTER_NO_PROGRESS_HALFMOVES) || isNaN(this.halfMove.get()))
-		{
-			throw "invalid halfmove clock in FEN string";
-		}
 		this.fullMove = parseInt(FENparts[5]);
-		//calculating the fullmove clock's upper bound in a given position would be WAY too difficult
-		//for not enough reward, so I am willing to allow impossible fullmove clocks
-		if((this.fullMove <= 0) || isNaN(this.fullMove))
-		{
-			throw "invalid fullmove clock in FEN string";
-		}
+		this.teams[WhiteTeam.name].init();
+		this.teams[BlackTeam.name].init();
 		
-		this.teamsByName[WhiteTeam.name].init();
-		this.teamsByName[BlackTeam.name].init();
 		//the white king was updated before the black pieces had any moves
 		//therefore, must update white king again to rule out moves based on opposing attacks
-		this.teamsByName[WhiteTeam.name].updatePiece(this.teamsByName[WhiteTeam.name].king);
+		this.teams[WhiteTeam.name].updatePiece(this.teams[WhiteTeam.name].king);
 		
 		this.movingPiece = new Manager();
 		this.targetPiece = new Manager();
 		
-		this.positionFrequenciesByBoardString = {};
+		this.positionCounts = {};
 		
 		this.playedMoves = [];
-		this.fullUpdatedPieces = new Manager();
+		this.piecesUpdatedPrevMove = new Manager();
 		
 		this.numPositionsAnalysed = 0;
 	}
@@ -250,7 +260,7 @@ class Game
 	
 	isDrawByRepetition()
 	{
-		return this.positionFrequenciesByBoardString[this.boardString()]==DRAW_BY_REPETITIONS;
+		return this.positionCounts[this.boardString()]==DRAW_BY_REPETITIONS;
 	}
 	
 	isDrawByMoveRule()
@@ -260,8 +270,8 @@ class Game
 	
 	immediatePositionScore()
 	{		
-		return (this.teamsByName[WhiteTeam.name].points*WhiteTeam.SCORE_MULTIPLIER) + 
-				(this.teamsByName[BlackTeam.name].points*BlackTeam.SCORE_MULTIPLIER);
+		return (this.teams[WhiteTeam.name].points*WhiteTeam.SCORE_MULTIPLIER) + 
+				(this.teams[BlackTeam.name].points*BlackTeam.SCORE_MULTIPLIER);
 	}
 	
 	ABevaluate(depth=DEFAULT_ANALYSIS_DEPTH, A=WhiteTeam.INF_SCORE, B=BlackTeam.INF_SCORE)
@@ -387,21 +397,21 @@ class Game
 	updateMovingPieceAndOppositionPiecesSeeingMove(movingPiece, move)
 	{
 		
-		const fullUpdatedPieces = [];
+		const piecesUpdatedPrevMove = [];
 		
 		//potentially update all pieces on the moving team
 		//because they all are able to gain/lose moves if friendly pieces get in/out of the way
 		this.movingTeam.activePieces.forEach((piece)=>{
-			const watchingBits = piece.squaresWatched.get().bits();
+			const watchedSquares = piece.squaresWatched.get();
 			if
 			(
-				watchingBits.read(move.mainPieceSquareBefore) ||
-				watchingBits.read(move.mainPieceSquareAfter) ||
-				watchingBits.read(move.enPassantSquare)
+				watchedSquares.has(move.mainPieceSquareBefore) ||
+				watchedSquares.has(move.mainPieceSquareAfter) ||
+				watchedSquares.has(move.enPassantSquare)
 			)
 			{
 				piece.team.updatePiece(piece);
-				fullUpdatedPieces.push(piece);
+				piecesUpdatedPrevMove.push(piece);
 			}
 		});
 		//the above condition would not rule out a promotion piece, because the piece would not have calculated any properties
@@ -419,20 +429,20 @@ class Game
 		if(!(movingPiece instanceof King))
 		{
 			this.movingTeam.opposition.updatePiece(this.movingTeam.opposition.king);
-			fullUpdatedPieces.push(this.movingTeam.opposition.king);
+			piecesUpdatedPrevMove.push(this.movingTeam.opposition.king);
 			this.movingTeam.opposition.activePieces.forEach((piece)=>{
 				if(piece instanceof BlockablePiece)
 				{
-					const watchingBits = piece.squaresWatched.get().bits();
+					const watchedSquares = piece.squaresWatched.get();
 					if
 					(
-						watchingBits.read(move.mainPieceSquareBefore) ||
-						watchingBits.read(move.mainPieceSquareAfter) ||
-						watchingBits.read(move.enPassantSquare)
+						watchedSquares.has(move.mainPieceSquareBefore) ||
+						watchedSquares.has(move.mainPieceSquareAfter) ||
+						watchedSquares.has(move.enPassantSquare)
 					)
 					{
 						piece.team.updatePiece(piece);
-						fullUpdatedPieces.push(piece);
+						piecesUpdatedPrevMove.push(piece);
 					}
 				}
 			});
@@ -440,21 +450,21 @@ class Game
 		else
 		{
 			this.movingTeam.opposition.activePieces.forEach((piece)=>{
-				const watchingBits = piece.squaresWatched.get().bits();
+				const watchedSquares = piece.squaresWatched.get();
 				if
 				(
-					watchingBits.read(move.mainPieceSquareBefore) ||
-					watchingBits.read(move.mainPieceSquareAfter) ||
-					watchingBits.read(move.enPassantSquare)
+					watchedSquares.has(move.mainPieceSquareBefore) ||
+					watchedSquares.has(move.mainPieceSquareAfter) ||
+					watchedSquares.has(move.enPassantSquare)
 				)
 				{
 					piece.team.updatePiece(piece);
-					fullUpdatedPieces.push(piece);
+					piecesUpdatedPrevMove.push(piece);
 				}
 			});
 		}
 		
-		this.fullUpdatedPieces.update(fullUpdatedPieces);
+		this.piecesUpdatedPrevMove.update(piecesUpdatedPrevMove);
 	}
 	
 	makeMove(move)
@@ -473,12 +483,12 @@ class Game
 		const movingPiece = this.pieces[move.mainPieceSquareBefore];
 		movingPiece.square = move.mainPieceSquareAfter;
 		this.pieces[move.mainPieceSquareAfter] = movingPiece;
-		movingPiece.team.activePieceLocationsBitVector.set(move.mainPieceSquareAfter);
+		movingPiece.team.activePieceLocations.add(move.mainPieceSquareAfter);
 		movingPiece.team.castleRights.update(movingPiece.team.castleRights.get() & movingPiece.castleRightsMask);
 		
 		//remove main piece from old square
 		this.pieces[move.mainPieceSquareBefore] = null;
-		movingPiece.team.activePieceLocationsBitVector.clear(move.mainPieceSquareBefore);
+		movingPiece.team.activePieceLocations.remove(move.mainPieceSquareBefore);
 		
 		//some types of moves require more work than just moving the main piece
 		if(move instanceof CastleMove)
@@ -488,11 +498,11 @@ class Game
 			//move the rook to its new square as well
 			const rook = this.pieces[move.rookBefore];
 			this.pieces[move.rookAfter] = rook;
-			rook.team.activePieceLocationsBitVector.set(move.rookAfter);
+			rook.team.activePieceLocations.add(move.rookAfter);
 
 			//remove the rook from its old square
 			this.pieces[move.rookBefore] = null;
-			rook.team.activePieceLocationsBitVector.clear(move.rookBefore);
+			rook.team.activePieceLocations.remove(move.rookBefore);
 		}
 		else if(move instanceof PromotionMove)
 		{
@@ -523,22 +533,22 @@ class Game
 		const nextHalfMove = ((movingPiece instanceof Pawn) || targetPiece)? 0 : this.halfMove.get()+1;
 		this.halfMove.update(nextHalfMove);
 		this.changeTurns();
-		if(this.movingTeam==this.teamsByName[WhiteTeam.name]){this.fullMove++;}
+		if(this.movingTeam==this.teams[WhiteTeam.name]){this.fullMove++;}
 		const boardString = this.boardString();
-		if(boardString in this.positionFrequenciesByBoardString)
+		if(boardString in this.positionCounts)
 		{
-			this.positionFrequenciesByBoardString[boardString]++;
+			this.positionCounts[boardString]++;
 		}
 		else
 		{
-			this.positionFrequenciesByBoardString[boardString] = 1;
+			this.positionCounts[boardString] = 1;
 		}
 	}
 	
 	undoMove()
 	{
-		this.positionFrequenciesByBoardString[this.boardString()]--;
-		if(this.movingTeam==this.teamsByName[WhiteTeam.name]){this.fullMove--;}
+		this.positionCounts[this.boardString()]--;
+		if(this.movingTeam==this.teams[WhiteTeam.name]){this.fullMove--;}
 		this.changeTurns();
 		this.halfMove.revert();
 		
@@ -547,8 +557,8 @@ class Game
 		const movingPiece = this.movingPiece.pop();
 		const targetPiece = this.targetPiece.pop();
 		
-		const fullUpdatedPieces = this.fullUpdatedPieces.pop();
-		fullUpdatedPieces.forEach((piece)=>{piece.team.revertPiece(piece);});
+		const piecesUpdatedPrevMove = this.piecesUpdatedPrevMove.pop();
+		piecesUpdatedPrevMove.forEach((piece)=>{piece.team.revertPiece(piece);});
 		
 		this.enPassantable.revert();
 		
@@ -557,11 +567,11 @@ class Game
 			//move the rook back to its old square
 			const rook = this.pieces[move.rookAfter];
 			this.pieces[move.rookBefore] = rook;
-			rook.team.activePieceLocationsBitVector.set(move.rookBefore);
+			rook.team.activePieceLocations.add(move.rookBefore);
 
 			//remove the rook from its new square
 			this.pieces[move.rookAfter] = null;
-			rook.team.activePieceLocationsBitVector.clear(move.rookAfter);
+			rook.team.activePieceLocations.remove(move.rookAfter);
 		}
 		else if(move instanceof PromotionMove)
 		{
@@ -572,12 +582,12 @@ class Game
 		//move main piece back to old square
 		movingPiece.square = move.mainPieceSquareBefore;
 		this.pieces[move.mainPieceSquareBefore] = movingPiece;
-		movingPiece.team.activePieceLocationsBitVector.set(move.mainPieceSquareBefore);
+		movingPiece.team.activePieceLocations.add(move.mainPieceSquareBefore);
 		movingPiece.team.castleRights.revert();
 
 		//remove main piece from new square
 		this.pieces[move.mainPieceSquareAfter] = null;
-		movingPiece.team.activePieceLocationsBitVector.clear(move.mainPieceSquareAfter);
+		movingPiece.team.activePieceLocations.remove(move.mainPieceSquareAfter);
 
 		//restore captured piece, if any
 		const captureSquare = move.enPassantSquare || move.mainPieceSquareAfter;;
@@ -705,7 +715,7 @@ class Game
 	toString()	//specifically to a FEN string
 	{
 		const boardString = this.boardString();
-		let castleRightsString = Object.values(this.teamsByName).reduce((accumulator, team)=>{
+		let castleRightsString = Object.values(this.teams).reduce((accumulator, team)=>{
 			WINGS.forEach((wing, wingIndex)=>{
 				if(team.castleRights.get() & (1<<wingIndex))
 				{
