@@ -289,24 +289,19 @@ class Game
 			
 		const moves = this.gatherMoves();
 
-		mainLoop:
-		for(const movesList of moves)
+		for(const newContinuation of moves)
 		{
-			for(let i=0; i<movesList.length; i++)
+			this.makeMove(newContinuation);
+			const newEval = this.ABevaluate(depth-1,A,B);
+			this.undoMove();
+			
+			if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
 			{
-				const newContinuation = movesList[i];
-				this.makeMove(newContinuation);
-				const newEval = this.ABevaluate(depth-1,A,B);
-				this.undoMove();
-				
-				if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
-				{
-					bestContinuation = newContinuation;
-					bestEval = newEval;
-				}
-				if(this.movingTeam.evalPreferredToEval(bestEval, this.movingTeam instanceof WhiteTeam?B:A)){break mainLoop;}
-				if(this.movingTeam instanceof WhiteTeam){A = bestEval;}else{B = bestEval;}
+				bestContinuation = newContinuation;
+				bestEval = newEval;
 			}
+			if(this.movingTeam.evalPreferredToEval(bestEval, this.movingTeam instanceof WhiteTeam?B:A)){break;}
+			if(this.movingTeam instanceof WhiteTeam){A = bestEval;}else{B = bestEval;}
 		}
 		
 		if(!bestContinuation)
@@ -603,7 +598,7 @@ class Game
 	
 	gatherMoves()
 	{
-		return this.movingTeam.gatherMoves();
+		return this.movingTeam.gatherMoves().flat(2);
 	}
 	
 	calculateLegals()
