@@ -12,8 +12,8 @@ const NUM_CPUs = require("os").cpus().length;
 
 const DEFAULT_ANALYSIS_DEPTH = 2;
 
-const DRAW_AFTER_NO_PROGRESS_HALFMOVES = 100;
-const DRAW_BY_REPETITIONS = 3;
+const DRAW_BY_REPDRAW_AFTER_NO_PROGRESS_HALFMOVE_COUNTOUNT = 100;
+const DRAW_BY_REPETITION_COUNT = 3;
 
 const EMPTY_FEN_FIELD = "-";
 
@@ -97,7 +97,7 @@ class Game
 		}
 		
 		const halfMove = parseInt(FENparts[4]);
-		if((!Number.isInteger(halfMove)) || (halfMove < 0) || (halfMove > DRAW_AFTER_NO_PROGRESS_HALFMOVES) || isNaN(halfMove))
+		if((!Number.isInteger(halfMove)) || (halfMove < 0) || (halfMove > DRAW_BY_REPDRAW_AFTER_NO_PROGRESS_HALFMOVE_COUNTOUNT) || isNaN(halfMove))
 		{
 			return "invalid halfmove clock";
 		}
@@ -260,12 +260,12 @@ class Game
 	
 	isDrawByRepetition()
 	{
-		return this.positionCounts[this.boardString()]==DRAW_BY_REPETITIONS;
+		return this.positionCounts[this.boardString()]==DRAW_BY_REPETITION_COUNT;
 	}
 	
 	isDrawByMoveRule()
 	{
-		return this.halfMove.get()==DRAW_AFTER_NO_PROGRESS_HALFMOVES;
+		return this.halfMove.get()==DRAW_BY_REPDRAW_AFTER_NO_PROGRESS_HALFMOVE_COUNTOUNT;
 	}
 	
 	immediatePositionScore()
@@ -276,7 +276,10 @@ class Game
 	
 	ABevaluate(depth=DEFAULT_ANALYSIS_DEPTH, A=WhiteTeam.INF_SCORE, B=BlackTeam.INF_SCORE)
 	{
+		//verify that current position is legal
 		if(this.kingCapturable()){return {score:NaN};}
+
+		//if this is a leaf node
 		if(depth==0){return {score:this.immediatePositionScore()};}
 		if(this.isDrawByRepetition()){return {score:0};}
 		if(this.isDrawByMoveRule()){return {score:0};}
@@ -284,7 +287,7 @@ class Game
 		let bestContinuation;
 		let bestEval = {score:this.movingTeam.opposition.constructor.INF_SCORE};		
 			
-		const moves = this.calculateMoves();
+		const moves = this.gatherMoves();
 
 		mainLoop:
 		for(const movesList of moves)
@@ -327,6 +330,7 @@ class Game
 		};
 	}
 	
+	/*
 	threadedABEvaluate(depth = DEFAULT_ANALYSIS_DEPTH)
 	{
 		const NUM_THREADS = Math.max(1, NUM_CPUs/2);
@@ -336,7 +340,7 @@ class Game
 		if(depth==0){return {score:this.immediatePositionScore()};}
 		if(this.isDrawByRepetition()){return {score:0};}
 		if(this.isDrawByMoveRule()){return {score:0};}
-		const moves = this.calculateMoves().flat(2);
+		const moves = this.gatherMoves().flat(2);
 		
 		const gameString = this.toString();
 		
@@ -393,6 +397,7 @@ class Game
 			};
 		});
 	}
+	*/
 	
 	updateMovingPieceAndOppositionPiecesSeeingMove(movingPiece, move)
 	{
@@ -596,7 +601,7 @@ class Game
 		targetPiece?.team.castleRights.revert();
 	}
 	
-	calculateMoves()
+	gatherMoves()
 	{
 		return this.movingTeam.gatherMoves();
 	}
@@ -604,7 +609,7 @@ class Game
 	calculateLegals()
 	{
 		//moves are illegal if they leave the team's king vulnerable to capture
-		return this.calculateMoves().flat(1).filter((move)=>{
+		return this.gatherMoves().flat(1).filter((move)=>{
 			this.makeMove(move);
 			const condition = !(this.kingCapturable());
 			this.undoMove();
