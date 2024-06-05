@@ -2,7 +2,8 @@ const {NUM_RANKS, NUM_FILES, MIN_FILE} = require("./Constants.js");
 const {asciiOffset, asciiDistance, deferredPromise} = require("./Helpers.js");
 const {Manager} = require("./Manager.js");
 const {Square} = require("./Square.js");
-const {PromotionMove, CastleMove} = require("./Move.js");
+const {SquareSet} = require("./SquareSet.js");
+const {PromotionMove, CastleMove, EnPassantMove} = require("./Move.js");
 const {Team, WhiteTeam, BlackTeam} = require("./Team.js");
 const {Piece, King, Rook, Pawn, PieceClassesByTypeChar, WINGS, BlockablePiece} = require("./Piece.js");
 
@@ -289,24 +290,19 @@ class Game
 			
 		const moves = this.gatherMoves();
 
-		mainLoop:
-		for(const movesList of moves)
+		for(const newContinuation of moves)
 		{
-			for(let i=0; i<movesList.length; i++)
+			this.makeMove(newContinuation);
+			const newEval = this.ABevaluate(depth-1,A,B);
+			this.undoMove();
+			
+			if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
 			{
-				const newContinuation = movesList[i];
-				this.makeMove(newContinuation);
-				const newEval = this.ABevaluate(depth-1,A,B);
-				this.undoMove();
-				
-				if(this.movingTeam.evalPreferredToEval(newEval,bestEval))
-				{
-					bestContinuation = newContinuation;
-					bestEval = newEval;
-				}
-				if(this.movingTeam.evalPreferredToEval(bestEval, this.movingTeam instanceof WhiteTeam?B:A)){break mainLoop;}
-				if(this.movingTeam instanceof WhiteTeam){A = bestEval;}else{B = bestEval;}
+				bestContinuation = newContinuation;
+				bestEval = newEval;
 			}
+			if(this.movingTeam.evalPreferredToEval(bestEval, this.movingTeam instanceof WhiteTeam?B:A)){break;}
+			if(this.movingTeam instanceof WhiteTeam){A = bestEval;}else{B = bestEval;}
 		}
 		
 		if(!bestContinuation)
@@ -404,23 +400,24 @@ class Game
 		
 		const piecesUpdatedPrevMove = [];
 		
+		const changedSquares = new SquareSet();
+		changedSquares.add(move.mainPieceSquareBefore);
+		changedSquares.add(move.mainPieceSquareAfter);
+		if(move instanceof EnPassantMove){changedSquares.add(move.enPassantSquare);}
 		//potentially update all pieces on the moving team
 		//because they all are able to gain/lose moves if friendly pieces get in/out of the way
 		this.movingTeam.activePieces.forEach((piece)=>{
 			const watchedSquares = piece.squaresWatched.get();
-			if
-			(
-				watchedSquares.has(move.mainPieceSquareBefore) ||
-				watchedSquares.has(move.mainPieceSquareAfter) ||
-				watchedSquares.has(move.enPassantSquare)
-			)
+			const seenChanges = changedSquares.clone();
+			seenChanges.intersection(watchedSquares);
+			if(!seenChanges.isEmpty())
 			{
 				piece.team.updatePiece(piece);
 				piecesUpdatedPrevMove.push(piece);
 			}
 		});
 		//the above condition would not rule out a promotion piece, because the piece would not have calculated any properties
-		if(move.promotionPiece){move.promotionPiece.team.updatePiece(move.promotionPiece);}	//manually update any promotion piece
+		if(move instanceof PromotionMove){move.promotionPiece.team.updatePiece(move.promotionPiece);}	//manually update any promotion piece
 
 		//potentially update all opposition's blockable pieces because they may have been blocked/unblocked, which would affect their moves
 		//also update the opposition's king, since the castle legality may have changed if the move blocked/unblocked safe squares from attack
@@ -439,12 +436,9 @@ class Game
 				if(piece instanceof BlockablePiece)
 				{
 					const watchedSquares = piece.squaresWatched.get();
-					if
-					(
-						watchedSquares.has(move.mainPieceSquareBefore) ||
-						watchedSquares.has(move.mainPieceSquareAfter) ||
-						watchedSquares.has(move.enPassantSquare)
-					)
+					const seenChanges = changedSquares.clone();
+					seenChanges.intersection(watchedSquares);
+					if(!seenChanges.isEmpty())
 					{
 						piece.team.updatePiece(piece);
 						piecesUpdatedPrevMove.push(piece);
@@ -456,12 +450,9 @@ class Game
 		{
 			this.movingTeam.opposition.activePieces.forEach((piece)=>{
 				const watchedSquares = piece.squaresWatched.get();
-				if
-				(
-					watchedSquares.has(move.mainPieceSquareBefore) ||
-					watchedSquares.has(move.mainPieceSquareAfter) ||
-					watchedSquares.has(move.enPassantSquare)
-				)
+				const seenChanges = changedSquares.clone();
+				seenChanges.intersection(watchedSquares);
+				if(!seenChanges.isEmpty())
 				{
 					piece.team.updatePiece(piece);
 					piecesUpdatedPrevMove.push(piece);
@@ -603,7 +594,7 @@ class Game
 	
 	gatherMoves()
 	{
-		return this.movingTeam.gatherMoves();
+		return this.movingTeam.gatherMoves().flat(2);
 	}
 	
 	calculateLegals()
