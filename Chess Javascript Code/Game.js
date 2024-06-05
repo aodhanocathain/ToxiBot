@@ -232,8 +232,6 @@ class Game
 		
 		this.playedMoves = [];
 		this.piecesUpdatedPrevMove = new Manager();
-		
-		this.numPositionsAnalysed = 0;
 	}
 	
 	clone()
@@ -325,75 +323,6 @@ class Game
 			reverseLine: reverseLine
 		};
 	}
-	
-	/*
-	threadedABEvaluate(depth = DEFAULT_ANALYSIS_DEPTH)
-	{
-		const NUM_THREADS = Math.max(1, NUM_CPUs/2);
-
-		this.numPositionsAnalysed++;
-		if(this.kingCapturable()){return {score:NaN};}
-		if(depth==0){return {score:this.immediatePositionScore()};}
-		if(this.isDrawByRepetition()){return {score:0};}
-		if(this.isDrawByMoveRule()){return {score:0};}
-		const moves = this.gatherMoves().flat(2);
-		
-		const gameString = this.toString();
-		
-		//the available continuations will be divided among a number of threads
-		const workers = Array(NUM_THREADS).fill(null).map((item)=>{return new Worker("./Chess Javascript Code/GameEvaluatorThread.js");});
-		const threadStatusObjects = workers.map((worker)=>{return deferredPromise();});
-		const threadStatusPromises = threadStatusObjects.map((statusObject)=>{return statusObject.promise;});
-		
-		const choosingTeam = this.movingTeam;
-		let bestIndex;
-		let bestEval = {score:this.movingTeam.opposition.constructor.INF_SCORE};	
-		
-		workers.forEach((worker, index)=>{
-			worker.on("message", (message)=>{
-				//can't pass circular objects (evaluations) back from the worker
-				//solution: worker passes the index of its best continuation,
-				//this index is then tried in the main thread and checked against
-				//the best current index
-				const moveIndex = parseInt(message);
-				if(!isNaN(moveIndex))
-				{
-					this.makeMove(moves[moveIndex]);
-					const evaluation = this.ABevaluate(depth-1);
-					if(choosingTeam.evalPreferredToEval(evaluation, bestEval))
-					{
-						bestEval = evaluation;
-						bestIndex = moveIndex;
-					}
-					this.undoMove();
-				}
-				threadStatusObjects[index].resolveFunction("done");
-			});
-			
-			worker.postMessage(JSON.stringify(
-				{
-					gameString: gameString,
-					threadIndex: index,
-					numThreads: NUM_THREADS,
-					workerDepth: depth-1
-				}
-			));
-		});
-		
-		//when all threads have finished, the current best is the best
-		return Promise.all(threadStatusPromises).then((values)=>{
-			const reverseLine = bestEval.reverseLine ?? [];
-			const bestContinuation = moves[bestIndex];
-			reverseLine.push(bestContinuation);
-		
-			return {
-				score: bestEval.score,
-				bestMove: bestContinuation,
-				reverseLine: reverseLine
-			};
-		});
-	}
-	*/
 	
 	updateMovingPieceAndOppositionPiecesSeeingMove(movingPiece, move)
 	{
