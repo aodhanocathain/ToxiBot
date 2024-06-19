@@ -15,10 +15,6 @@ using BitVector64::bitvector64_t;
 using SquareSet::squareset_t;
 #include "Team.h"
 
-char Team::getSymbol() {
-	throw exception("a subclass of Team did not implement getSymbol");
-}
-
 int Team::getNextId()
 {
 	return this->nextId;
@@ -46,22 +42,26 @@ WhiteTeam::WhiteTeam() : Team() {
 
 }
 
-char WhiteTeam::getSymbol() {
-	return 'w';
+char WhiteTeam::getClassSymbol() {
+	return WhiteTeam::symbol;
 }
 
 char WhiteTeam::convert(char teamedChar){
 	return toupper(teamedChar);
 }
 
+char const WhiteTeam::symbol = 'w';
+
 BlackTeam::BlackTeam() : Team() {
 
 }
 
-char BlackTeam::getSymbol() {
-	return 'b';
+char BlackTeam::getClassSymbol() {
+	return BlackTeam::symbol;
 }
 
 char BlackTeam::convert(char teamedChar) {
 	return tolower(teamedChar);
 }
+
+char const BlackTeam::symbol = 'b';

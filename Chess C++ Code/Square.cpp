@@ -31,13 +31,15 @@ int Square::file(square_t s)
 	return s % NUM_FILES;
 }
 
+int const Square::DUMMY_FILE = -1;
+
 string Square::fileString(square_t s)
 {
-	return string(1, MIN_FILE + Square::file(s));
+	return string(1, MIN_FILE_CHAR + Square::file(s));
 }
 string Square::rankString(square_t s)
 {
-	return string(1, MIN_RANK + Square::rank(s));
+	return string(1, MIN_RANK_CHAR + Square::rank(s));
 }
 string Square::fullString(square_t s)
 {

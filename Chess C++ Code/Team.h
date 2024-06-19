@@ -10,7 +10,7 @@
 
 class Team {
 public:
-	static char getSymbol();
+	virtual char getClassSymbol() = 0;
 	virtual char convert(char teamedChar) = 0;
 
 	int getNextId();
@@ -32,13 +32,15 @@ private:
 class WhiteTeam : public Team {
 public:
 	WhiteTeam();
-	static char getSymbol();
+	virtual char getClassSymbol() override;
 	virtual char convert(char teamedChar) override;
+	static char const symbol;
 };
 
 class BlackTeam : public Team {
 public:
 	BlackTeam();
-	static char getSymbol();
+	virtual char getClassSymbol() override;
 	virtual char convert(char teamedChar) override;
+	static char const symbol;
 };

@@ -14,6 +14,8 @@ namespace Square {
 	int rank(square_t s);
 	int file(square_t s);
 
+	extern int const DUMMY_FILE;
+
 	std::string rankString(square_t s);
 	std::string fileString(square_t s);
 	std::string fullString(square_t s);

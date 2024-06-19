@@ -65,8 +65,8 @@ King::King(square_t square, int id) : FixedOffsetPiece(square, id) {
 
 }
 
-char King::getSymbol() {
-	return this->symbol;
+char King::getClassSymbol() {
+	return King::symbol;
 }
 
 int const King::numOffsetPairs = 8;

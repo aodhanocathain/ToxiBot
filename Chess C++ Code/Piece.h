@@ -8,7 +8,7 @@ public:
 	static Piece* createFrom(char symbol, Square::square_t square, int id);
 	static char getPlainSymbolFromTeamedSymbol(char teamedSymbol);
 
-	virtual char getSymbol() = 0;
+	virtual char getClassSymbol() = 0;
 	virtual SquareSet::squareset_t getAttackSet() = 0;
 	Square::square_t getSquare();
 	int getId();
@@ -34,7 +34,7 @@ class King final : public FixedOffsetPiece {
 public:
 	King(Square::square_t square, int id);
 	static char const symbol;
-	virtual char getSymbol() override;
+	virtual char getClassSymbol() override;
 protected:
 	virtual int const * const getOffsetPair(int pair) override;
 	virtual int getNumOffsetPairs() override;

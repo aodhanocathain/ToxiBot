@@ -19,14 +19,18 @@ using Square::square_t;
 string Game::DEFAULT_FEN = "4k3/8/8/8/8/8/8/4K3 w KQkq - 0 1";
 
 Game::Game(string fen) {
+
+	//initialize teams
 	this->white = shared_ptr<Team>(new WhiteTeam());
 	this->black = shared_ptr<Team>(new BlackTeam());
 	this->teams = std::map<char, shared_ptr<Team>> {
-		{WhiteTeam::getSymbol(),this->white},
-		{BlackTeam::getSymbol(),this->black}
+		{WhiteTeam::symbol,this->white},
+		{BlackTeam::symbol ,this->black}
 	};
 
 	vector<string> fenParts = Helpers::string_split(fen, ' ');
+
+	//initialize pieces from the board state
 	string board = fenParts.at(0);
 	vector<string> rankStrings = Helpers::string_split(board, '/');
 	int rank = 0;
@@ -60,6 +64,40 @@ Game::Game(string fen) {
 		}
 		rank++;
 	}
+
+	//initialize which turn it is
+	string turnString = fenParts[1];
+	char turnTeamSymbol = turnString[0];
+	this->movingTeam = std::find_if(this->teams.cbegin(), this->teams.cend(), [turnTeamSymbol](std::pair<char, shared_ptr<Team>> pair) {
+		return pair.second->getClassSymbol() == turnTeamSymbol;
+	})->second;
+
+	//initialize which file (if any) contains a pawn on which a valid en-passant capture could be performed
+	string enPassantFileString = fenParts[3];
+	char enPassantFile = enPassantFileString[0];
+	if (enPassantFile == NO_ENPASSANT_CHAR) {
+		this->validEnPassantFile = Square::DUMMY_FILE;
+	}
+	else {
+		this->validEnPassantFile = enPassantFile - MIN_FILE_CHAR;
+	}
+
+	//initialize move clocks
+	string halfMoveString = fenParts[4];
+	this->halfMoveClock = halfMoveString[0] - '0';
+	string fullMoveString = fenParts[5];
+	this->fullMoveClock = fullMoveString[0] - '0';
+}
+
+string Game::getFen()
+{
+	string boardString = this->getBoardString();
+	string turnString = string(1, this->movingTeam->getClassSymbol());
+	string castleRightsString = this->getCastleRightsString();
+	string enPassantFileString = (Square::validFile(this->validEnPassantFile) ? Square::fileString(this->validEnPassantFile) : "-");
+	string halfMoveClockString = string(1, '0' + this->halfMoveClock);
+	string fullMoveClockString = string(1, '0' + this->fullMoveClock);
+	return boardString + " " + turnString + " " + castleRightsString + " " + enPassantFileString + " " + halfMoveClockString + " " + fullMoveClockString;
 }
 
 string Game::getBoardString() {
@@ -84,7 +122,7 @@ string Game::getBoardString() {
 				map<char, shared_ptr<Team>>::const_iterator symbolTeamPair = std::find_if(this->teams.cbegin(), (this->teams.cend()), [piece](std::pair<char, shared_ptr<Team>> pair) {
 					return pair.second->has(piece);
 				});
-				rankString = rankString + symbolTeamPair->second->convert(piece->getSymbol());
+				rankString = rankString + symbolTeamPair->second->convert(piece->getClassSymbol());
 			}
 			else
 			{
@@ -104,7 +142,6 @@ string Game::getBoardString() {
 	return boardString;
 }
 
-string Game::getFen()
-{
-	return this->getBoardString();
+string Game::getCastleRightsString() {
+	return "KQkq";
 }
