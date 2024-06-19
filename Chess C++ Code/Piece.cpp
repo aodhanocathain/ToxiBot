@@ -43,11 +43,11 @@ SquareSet::squareset_t FixedOffsetPiece::getAttackSet() {
 	int numPairs = this->getNumOffsetPairs();
 	for (int pair = 0; pair < numPairs; pair++)
 	{
-		int const * const offsetPair = this->getOffsetPair(pair);
-		int const rankOffset = offsetPair[0];
-		int const fileOffset = offsetPair[1];
-		int const attackedRank = rank + rankOffset;
-		int const attackedFile = file + fileOffset;
+		int const * offsetPair = this->getOffsetPair(pair);
+		int rankOffset = offsetPair[0];
+		int fileOffset = offsetPair[1];
+		int attackedRank = rank + rankOffset;
+		int attackedFile = file + fileOffset;
 		if (Square::validRankAndFile(attackedRank, attackedFile))
 		{
 			square_t attackedSquare = Square::ofRankAndFile(attackedRank, attackedFile);

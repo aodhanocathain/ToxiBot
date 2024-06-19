@@ -20,11 +20,10 @@ vector<string> Helpers::string_split(string base, char delimiter)
 			substringStart = scanner+1;
 		}
 	}
-	if (substringStart != base.cend()) {
-		int start = std::distance(base.cbegin(), substringStart);
-		int length = std::distance(substringStart, base.cend());
-		substrings.push_back(base.substr(start, length));
-	}
+
+	int start = std::distance(base.cbegin(), substringStart);
+	int length = std::distance(substringStart, base.cend());
+	substrings.push_back(base.substr(start, length));
 
 	return substrings;
 }

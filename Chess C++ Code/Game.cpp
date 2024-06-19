@@ -44,19 +44,17 @@ Game::Game(string fen) {
 			}
 			else
 			{
-				square_t square = Square::ofRankAndFile(rank,file);
 				char pieceSymbol = Piece::getPlainSymbolFromTeamedSymbol(current);
+				square_t square = Square::ofRankAndFile(rank, file);
 				map<char, shared_ptr<Team>>::const_iterator symbolTeamPair = std::find_if(this->teams.cbegin(), this->teams.cend(), [current](std::pair<char, shared_ptr<Team>> pair) {
 					//find the team whose converter has been applied to the piece symbol, which means the piece is on that team
 					return pair.second->convert(current) == current;
 				});
-				char teamSymbol = symbolTeamPair->first;
-				//Piece* piece = Piece::createFrom(pieceSymbol, square, 0);
-				shared_ptr<Piece> piece(Piece::createFrom(pieceSymbol, square, 0));
-				shared_ptr<Team> team = this->teams[teamSymbol];
+				int id = symbolTeamPair->second->getNextId();
+				shared_ptr<Piece> piece(Piece::createFrom(pieceSymbol, square, id));
 
 				this->pieces[square] = piece;
-				team->registerActivePiece(piece);
+				this->teams[symbolTeamPair->first]->registerActivePiece(piece);
 				file++;
 			}
 		}

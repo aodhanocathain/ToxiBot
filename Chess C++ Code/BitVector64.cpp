@@ -21,9 +21,7 @@ int BitVector64::read(bitvector64_t bv, int index)
 }
 bitvector64_t BitVector64::write(bitvector64_t bv, int index, int value)
 {
-	bitvector64_t intermediate = BitVector64::clear(bv, index);
-	intermediate |= (value << index);
-	return intermediate;
+	return BitVector64::clear(bv, index) | (value << index);
 }
 
 bitvector64_t BitVector64::invert(bitvector64_t bv)

@@ -27,8 +27,8 @@ int Team::getNextId()
 void Team::registerActivePiece(shared_ptr<Piece> piece)
 {
 	this->activePieces[this->nextId] = piece;
-	this->activePieceLocations = SquareSet::add(this->activePieceLocations, piece->getSquare());
 	this->nextId++;
+	this->activePieceLocations = SquareSet::add(this->activePieceLocations, piece->getSquare());
 }
 
 bool Team::has(shared_ptr<Piece> piece) {
