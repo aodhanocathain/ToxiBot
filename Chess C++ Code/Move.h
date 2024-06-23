@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "Square.h"
 
 class Move
@@ -7,6 +9,8 @@ class Move
 public:
 	Square::square_t getMainPieceSquareBefore();
 	Square::square_t getMainPieceSquareAfter();
+
+	std::string toString();
 protected:
 	Move(Square::square_t mainPieceSquareBefore, Square::square_t mainPieceSquareAfter);
 private:

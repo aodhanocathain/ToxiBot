@@ -8,11 +8,11 @@ bitvector64_t BitVector64::zeroes()
 
 bitvector64_t BitVector64::set(bitvector64_t bv, int index)
 {
-	return bv | (1 << index);
+	return bv | (((bitvector64_t)1)<<index);
 }
 bitvector64_t BitVector64::clear(bitvector64_t bv, int index)
 {
-	return bv & ~(1 << index);
+	return bv & ~(((bitvector64_t)1) << index);
 }
 
 int BitVector64::read(bitvector64_t bv, int index)
@@ -21,7 +21,7 @@ int BitVector64::read(bitvector64_t bv, int index)
 }
 bitvector64_t BitVector64::write(bitvector64_t bv, int index, int value)
 {
-	return BitVector64::clear(bv, index) | (value << index);
+	return BitVector64::clear(bv, index) | (((bitvector64_t)value) << index);
 }
 
 bitvector64_t BitVector64::invert(bitvector64_t bv)

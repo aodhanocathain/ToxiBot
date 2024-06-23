@@ -15,17 +15,21 @@ using std::vector;
 #include "Piece.h"
 #include "Square.h"
 using Square::square_t;
+#include "Team.h"
 
-string Game::DEFAULT_FEN = "4k3/8/8/8/8/8/8/4K3 w KQkq - 0 1";
+//string Game::DEFAULT_FEN = "4k3/8/8/8/8/8/8/4K3 b KQkq - 0 1";
+string Game::DEFAULT_FEN = "4k3/8/8/8/4K3/8/8/8 w KQkq - 0 1";
+//string Game::DEFAULT_FEN = "1n2k1n1/8/8/8/8/8/8/1N2K1N1 w KQkq - 0 1";
+//string Game::DEFAULT_FEN = "7k/8/6N1/6K1/8/8/8/8 w - - 0 1";
 
-Game::Game(string fen) {
+//string Game::DEFAULT_FEN = 
+
+Game::Game(string fen) : white(WhiteTeam(&(this->black))), black(BlackTeam(&(this->white))) {
 
 	//initialize teams
-	this->white = shared_ptr<Team>(new WhiteTeam());
-	this->black = shared_ptr<Team>(new BlackTeam());
-	this->teams = std::map<char, shared_ptr<Team>> {
-		{WhiteTeam::symbol,this->white},
-		{BlackTeam::symbol ,this->black}
+	this->teams = std::map<char, Team*> {
+		{WhiteTeam::symbol,&(this->white)},
+		{BlackTeam::symbol,&(this->black)}
 	};
 
 	vector<string> fenParts = Helpers::string_split(fen, ' ');
@@ -50,7 +54,7 @@ Game::Game(string fen) {
 			{
 				char pieceSymbol = Piece::getPlainSymbolFromTeamedSymbol(current);
 				square_t square = Square::ofRankAndFile(rank, file);
-				map<char, shared_ptr<Team>>::const_iterator symbolTeamPair = std::find_if(this->teams.cbegin(), this->teams.cend(), [current](std::pair<char, shared_ptr<Team>> pair) {
+				map<char, Team*>::const_iterator symbolTeamPair = std::find_if(this->teams.cbegin(), this->teams.cend(), [current](std::pair<char, Team*> pair) {
 					//find the team whose converter has been applied to the piece symbol, which means the piece is on that team
 					return pair.second->convert(current) == current;
 				});
@@ -68,7 +72,7 @@ Game::Game(string fen) {
 	//initialize which turn it is
 	string turnString = fenParts[1];
 	char turnTeamSymbol = turnString[0];
-	this->movingTeam = std::find_if(this->teams.cbegin(), this->teams.cend(), [turnTeamSymbol](std::pair<char, shared_ptr<Team>> pair) {
+	this->movingTeam = std::find_if(this->teams.cbegin(), this->teams.cend(), [turnTeamSymbol](std::pair<char, Team*> pair) {
 		return pair.second->getClassSymbol() == turnTeamSymbol;
 	})->second;
 
@@ -89,7 +93,7 @@ Game::Game(string fen) {
 	this->fullMoveClock = fullMoveString[0] - '0';
 }
 
-string Game::getFen()
+string Game::calculateFen()
 {
 	string boardString = this->getBoardString();
 	string turnString = string(1, this->movingTeam->getClassSymbol());
@@ -98,6 +102,18 @@ string Game::getFen()
 	string halfMoveClockString = string(1, '0' + this->halfMoveClock);
 	string fullMoveClockString = string(1, '0' + this->fullMoveClock);
 	return boardString + " " + turnString + " " + castleRightsString + " " + enPassantFileString + " " + halfMoveClockString + " " + fullMoveClockString;
+}
+
+vector<vector<Move>> Game::calculateConsideredMoves() {
+	return this->movingTeam->calculateConsideredMoves();
+}
+
+bool Game::kingCapturable() {
+	return SquareSet::has(this->movingTeam->calculateAttackSet(), this->movingTeam->getOpposition()->getKing()->getSquare());
+}
+
+bool Game::kingChecked() {
+	return SquareSet::has(this->movingTeam->getOpposition()->calculateAttackSet(), this->movingTeam->getKing()->getSquare());
 }
 
 string Game::getBoardString() {
@@ -119,7 +135,7 @@ string Game::getBoardString() {
 					emptySquares = 0;
 				}
 				//find which team owns this piece, so that its symbol can be appropriately converted for the string
-				map<char, shared_ptr<Team>>::const_iterator symbolTeamPair = std::find_if(this->teams.cbegin(), (this->teams.cend()), [piece](std::pair<char, shared_ptr<Team>> pair) {
+				map<char, Team*>::const_iterator symbolTeamPair = std::find_if(this->teams.cbegin(), (this->teams.cend()), [piece](std::pair<char, Team*> pair) {
 					return pair.second->has(piece);
 				});
 				rankString = rankString + symbolTeamPair->second->convert(piece->getClassSymbol());

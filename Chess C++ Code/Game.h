@@ -14,15 +14,21 @@
 class Game {
 public:
 	Game(std::string fen = Game::DEFAULT_FEN);
-	std::string getFen();
+
+	std::string calculateFen();
+	std::vector<std::vector<Move>> calculateConsideredMoves();
+
+	bool kingCapturable();
+	bool kingChecked();
+
 private:
 	static std::string DEFAULT_FEN;
-	std::shared_ptr<Team> white;
-	std::shared_ptr<Team> black;
-	std::map<char, std::shared_ptr<Team>> teams;
-	std::array<std::shared_ptr<Piece>, NUM_SQUARES> pieces;
 
-	std::shared_ptr<Team> movingTeam;
+	WhiteTeam white;
+	BlackTeam black;
+	std::map<char, Team*> teams;
+	Team* movingTeam;
+	std::array<std::shared_ptr<Piece>, NUM_SQUARES> pieces;
 	std::vector<Move> playedMoves;
 
 	int validEnPassantFile;
