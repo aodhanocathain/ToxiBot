@@ -18,14 +18,18 @@ public:
 	SquareSet::squareset_t getActivePieceLocations();
 	BitVector64::bitvector64_t getIdsSeeingOpposingKing();
 
+	void setActivePieceLocations(SquareSet::squareset_t activePieceLocations);
+
 	virtual char getClassSymbol() = 0;
 	virtual char convert(char teamedChar) = 0;
 
 	void registerActivePiece(std::shared_ptr<Piece> piece);
+	void deactivatePiece(std::shared_ptr<Piece> piece);
+	void activatePiece(std::shared_ptr<Piece> piece);
 	bool has(std::shared_ptr<Piece>);
 
 	SquareSet::squareset_t calculateAttackSet();
-	std::vector<std::vector<Move>> calculateConsideredMoves();
+	std::vector<std::vector<Move*>> calculateConsideredMoves();
 
 
 protected:

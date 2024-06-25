@@ -11,8 +11,11 @@ public:
 	Square::square_t getSquare();
 	int getId();
 	virtual char getClassSymbol() = 0;
+
+	void setSquare(Square::square_t square);
+
 	virtual SquareSet::squareset_t calculateAttackSet(SquareSet::squareset_t friendlyActivePieceLocations, SquareSet::squareset_t oppositionActivePieceLocations) = 0;
-	virtual std::vector<Move> calculateConsideredMoves(SquareSet::squareset_t friendlyActivePieceLocations, SquareSet::squareset_t oppositionActivePieceLocations);
+	virtual std::vector<Move*> calculateConsideredMoves(SquareSet::squareset_t friendlyActivePieceLocations, SquareSet::squareset_t oppositionActivePieceLocations);
 
 	static Piece* createFrom(char symbol, Square::square_t square, int id);
 	static char getPlainSymbolFromTeamedSymbol(char teamedSymbol);

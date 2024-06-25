@@ -28,3 +28,7 @@ PlainMove::PlainMove(square_t mainPieceSquareBefore, square_t mainPieceSquareAft
 {
 
 }
+
+square_t PlainMove::getCaptureSquare() {
+	return this->getMainPieceSquareAfter();
+}

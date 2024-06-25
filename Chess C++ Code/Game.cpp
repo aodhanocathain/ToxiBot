@@ -24,6 +24,8 @@ string Game::DEFAULT_FEN = "4k3/8/8/8/4K3/8/8/8 w KQkq - 0 1";
 
 //string Game::DEFAULT_FEN = 
 
+int Game::MAX_HISTORY = 256;
+
 Game::Game(string fen) : white(WhiteTeam(&(this->black))), black(BlackTeam(&(this->white))) {
 
 	//initialize teams
@@ -79,32 +81,37 @@ Game::Game(string fen) : white(WhiteTeam(&(this->black))), black(BlackTeam(&(thi
 	//initialize which file (if any) contains a pawn on which a valid en-passant capture could be performed
 	string enPassantFileString = fenParts[3];
 	char enPassantFile = enPassantFileString[0];
+	this->validEnPassantFile = vector<int>(Game::MAX_HISTORY);
 	if (enPassantFile == NO_ENPASSANT_CHAR) {
-		this->validEnPassantFile = Square::DUMMY_FILE;
+		this->validEnPassantFile.push_back(Square::DUMMY_FILE);
 	}
 	else {
-		this->validEnPassantFile = enPassantFile - MIN_FILE_CHAR;
+		this->validEnPassantFile.push_back(enPassantFile - MIN_FILE_CHAR);
 	}
 
 	//initialize move clocks
+	this->halfMoveClock = vector<int>(Game::MAX_HISTORY);
 	string halfMoveString = fenParts[4];
-	this->halfMoveClock = halfMoveString[0] - '0';
+	this->halfMoveClock.push_back(halfMoveString[0] - '0');
+	this->fullMoveClock = vector<int>(Game::MAX_HISTORY);
 	string fullMoveString = fenParts[5];
-	this->fullMoveClock = fullMoveString[0] - '0';
+	this->fullMoveClock.push_back(fullMoveString[0] - '0');
+
+	this->positionCounts[this->getPositionString()] = 1;
 }
 
 string Game::calculateFen()
 {
 	string boardString = this->getBoardString();
-	string turnString = string(1, this->movingTeam->getClassSymbol());
+	string turnString = this->getTurnString();
 	string castleRightsString = this->getCastleRightsString();
-	string enPassantFileString = (Square::validFile(this->validEnPassantFile) ? Square::fileString(this->validEnPassantFile) : "-");
-	string halfMoveClockString = string(1, '0' + this->halfMoveClock);
-	string fullMoveClockString = string(1, '0' + this->fullMoveClock);
+	string enPassantFileString = this->getValidEnPassantFileString();
+	string halfMoveClockString = this->getHalfMoveString();
+	string fullMoveClockString = this->getFullMoveString();
 	return boardString + " " + turnString + " " + castleRightsString + " " + enPassantFileString + " " + halfMoveClockString + " " + fullMoveClockString;
 }
 
-vector<vector<Move>> Game::calculateConsideredMoves() {
+vector<vector<Move*>> Game::calculateConsideredMoves() {
 	return this->movingTeam->calculateConsideredMoves();
 }
 
@@ -114,6 +121,78 @@ bool Game::kingCapturable() {
 
 bool Game::kingChecked() {
 	return SquareSet::has(this->movingTeam->getOpposition()->calculateAttackSet(), this->movingTeam->getKing()->getSquare());
+}
+
+void Game::makeMove(Move* move) {
+	square_t captureSquare = move->getCaptureSquare();
+	shared_ptr<Piece> captureTarget = this->pieces[captureSquare];
+	//assume the captured piece is always going to be the opposition of the moving team
+	if (captureTarget) {
+		this->movingTeam->getOpposition()->deactivatePiece(captureTarget);
+	}
+	this->pieces[captureSquare].reset();
+	if (captureTarget) {
+		//update castle rights
+	}
+
+	shared_ptr<Piece> movingPiece = this->pieces[move->getMainPieceSquareBefore()];
+	movingPiece->setSquare(move->getMainPieceSquareAfter());
+	this->pieces[move->getMainPieceSquareAfter()] = movingPiece;
+	this->movingTeam->setActivePieceLocations(SquareSet::add(this->movingTeam->getActivePieceLocations(), move->getMainPieceSquareAfter()));
+	//update castle rights
+
+	this->pieces[move->getMainPieceSquareBefore()].reset();
+	this->movingTeam->setActivePieceLocations(SquareSet::remove(this->movingTeam->getActivePieceLocations(), move->getMainPieceSquareBefore()));
+
+	//if move is castle move...
+	//if move is promotion move...
+	//if move is pawn move...
+
+	this->validEnPassantFile.push_back(Square::DUMMY_FILE);
+	this->playedMoves.push_back(move);
+	this->lastMovedPiece.push_back(movingPiece);
+	this->lastTargetPiece.push_back(captureTarget);
+	this->halfMoveClock.push_back(this->halfMoveClock.back() + 1);
+	this->fullMoveClock.push_back(this->fullMoveClock.back() + (this->movingTeam == &(this->black) ? 1 : 0));
+	this->movingTeam = this->movingTeam->getOpposition();
+
+	string positionString = this->getPositionString();
+	if (this->positionCounts.find(positionString) == this->positionCounts.end()) {
+		this->positionCounts[positionString] = 1;
+	}
+	else {
+		this->positionCounts[positionString]++;
+	}
+}
+void Game::undoMove() {
+	this->positionCounts[this->getPositionString()]--;
+	this->movingTeam = this->movingTeam->getOpposition();
+	this->fullMoveClock.pop_back();
+	this->halfMoveClock.pop_back();
+	shared_ptr<Piece> captureTarget = this->lastTargetPiece.back();
+	this->lastTargetPiece.pop_back();
+	shared_ptr<Piece> movingPiece = this->lastMovedPiece.back();
+	this->lastMovedPiece.pop_back();
+	Move* move = this->playedMoves.back();
+	this->playedMoves.pop_back();
+	this->validEnPassantFile.pop_back();
+
+	this->pieces[move->getMainPieceSquareBefore()] = movingPiece;
+	this->movingTeam->setActivePieceLocations(SquareSet::add(this->movingTeam->getActivePieceLocations(), move->getMainPieceSquareBefore()));
+
+	movingPiece->setSquare(move->getMainPieceSquareBefore());
+	this->pieces[move->getMainPieceSquareAfter()].reset();
+	this->movingTeam->setActivePieceLocations(SquareSet::remove(this->movingTeam->getActivePieceLocations(), move->getMainPieceSquareAfter()));
+	//update castle rights
+
+	square_t captureSquare = move->getCaptureSquare();
+	if (captureTarget) {
+		this->movingTeam->getOpposition()->activatePiece(captureTarget);
+	}
+	this->pieces[captureSquare] = captureTarget;
+	if (captureTarget) {
+		//update castle rights
+	}
 }
 
 string Game::getBoardString() {
@@ -158,6 +237,27 @@ string Game::getBoardString() {
 	return boardString;
 }
 
+string Game::getTurnString() {
+	return string(1, this->movingTeam->getClassSymbol());
+}
+
 string Game::getCastleRightsString() {
 	return "KQkq";
+}
+
+string Game::getValidEnPassantFileString() {
+	return (Square::validFile(this->validEnPassantFile.back()) ? Square::fileString(this->validEnPassantFile.back()) : "-");;
+}
+
+string Game::getHalfMoveString() {
+	return string(1, '0' + this->halfMoveClock.back());
+}
+
+string Game::getFullMoveString() {
+	return string(1, '0' + this->fullMoveClock.back());
+}
+
+//not to be used for display purposes, only for counting occurences of each position
+string Game::getPositionString() {
+	return this->getBoardString() + this->getTurnString() + this->getCastleRightsString() + this->getValidEnPassantFileString();
 }

@@ -35,6 +35,10 @@ bitvector64_t Team::getIdsSeeingOpposingKing() {
 	return this->idsSeeingOpposingKing;
 }
 
+void Team::setActivePieceLocations(SquareSet::squareset_t activePieceLocations) {
+	this->activePieceLocations = activePieceLocations;
+}
+
 void Team::registerActivePiece(shared_ptr<Piece> piece)
 {
 	this->activePieces[this->nextId] = piece;
@@ -43,6 +47,14 @@ void Team::registerActivePiece(shared_ptr<Piece> piece)
 	if (piece->getClassSymbol() == King::symbol) {
 		this->king = std::static_pointer_cast<King>(piece);
 	}
+}
+void Team::deactivatePiece(std::shared_ptr<Piece> piece) {
+	this->activePieces[piece->getId()].reset();
+	this->inactivePieces[piece->getId()] = piece;
+}
+void Team::activatePiece(std::shared_ptr<Piece> piece) {
+	this->activePieces[piece->getId()] = piece;
+	this->inactivePieces[piece->getId()].reset();
 }
 bool Team::has(shared_ptr<Piece> piece) {
 	return std::find(this->activePieces.cbegin(), this->activePieces.cend(), piece) != this->activePieces.cend();
@@ -58,8 +70,8 @@ squareset_t Team::calculateAttackSet() {
 		});
 	return set;
 }
-vector<vector<Move>> Team::calculateConsideredMoves() {
-	vector<vector<Move>> consideredMoves;
+vector<vector<Move*>> Team::calculateConsideredMoves() {
+	vector<vector<Move*>> consideredMoves;
 	squareset_t oppositionActivePieceLocations = this->opposition->getActivePieceLocations();
 	for (array<shared_ptr<Piece>, NUM_SQUARES>::const_iterator pieceItr = this->activePieces.cbegin(); pieceItr != this->activePieces.cend(); pieceItr++) {
 		if ((*pieceItr)) {

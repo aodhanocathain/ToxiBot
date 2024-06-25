@@ -21,6 +21,10 @@ int Piece::getId() {
 	return this->id;
 }
 
+void Piece::setSquare(square_t square) {
+	this->square = square;
+}
+
 void findFirstBit(unsigned long* lsb, squareset_t attackset) {
 	for (int i = 0; i < 64; i++) {
 		if ((attackset >> i) & 1) {
@@ -30,8 +34,8 @@ void findFirstBit(unsigned long* lsb, squareset_t attackset) {
 	}
 }
 
-vector<Move> Piece::calculateConsideredMoves(squareset_t friendlyActivePieceLocations, squareset_t oppositionActivePieceLocations) {
-	vector<Move> consideredMoves;
+vector<Move*> Piece::calculateConsideredMoves(squareset_t friendlyActivePieceLocations, squareset_t oppositionActivePieceLocations) {
+	vector<Move*> consideredMoves;
 	SquareSet::squareset_t attackset = this->calculateAttackSet(friendlyActivePieceLocations, oppositionActivePieceLocations);
 	unsigned long lsb;
 	while (attackset != SquareSet::emptySet()) {
@@ -39,7 +43,7 @@ vector<Move> Piece::calculateConsideredMoves(squareset_t friendlyActivePieceLoca
 		findFirstBit(&lsb, attackset);
 		square_t square = lsb;
 		attackset = SquareSet::remove(attackset, square);
-		consideredMoves.push_back(PlainMove(this->getSquare(), square));
+		consideredMoves.push_back(new PlainMove(this->getSquare(), square));
 	}
 	return consideredMoves;
 }
