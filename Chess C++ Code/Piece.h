@@ -91,5 +91,34 @@ private:
 	static float const points;
 	static int const numDirections;
 	static int const directionsOffsets[];
+};
 
+class Rook final : public DirectionPiece {
+public:
+	Rook(Square::square_t square, int id);
+	static char const symbol;
+	virtual char getClassSymbol() override;
+	virtual float getClassPoints() override;
+protected:
+	virtual int const* const getDirectionOffsets(int direction) override;
+	virtual int getNumDirections() override;
+private:
+	static float const points;
+	static int const numDirections;
+	static int const directionsOffsets[];
+};
+
+class Queen final : public DirectionPiece {
+public:
+	Queen(Square::square_t square, int id);
+	static char const symbol;
+	virtual char getClassSymbol() override;
+	virtual float getClassPoints() override;
+protected:
+	virtual int const* const getDirectionOffsets(int direction) override;
+	virtual int getNumDirections() override;
+private:
+	static float const points;
+	static int const numDirections;
+	static int const directionsOffsets[];
 };

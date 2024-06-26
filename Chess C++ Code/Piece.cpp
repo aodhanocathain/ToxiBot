@@ -42,7 +42,9 @@ Piece* Piece::createFrom(char symbol, square_t square, int id) {
 	static map<char, function<Piece* (square_t, int)>> creators{
 		{King::symbol,[](square_t square, int id) {return new King(square, id); }},
 		{Knight::symbol,[](square_t square, int id) {return new Knight(square, id); }},
-		{Bishop::symbol,[](square_t square, int id) {return new Bishop(square, id); }}
+		{Bishop::symbol,[](square_t square, int id) {return new Bishop(square, id); }},
+		{Rook::symbol,[](square_t square, int id) {return new Rook(square, id); }},
+		{Queen::symbol,[](square_t square, int id) {return new Queen(square, id); }}
 	};
 	return (creators[symbol])(square, id);
 }
@@ -210,5 +212,63 @@ int const Bishop::directionsOffsets[Bishop::numDirections*2] = {
 	-1,-1,
 	-1,1,
 	1,-1,
+	1,1
+};
+
+Rook::Rook(square_t square, int id) : DirectionPiece(square, id) {
+
+}
+
+char Rook::getClassSymbol() {
+	return Rook::symbol;
+}
+float Rook::getClassPoints() {
+	return Rook::points;
+}
+int const* const Rook::getDirectionOffsets(int direction) {
+	return Rook::directionsOffsets + (2 * direction);
+}
+int Rook::getNumDirections() {
+	return Rook::numDirections;
+}
+
+char const Rook::symbol = 'R';
+float const Rook::points = 5;
+int const Rook::numDirections = 4;
+int const Rook::directionsOffsets[Rook::numDirections * 2] = {
+	-1,0,
+	0,-1,
+	0,1,
+	1,0
+};
+
+Queen::Queen(square_t square, int id) : DirectionPiece(square, id) {
+
+}
+
+char Queen::getClassSymbol() {
+	return Queen::symbol;
+}
+float Queen::getClassPoints() {
+	return Queen::points;
+}
+int const* const Queen::getDirectionOffsets(int direction) {
+	return Queen::directionsOffsets + (2 * direction);
+}
+int Queen::getNumDirections() {
+	return Queen::numDirections;
+}
+
+char const Queen::symbol = 'Q';
+float const Queen::points = 9;
+int const Queen::numDirections = 8;
+int const Queen::directionsOffsets[Queen::numDirections * 2] = {
+	-1,-1,
+	-1,0,
+	-1,1,
+	0,-1,
+	0,1,
+	1,-1,
+	1,0,
 	1,1
 };

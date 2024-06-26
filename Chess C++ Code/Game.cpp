@@ -25,9 +25,11 @@ using Square::square_t;
 
 //string Game::DEFAULT_FEN = "k7/8/3N4/1N6/2NN4/8/8/7K w - - 0 1";	//checkmate in 2 with only knights and kings
 
-string Game::DEFAULT_FEN = "7k/8/4B1K1/8/7B/8/8/8 w - - 0 1";
+//string Game::DEFAULT_FEN = "7k/8/4B1K1/8/7B/8/8/8 w - - 0 1";	//checkmate in 1 with only bishops and kings
 
-//string Game::DEFAULT_FEN = 
+//string Game::DEFAULT_FEN = "7k/8/R6K/8/8/8/8/8 w - - 0 1";	//checkmate in 1 with only rooks and kings
+
+string Game::DEFAULT_FEN = "7k/8/7K/7Q/8/8/8/8 w - - 0 1";	//checkmate in 1 with only queens and kings
 
 int Game::MAX_HISTORY = 256;
 
