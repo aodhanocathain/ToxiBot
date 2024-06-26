@@ -35,7 +35,7 @@ int main()
 	}
 
 	cout << "evaluation:" << endl;
-	Evaluation e = Evaluation::evaluate(game, 2);
+	Evaluation e = Evaluation::evaluate(game, 3);
 	cout << e.getScore() << endl;
 	vector<Move*> bestLine = e.getBestLine();
 	for (vector<Move*>::reverse_iterator i = bestLine.rbegin(); i < bestLine.rend(); i++) {

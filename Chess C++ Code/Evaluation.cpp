@@ -27,9 +27,6 @@ Evaluation Evaluation::evaluate(Game& game, int depth) {
 	}
 
 	vector<Move*> legals = game.calculateLegalMoves();
-	if (legals.size() == 0) { 
-		throw "what the fuck"; 
-	}
 
 	Move* bestMove = *(legals.begin());
 	game.makeMove(bestMove);

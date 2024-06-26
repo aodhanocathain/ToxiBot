@@ -29,7 +29,9 @@ using Square::square_t;
 
 //string Game::DEFAULT_FEN = "7k/8/R6K/8/8/8/8/8 w - - 0 1";	//checkmate in 1 with only rooks and kings
 
-string Game::DEFAULT_FEN = "7k/8/7K/7Q/8/8/8/8 w - - 0 1";	//checkmate in 1 with only queens and kings
+//string Game::DEFAULT_FEN = "7k/8/7K/7Q/8/8/8/8 w - - 0 1";	//checkmate in 1 with only queens and kings
+
+string Game::DEFAULT_FEN = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
 
 int Game::MAX_HISTORY = 256;
 
@@ -196,8 +198,10 @@ void Game::makeMove(Move* move) {
 	this->lastTargetPiece.push_back(captureTarget);
 	this->halfMoveClock.push_back(this->halfMoveClock.back() + 1);
 	this->fullMoveClock.push_back(this->fullMoveClock.back() + (this->movingTeam == &(this->black) ? 1 : 0));
+
 	this->movingTeam = this->movingTeam->getOpposition();
 
+	/*
 	string positionString = this->getPositionString();
 	if (this->positionCounts.find(positionString) == this->positionCounts.end()) {
 		this->positionCounts[positionString] = 1;
@@ -205,9 +209,10 @@ void Game::makeMove(Move* move) {
 	else {
 		this->positionCounts[positionString]++;
 	}
+	*/
 }
 void Game::undoMove() {
-	this->positionCounts[this->getPositionString()]--;
+	//this->positionCounts[this->getPositionString()]--;
 	this->movingTeam = this->movingTeam->getOpposition();
 	this->fullMoveClock.pop_back();
 	this->halfMoveClock.pop_back();

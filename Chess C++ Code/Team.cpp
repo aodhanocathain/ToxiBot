@@ -31,9 +31,6 @@ shared_ptr<King> Team::getKing() {
 squareset_t Team::getActivePieceLocations() {
 	return this->activePieceLocations;
 }
-bitvector64_t Team::getIdsSeeingOpposingKing() {
-	return this->idsSeeingOpposingKing;
-}
 
 void Team::setActivePieceLocations(SquareSet::squareset_t activePieceLocations) {
 	this->activePieceLocations = activePieceLocations;
@@ -51,10 +48,12 @@ void Team::registerActivePiece(shared_ptr<Piece> piece)
 void Team::deactivatePiece(std::shared_ptr<Piece> piece) {
 	this->activePieces[piece->getId()].reset();
 	this->inactivePieces[piece->getId()] = piece;
+	this->activePieceLocations = SquareSet::remove(this->getActivePieceLocations(), piece->getSquare());
 }
 void Team::activatePiece(std::shared_ptr<Piece> piece) {
 	this->activePieces[piece->getId()] = piece;
 	this->inactivePieces[piece->getId()].reset();
+	this->activePieceLocations = SquareSet::add(this->getActivePieceLocations(), piece->getSquare());
 }
 bool Team::has(shared_ptr<Piece> piece) {
 	return std::find(this->activePieces.cbegin(), this->activePieces.cend(), piece) != this->activePieces.cend();
@@ -96,7 +95,6 @@ Team::Team(Team* opposition)
 	this->opposition = opposition;
 	this->nextId = 0;
 	this->activePieceLocations = SquareSet::emptySet();
-	this->idsSeeingOpposingKing = BitVector64::zeroes();
 }
 
 WhiteTeam::WhiteTeam(Team* opposition) : Team(opposition) {

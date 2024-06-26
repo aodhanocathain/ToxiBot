@@ -16,7 +16,6 @@ public:
 	Team* getOpposition();
 	std::shared_ptr<King> getKing();
 	SquareSet::squareset_t getActivePieceLocations();
-	BitVector64::bitvector64_t getIdsSeeingOpposingKing();
 
 	void setActivePieceLocations(SquareSet::squareset_t activePieceLocations);
 
@@ -44,7 +43,6 @@ private:
 	std::array<std::shared_ptr<Piece>, NUM_SQUARES> activePieces;
 	std::array<std::shared_ptr<Piece>, NUM_SQUARES> inactivePieces;
 	SquareSet::squareset_t activePieceLocations;
-	BitVector64::bitvector64_t idsSeeingOpposingKing;
 };
 
 class WhiteTeam : public Team {
