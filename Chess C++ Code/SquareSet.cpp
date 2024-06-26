@@ -1,3 +1,5 @@
+#include <intrin.h>
+
 #include "BitVector64.h"
 using BitVector64::bitvector64_t;
 #include "Square.h"
@@ -32,7 +34,13 @@ squareset_t SquareSet::intersect(squareset_t s1, squareset_t s2)
 {
 	return BitVector64::bitwiseAnd(s1, s2);
 }
-squareset_t SquareSet::differ(squareset_t s1, squareset_t s2)
+squareset_t SquareSet::differ(squareset_t mainset, squareset_t removedset)
 {
-	return BitVector64::bitwiseAnd(s1, BitVector64::invert(s2));
+	return BitVector64::bitwiseAnd(mainset, BitVector64::invert(removedset));
+}
+
+square_t SquareSet::getLowestSquare(squareset_t set) {
+	square_t lsb;
+	_BitScanForward64(&lsb, set);
+	return lsb;
 }

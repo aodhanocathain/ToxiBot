@@ -15,5 +15,7 @@ namespace SquareSet {
 
 	squareset_t unify(squareset_t s1, squareset_t s2);
 	squareset_t intersect(squareset_t s1, squareset_t s2);
-	squareset_t differ(squareset_t s1, squareset_t s2);
+	squareset_t differ(squareset_t mainset, squareset_t removedset);
+
+	Square::square_t getLowestSquare(squareset_t set);
 }

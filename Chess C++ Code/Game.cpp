@@ -18,9 +18,14 @@ using Square::square_t;
 #include "Team.h"
 
 //string Game::DEFAULT_FEN = "4k3/8/8/8/8/8/8/4K3 b KQkq - 0 1";
-string Game::DEFAULT_FEN = "4k3/8/8/8/4K3/8/8/8 w KQkq - 0 1";
+//string Game::DEFAULT_FEN = "4k3/8/8/8/4K3/8/8/8 w KQkq - 0 1";
 //string Game::DEFAULT_FEN = "1n2k1n1/8/8/8/8/8/8/1N2K1N1 w KQkq - 0 1";
 //string Game::DEFAULT_FEN = "7k/8/6N1/6K1/8/8/8/8 w - - 0 1";
+//string Game::DEFAULT_FEN = "6nk/8/6KN/8/8/8/8/8 w - - 0 1";
+
+//string Game::DEFAULT_FEN = "k7/8/3N4/1N6/2NN4/8/8/7K w - - 0 1";	//checkmate in 2 with only knights and kings
+
+string Game::DEFAULT_FEN = "7k/8/4B1K1/8/7B/8/8/8 w - - 0 1";
 
 //string Game::DEFAULT_FEN = 
 
@@ -111,8 +116,35 @@ string Game::calculateFen()
 	return boardString + " " + turnString + " " + castleRightsString + " " + enPassantFileString + " " + halfMoveClockString + " " + fullMoveClockString;
 }
 
+Team& Game::getMovingTeam() {
+	return *(this->movingTeam);
+}
+
+WhiteTeam& Game::getWhite() {
+	return this->white;
+}
+
+BlackTeam& Game::getBlack() {
+	return this->black;
+}
+
 vector<vector<Move*>> Game::calculateConsideredMoves() {
 	return this->movingTeam->calculateConsideredMoves();
+}
+
+vector<Move*> Game::calculateLegalMoves() {
+	vector<Move*> legals;
+	vector<vector<Move*>> movelists = this->calculateConsideredMoves();
+	for (vector<vector<Move*>>::iterator list = movelists.begin(); list != movelists.end(); list++) {
+		for (vector<Move*>::iterator move = (*list).begin(); move != (*list).end(); move++) {
+			this->makeMove(*move);
+			if (!(this->kingCapturable())) {
+				legals.push_back(*move);
+			}
+			this->undoMove();
+		}
+	}
+	return legals;
 }
 
 bool Game::kingCapturable() {
@@ -121,6 +153,14 @@ bool Game::kingCapturable() {
 
 bool Game::kingChecked() {
 	return SquareSet::has(this->movingTeam->getOpposition()->calculateAttackSet(), this->movingTeam->getKing()->getSquare());
+}
+
+bool Game::isCheckmate() {
+	return (this->calculateLegalMoves().size() == 0) && this->kingChecked();
+}
+
+bool Game::isStalemate() {
+	return (this->calculateLegalMoves().size() == 0) && !(this->kingChecked());
 }
 
 void Game::makeMove(Move* move) {

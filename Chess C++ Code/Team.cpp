@@ -60,6 +60,16 @@ bool Team::has(shared_ptr<Piece> piece) {
 	return std::find(this->activePieces.cbegin(), this->activePieces.cend(), piece) != this->activePieces.cend();
 }
 
+float Team::calculatePoints() {
+	float points = 0;
+	for (array<shared_ptr<Piece>, NUM_SQUARES>::iterator piece = this->activePieces.begin(); piece != this->activePieces.end(); piece++) {
+		if (*piece) {
+			points += (*piece)->getClassPoints();
+		}
+	}
+	return points;
+}
+
 squareset_t Team::calculateAttackSet() {
 	squareset_t set = SquareSet::emptySet();
 	squareset_t* accumulator = &set;
@@ -98,6 +108,14 @@ char WhiteTeam::getClassSymbol() {
 char WhiteTeam::convert(char teamedChar){
 	return toupper(teamedChar);
 }
+bool WhiteTeam::prefers(float preferred, float to) {
+	return preferred > to;
+}
+
+float WhiteTeam::getWorstScore() {
+	return -INFINITY;
+}
+
 char const WhiteTeam::symbol = 'w';
 
 BlackTeam::BlackTeam(Team* opposition) : Team(opposition) {
@@ -109,4 +127,12 @@ char BlackTeam::getClassSymbol() {
 char BlackTeam::convert(char teamedChar) {
 	return tolower(teamedChar);
 }
+bool BlackTeam::prefers(float preferred, float to) {
+	return preferred < to;
+}
+
+float BlackTeam::getWorstScore() {
+	return INFINITY;
+}
+
 char const BlackTeam::symbol = 'b';

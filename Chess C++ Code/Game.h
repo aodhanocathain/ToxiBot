@@ -15,11 +15,19 @@ class Game {
 public:
 	Game(std::string fen = Game::DEFAULT_FEN);
 
+	Team& getMovingTeam();
+	WhiteTeam& getWhite();
+	BlackTeam& getBlack();
+
 	std::string calculateFen();
 	std::vector<std::vector<Move*>> calculateConsideredMoves();
+	std::vector<Move*> calculateLegalMoves();
 
 	bool kingCapturable();
 	bool kingChecked();
+
+	bool isCheckmate();
+	bool isStalemate();
 
 	void makeMove(Move* move);
 	void undoMove();

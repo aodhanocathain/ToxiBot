@@ -6,6 +6,7 @@ using std::string;
 #include <vector>
 using std::vector;
 
+#include "Evaluation.h"
 #include "Game.h"
 #include "Helpers.h"
 #include "Move.h"
@@ -14,31 +15,33 @@ using std::vector;
 int main()
 {
 	Game game;
-	string fen = game.calculateFen();
-	cout << fen << endl;
 
+	string fen = game.calculateFen();
+	cout << "fen: " << fen << endl;
+
+	cout << "considered moves:" << endl;
 	vector<vector<Move*>> moves = game.calculateConsideredMoves();
 	for (vector<Move*> movevec : moves) {
 		cout << "new vector: " << endl;
 		for (vector<Move*>::iterator m = movevec.begin(); m!=movevec.end(); m++) {
 			cout << (*m)->toString() << endl;
-			cout << (*m)->getMainPieceSquareBefore() << endl;
-			cout << (*m)->getMainPieceSquareAfter() << endl;
 		}
 	}
-	
-	game.makeMove(moves[0][0]);
 
-	fen = game.calculateFen();
-	cout << fen << endl;
+	cout << "legal moves:" << endl;
+	vector<Move*> legals = game.calculateLegalMoves();
+	for (vector<Move*>::iterator m = legals.begin(); m != legals.end(); m++) {
+		cout << (*m)->toString() << endl;
+	}
 
-	cout << game.kingCapturable();
-	cout << game.kingChecked();
+	cout << "evaluation:" << endl;
+	Evaluation e = Evaluation::evaluate(game, 2);
+	cout << e.getScore() << endl;
+	vector<Move*> bestLine = e.getBestLine();
+	for (vector<Move*>::reverse_iterator i = bestLine.rbegin(); i < bestLine.rend(); i++) {
+		cout << (*i)->toString() << '\t';
+	}
 	cout << endl;
-
-	game.undoMove();
-	fen = game.calculateFen();
-	cout << fen << endl;
 
 	return 0;
 }
