@@ -5,7 +5,7 @@
 namespace Square {
 	typedef unsigned long int square_t;
 
-	square_t ofRankAndFile(int rank, int file);
+	square_t make(int rank, int file);
 
 	bool validRank(int rank);
 	bool validFile(int file);

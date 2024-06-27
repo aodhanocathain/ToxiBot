@@ -4,7 +4,7 @@ using std::string;
 #include "Square.h"
 using Square::square_t;
 
-square_t Square::ofRankAndFile(int rank, int file)
+square_t Square::make(int rank, int file)
 {
 	return (rank * NUM_FILES) + file;
 }

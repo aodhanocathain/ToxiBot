@@ -74,7 +74,7 @@ SquareSet::squareset_t FixedOffsetPiece::calculateAttackSet(SquareSet::squareset
 		int attackedFile = file + fileOffset;
 		if (Square::validRankAndFile(attackedRank, attackedFile))
 		{
-			square_t attackedSquare = Square::ofRankAndFile(attackedRank, attackedFile);
+			square_t attackedSquare = Square::make(attackedRank, attackedFile);
 			attackSet = SquareSet::add(attackSet, attackedSquare);
 		}
 	}
@@ -170,7 +170,7 @@ squareset_t DirectionPiece::calculateAttackSet(squareset_t friendlies, squareset
 		bool blocked = false;
 		bool valid = Square::validRankAndFile(newRank, newFile);
 		while (valid && !blocked) {
-			square_t newSquare = Square::ofRankAndFile(newRank, newFile);
+			square_t newSquare = Square::make(newRank, newFile);
 			attackSet = SquareSet::add(attackSet, newSquare);
 
 			blocked = SquareSet::has(obstacles, newSquare);
@@ -293,8 +293,8 @@ squareset_t Pawn::calculateAttackSet(SquareSet::squareset_t friendlyActivePieceL
 	int file = Square::file(currentSquare);
 	int leftFile = file - 1;
 	int rightFile = file + 1;
-	square_t leftCaptureSquare = Square::ofRankAndFile(nextRank, leftFile);
-	square_t rightCaptureSquare = Square::ofRankAndFile(nextRank, rightFile);
+	square_t leftCaptureSquare = Square::make(nextRank, leftFile);
+	square_t rightCaptureSquare = Square::make(nextRank, rightFile);
 	if (Square::validRankAndFile(nextRank, leftFile) && SquareSet::has(oppositionActivePieceLocations, leftCaptureSquare)) {
 		attackset = SquareSet::add(attackset, leftCaptureSquare);
 	}
@@ -311,10 +311,10 @@ vector<Move*> Pawn::calculateConsideredMoves(SquareSet::squareset_t friendlyActi
 	int nextRank = rank + this->increment;
 	int file = Square::file(currentSquare);
 	squareset_t obstacles = SquareSet::unify(friendlyActivePieceLocations, oppositionActivePieceLocations);
-	int nextSquare = Square::ofRankAndFile(nextRank, file);
+	int nextSquare = Square::make(nextRank, file);
 	if (!SquareSet::has(obstacles, nextSquare)) {
 		consideredMoves.push_back(new PlainMove(currentSquare, nextSquare));
-		square_t nextnextSquare = Square::ofRankAndFile(rank + (2* this->increment), file);
+		square_t nextnextSquare = Square::make(rank + (2* this->increment), file);
 		if ((rank == this->startRank) && (!SquareSet::has(obstacles, nextnextSquare))) {
 			consideredMoves.push_back(new PlainMove(currentSquare, nextnextSquare));
 		}

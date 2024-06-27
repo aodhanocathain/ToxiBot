@@ -66,7 +66,7 @@ Game::Game(string fen) : white(WhiteTeam(&(this->black))), black(BlackTeam(&(thi
 			else
 			{
 				char pieceSymbol = Piece::getPlainSymbolFromTeamedSymbol(current);
-				square_t square = Square::ofRankAndFile(rank, file);
+				square_t square = Square::make(rank, file);
 				map<char, Team*>::const_iterator symbolTeamPair = std::find_if(this->teams.cbegin(), this->teams.cend(), [current](std::pair<char, Team*> pair) {
 					//find the team whose converter has been applied to the piece symbol, which means the piece is on that team
 					return pair.second->convert(current) == current;
@@ -252,7 +252,7 @@ string Game::getBoardString() {
 		int emptySquares = 0;
 		for (int file = 0; file < NUM_FILES; file++)
 		{
-			square_t square = Square::ofRankAndFile(rank, file);
+			square_t square = Square::make(rank, file);
 			shared_ptr<Piece> piece = this->pieces[square];
 			if (piece)
 			{
