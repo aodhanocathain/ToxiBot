@@ -272,3 +272,55 @@ int const Queen::directionsOffsets[Queen::numDirections * 2] = {
 	1,0,
 	1,1
 };
+
+Pawn::Pawn(Square::square_t square, int id, int increment, int startRank) : Piece(square, id), increment(increment), startRank(startRank) {
+
+}
+
+char Pawn::getClassSymbol() {
+	return Pawn::symbol;
+}
+
+float Pawn::getClassPoints() {
+	return Pawn::points;
+}
+
+squareset_t Pawn::calculateAttackSet(SquareSet::squareset_t friendlyActivePieceLocations, SquareSet::squareset_t oppositionActivePieceLocations) {
+	squareset_t attackset = SquareSet::emptySet();
+	square_t currentSquare = this->getSquare();
+	int rank = Square::rank(currentSquare);
+	int nextRank = rank + this->increment;
+	int file = Square::file(currentSquare);
+	int leftFile = file - 1;
+	int rightFile = file + 1;
+	square_t leftCaptureSquare = Square::ofRankAndFile(nextRank, leftFile);
+	square_t rightCaptureSquare = Square::ofRankAndFile(nextRank, rightFile);
+	if (Square::validRankAndFile(nextRank, leftFile) && SquareSet::has(oppositionActivePieceLocations, leftCaptureSquare)) {
+		attackset = SquareSet::add(attackset, leftCaptureSquare);
+	}
+	if (Square::validRankAndFile(nextRank, rightFile) && SquareSet::has(oppositionActivePieceLocations, rightCaptureSquare)) {
+		attackset = SquareSet::add(attackset, rightCaptureSquare);
+	}
+	return attackset;
+}
+
+vector<Move*> Pawn::calculateConsideredMoves(SquareSet::squareset_t friendlyActivePieceLocations, SquareSet::squareset_t oppositionActivePieceLocations) {
+	vector<Move*> consideredMoves = Piece::calculateConsideredMoves(friendlyActivePieceLocations, oppositionActivePieceLocations);
+	square_t currentSquare = this->getSquare();
+	int rank = Square::rank(currentSquare);
+	int nextRank = rank + this->increment;
+	int file = Square::file(currentSquare);
+	squareset_t obstacles = SquareSet::unify(friendlyActivePieceLocations, oppositionActivePieceLocations);
+	int nextSquare = Square::ofRankAndFile(nextRank, file);
+	if (!SquareSet::has(obstacles, nextSquare)) {
+		consideredMoves.push_back(new PlainMove(currentSquare, nextSquare));
+		square_t nextnextSquare = Square::ofRankAndFile(rank + (2* this->increment), file);
+		if ((rank == this->startRank) && (!SquareSet::has(obstacles, nextnextSquare))) {
+			consideredMoves.push_back(new PlainMove(currentSquare, nextnextSquare));
+		}
+	}
+	return consideredMoves;
+}
+
+char const Pawn::symbol = 'P';
+float const Pawn::points = 1;

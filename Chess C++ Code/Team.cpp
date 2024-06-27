@@ -109,7 +109,12 @@ char WhiteTeam::convert(char teamedChar){
 bool WhiteTeam::prefers(float preferred, float to) {
 	return preferred > to;
 }
-
+int WhiteTeam::getClassPawnStartRank() {
+	return 1;
+}
+int WhiteTeam::getClassPawnIncrement() {
+	return 1;
+}
 float WhiteTeam::getWorstScore() {
 	return -INFINITY;
 }
@@ -128,7 +133,12 @@ char BlackTeam::convert(char teamedChar) {
 bool BlackTeam::prefers(float preferred, float to) {
 	return preferred < to;
 }
-
+int BlackTeam::getClassPawnStartRank() {
+	return NUM_RANKS - 2;
+}
+int BlackTeam::getClassPawnIncrement() {
+	return -1;
+}
 float BlackTeam::getWorstScore() {
 	return INFINITY;
 }

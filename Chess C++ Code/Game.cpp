@@ -31,7 +31,9 @@ using Square::square_t;
 
 //string Game::DEFAULT_FEN = "7k/8/7K/7Q/8/8/8/8 w - - 0 1";	//checkmate in 1 with only queens and kings
 
-string Game::DEFAULT_FEN = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
+//string Game::DEFAULT_FEN = "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w KQkq - 0 1";
+
+string Game::DEFAULT_FEN = "4k3/p7/1P6/8/8/8/8/4K3 b KQkq - 0 1";
 
 int Game::MAX_HISTORY = 256;
 
@@ -70,7 +72,7 @@ Game::Game(string fen) : white(WhiteTeam(&(this->black))), black(BlackTeam(&(thi
 					return pair.second->convert(current) == current;
 				});
 				int id = symbolTeamPair->second->getNextId();
-				shared_ptr<Piece> piece(Piece::createFrom(pieceSymbol, square, id));
+				shared_ptr<Piece> piece(pieceSymbol==Pawn::symbol? new Pawn(square, id, symbolTeamPair->second->getClassPawnIncrement(), symbolTeamPair->second->getClassPawnStartRank()) :Piece::createFrom(pieceSymbol, square, id));
 
 				this->pieces[square] = piece;
 				this->teams[symbolTeamPair->first]->registerActivePiece(piece);

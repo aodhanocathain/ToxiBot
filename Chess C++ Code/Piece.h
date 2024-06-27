@@ -122,3 +122,18 @@ private:
 	static int const numDirections;
 	static int const directionsOffsets[];
 };
+
+class Pawn final : public Piece {
+public:
+	Pawn(Square::square_t square, int id, int increment, int startRank);
+	virtual char getClassSymbol() override;
+	virtual float getClassPoints() override;
+	virtual SquareSet::squareset_t calculateAttackSet(SquareSet::squareset_t friendlyActivePieceLocations, SquareSet::squareset_t oppositionActivePieceLocations) override;
+	virtual std::vector<Move*> calculateConsideredMoves(SquareSet::squareset_t friendlyActivePieceLocations, SquareSet::squareset_t oppositionActivePieceLocations) override;
+	static char const symbol;
+	static float const points;
+private:
+
+	int increment;
+	int startRank;
+};

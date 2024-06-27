@@ -21,6 +21,8 @@ public:
 
 	virtual char getClassSymbol() = 0;
 	virtual float getWorstScore() = 0;
+	virtual int getClassPawnStartRank() = 0;
+	virtual int getClassPawnIncrement() = 0;
 	virtual char convert(char teamedChar) = 0;
 	virtual bool prefers(float preferred, float to) = 0;
 
@@ -52,6 +54,8 @@ public:
 	virtual char convert(char teamedChar) override;
 	virtual bool prefers(float preferred, float to) override;
 	virtual float getWorstScore() override;
+	virtual int getClassPawnStartRank() override;
+	virtual int getClassPawnIncrement() override;
 	static char const symbol;
 };
 
@@ -62,5 +66,7 @@ public:
 	virtual char convert(char teamedChar) override;
 	virtual bool prefers(float preferred, float to) override;
 	virtual float getWorstScore() override;
+	virtual int getClassPawnStartRank() override;
+	virtual int getClassPawnIncrement() override;
 	static char const symbol;
 };
