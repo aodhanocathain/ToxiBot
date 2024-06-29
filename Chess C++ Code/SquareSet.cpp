@@ -40,7 +40,7 @@ squareset_t SquareSet::differ(squareset_t mainset, squareset_t removedset)
 }
 
 square_t SquareSet::getLowestSquare(squareset_t set) {
-	square_t lsb;
+	unsigned long int lsb;
 	_BitScanForward64(&lsb, set);
 	return lsb;
 }

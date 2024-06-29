@@ -3,7 +3,7 @@
 #include <string>
 
 namespace Square {
-	typedef unsigned long int square_t;
+	typedef unsigned char square_t;
 
 	square_t make(int rank, int file);
 
