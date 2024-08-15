@@ -1,7 +1,11 @@
 #include <intrin.h>
 
+#include <iostream>
+using std::cout;
+
 #include "BitVector64.h"
 using BitVector64::bitvector64_t;
+#include "Constants.h"
 #include "Square.h"
 using Square::square_t;
 #include "SquareSet.h"
@@ -42,5 +46,15 @@ squareset_t SquareSet::differ(squareset_t mainset, squareset_t removedset)
 square_t SquareSet::getLowestSquare(squareset_t set) {
 	unsigned long int lsb;
 	_BitScanForward64(&lsb, set);
-	return lsb;
+	return (square_t)lsb;
+}
+
+void SquareSet::print(squareset_t set) {
+	for (int rank = NUM_RANKS - 1; rank >= 0; rank--) {
+		for (int file = 0; file < NUM_FILES; file++) {
+			square_t square = Square::make(rank, file);
+			cout << SquareSet::has(set, square);
+		}
+		cout << '\n';
+	}
 }

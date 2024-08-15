@@ -1,171 +1,99 @@
-#include <algorithm>
-#include <functional>
-using std::function;
-#include <map>
-using std::map;
-#include <vector>
-using std::vector;
-
-#include "Move.h"
 #include "Piece.h"
-#include "SquareSet.h"
-using SquareSet::squareset_t;
 #include "Square.h"
 using Square::square_t;
-
-square_t Piece::getSquare() {
-	return this->square;
-}
-int Piece::getId() {
-	return this->id;
-}
-
-void Piece::setSquare(square_t square) {
-	this->square = square;
-}
-
-vector<Move*> Piece::calculateConsideredMoves(squareset_t friendlyActivePieceLocations, squareset_t oppositionActivePieceLocations) {
-	vector<Move*> consideredMoves;
-	squareset_t attackset = this->calculateAttackSet(friendlyActivePieceLocations, oppositionActivePieceLocations);
-	squareset_t moveset = SquareSet::differ(attackset, friendlyActivePieceLocations);
-	square_t currentSquare = this->getSquare();
-	squareset_t emptyset = SquareSet::emptySet();
-	while (moveset != emptyset) {
-		square_t leastSquare = SquareSet::getLowestSquare(moveset);
-		moveset = SquareSet::remove(moveset, leastSquare);
-		consideredMoves.push_back(new PlainMove(currentSquare, leastSquare));
-	}
-	return consideredMoves;
-}
-
-Piece* Piece::createFrom(char symbol, square_t square, int id) {
-	static map<char, function<Piece* (square_t, int)>> creators{
-		{King::symbol,[](square_t square, int id) {return new King(square, id); }},
-		{Knight::symbol,[](square_t square, int id) {return new Knight(square, id); }},
-		{Bishop::symbol,[](square_t square, int id) {return new Bishop(square, id); }},
-		{Rook::symbol,[](square_t square, int id) {return new Rook(square, id); }},
-		{Queen::symbol,[](square_t square, int id) {return new Queen(square, id); }}
-	};
-	return (creators[symbol])(square, id);
-}
+using Square::rank_t;
+using Square::file_t;
+#include "SquareSet.h"
+using SquareSet::squareset_t;
 
 char Piece::getPlainSymbolFromTeamedSymbol(char teamedSymbol) {
 	return toupper(teamedSymbol);
 }
 
-Piece::Piece(square_t square, int id) : square(square), id(id) {
-
+Piece::type_t Piece::getTypeOfPlainSymbol(char plainSymbol) {
+	for (int i = 0; i < Piece::NONE; i++) {
+		if (Piece::symbols[i] == plainSymbol) {
+			return (type_t)i;
+		}
+	}
+	return NONE;
 }
 
-SquareSet::squareset_t FixedOffsetPiece::calculateAttackSet(SquareSet::squareset_t friendlies, SquareSet::squareset_t opposition) {
+const char Piece::symbols[] = { 'K', 'Q', 'R', 'B', 'N', 'P', '?'};
+const float Piece::pointsValues[] = {0.0f, 9.0f, 5.0f, 3.0f, 3.0f, 1.0f, NAN};
+
+squareset_t calculateAttackSet_fixedOffsetPairs(square_t square, squareset_t friendlies, squareset_t opposition, int numOffsetPairs, int* offsetPairs) {
 	squareset_t attackSet = SquareSet::emptySet();
 
-	square_t square = this->getSquare();
-	int rank = Square::rank(square);
-	int file = Square::file(square);
+	rank_t rank = Square::rank(square);
+	file_t file = Square::file(square);
 
-	int numPairs = this->getNumOffsetPairs();
+	int numPairs = numOffsetPairs;
 	for (int pair = 0; pair < numPairs; pair++)
 	{
-		int const * offsetPair = this->getOffsetPair(pair);
+		int const* offsetPair = offsetPairs + (pair * 2);
 		int rankOffset = offsetPair[0];
 		int fileOffset = offsetPair[1];
-		int attackedRank = rank + rankOffset;
-		int attackedFile = file + fileOffset;
+		rank_t attackedRank = rank + rankOffset;
+		file_t attackedFile = file + fileOffset;
 		if (Square::validRankAndFile(attackedRank, attackedFile))
 		{
 			square_t attackedSquare = Square::make(attackedRank, attackedFile);
 			attackSet = SquareSet::add(attackSet, attackedSquare);
 		}
 	}
-	return attackSet;
+	return SquareSet::differ(attackSet, friendlies);
 }
 
-FixedOffsetPiece::FixedOffsetPiece(square_t square, int id) : Piece(square, id) {
-
+namespace King {
+	int numOffsetPairs = 8;
+	int offsetPairs[] = {
+		-1, -1,
+		-1, 0,
+		-1, 1,
+		0, -1,
+		0, 1,
+		1, -1,
+		1, 0,
+		1, 1
+	};
+	squareset_t calculateAttackSet(square_t square, squareset_t sameTeamAlivePieceLocations, squareset_t opposingTeamAlivePieceLocations) {
+		return calculateAttackSet_fixedOffsetPairs(square, sameTeamAlivePieceLocations, opposingTeamAlivePieceLocations, numOffsetPairs, offsetPairs);
+	}
 }
 
-King::King(square_t square, int id) : FixedOffsetPiece(square, id) {
-
+namespace Knight {
+	int numOffsetPairs = 8;
+	int offsetPairs[] = {
+		-2, -1,
+		-2, 1,
+		-1, -2,
+		-1, 2,
+		1, -2,
+		1, 2,
+		2, -1,
+		2, 1
+	};
+	squareset_t calculateAttackSet(square_t square, squareset_t sameTeamAlivePieceLocations, squareset_t opposingTeamAlivePieceLocations) {
+		return calculateAttackSet_fixedOffsetPairs(square, sameTeamAlivePieceLocations, opposingTeamAlivePieceLocations, numOffsetPairs, offsetPairs);
+	}
 }
 
-char const King::symbol = 'K';
-char King::getClassSymbol() {
-	return King::symbol;
-}
-float King::getClassPoints() {
-	return King::points;
-}
-
-int const* const King::getOffsetPair(int pair) {
-	return (int const* const)(King::offsets + (pair * 2));
-}
-int King::getNumOffsetPairs() {
-	return King::numOffsetPairs;
-}
-
-float const King::points = 0;
-int const King::numOffsetPairs = 8;
-int const King::offsets[King::numOffsetPairs*2] = {
-	-1, -1,
-	-1, 0,
-	-1, 1,
-	0, -1,
-	0, 1,
-	1, -1,
-	1, 0,
-	1, 1
-};
-
-Knight::Knight(square_t square, int id) : FixedOffsetPiece(square, id) {
-
-}
-
-char const Knight::symbol = 'N';
-char Knight::getClassSymbol() {
-	return Knight::symbol;
-}
-float Knight::getClassPoints() {
-	return Knight::points;
-}
-
-int const* const Knight::getOffsetPair(int pair) {
-	return (int const* const)(Knight::offsets + (pair * 2));
-}
-int Knight::getNumOffsetPairs() {
-	return Knight::numOffsetPairs;
-}
-
-float const Knight::points = 3;
-int const Knight::numOffsetPairs = 8;
-int const Knight::offsets[Knight::numOffsetPairs * 2] = {
-	-2, -1,
-	-2, 1,
-	-1, -2,
-	-1, 2,
-	1, -2,
-	1, 2,
-	2, -1,
-	2, 1
-};
-
-squareset_t DirectionPiece::calculateAttackSet(squareset_t friendlies, squareset_t opposition) {
+squareset_t calculateAttackSet_directionOffsetPairs(square_t square, squareset_t friendlies, squareset_t opposition, int numDirections, int* offsetPairs) {
 	squareset_t attackSet = SquareSet::emptySet();
 	squareset_t obstacles = SquareSet::unify(friendlies, opposition);
 
-	square_t square = this->getSquare();
-	int rank = Square::rank(square);
-	int file = Square::file(square);
+	rank_t rank = Square::rank(square);
+	file_t file = Square::file(square);
 
-	int numDirections = this->getNumDirections();
 	for (int direction = 0; direction < numDirections; direction++)
 	{
-		int const* offsetPair = this->getDirectionOffsets(direction);
+		int const* offsetPair = offsetPairs + (2 * direction);
 		int rankOffset = offsetPair[0];
 		int fileOffset = offsetPair[1];
 
-		int newRank = rank + rankOffset;
-		int newFile = file + fileOffset;
+		rank_t newRank = rank + rankOffset;
+		file_t newFile = file + fileOffset;
 
 		bool blocked = false;
 		bool valid = Square::validRankAndFile(newRank, newFile);
@@ -181,146 +109,106 @@ squareset_t DirectionPiece::calculateAttackSet(squareset_t friendlies, squareset
 			valid = Square::validRankAndFile(newRank, newFile);
 		}
 	}
-	return attackSet;
+	return SquareSet::differ(attackSet, friendlies);;
 }
 
-DirectionPiece::DirectionPiece(square_t square, int id) : Piece(square, id){
-
-}
-
-Bishop::Bishop(square_t square, int id) : DirectionPiece(square, id) {
-
-}
-
-char Bishop::getClassSymbol() {
-	return Bishop::symbol;
-}
-float Bishop::getClassPoints() {
-	return Bishop::points;
-}
-int const* const Bishop::getDirectionOffsets(int direction) {
-	return Bishop::directionsOffsets + (2*direction);
-}
-int Bishop::getNumDirections() {
-	return Bishop::numDirections;
-}
-
-char const Bishop::symbol = 'B';
-float const Bishop::points = 3;
-int const Bishop::numDirections = 4;
-int const Bishop::directionsOffsets[Bishop::numDirections*2] = {
-	-1,-1,
-	-1,1,
-	1,-1,
-	1,1
-};
-
-Rook::Rook(square_t square, int id) : DirectionPiece(square, id) {
-
-}
-
-char Rook::getClassSymbol() {
-	return Rook::symbol;
-}
-float Rook::getClassPoints() {
-	return Rook::points;
-}
-int const* const Rook::getDirectionOffsets(int direction) {
-	return Rook::directionsOffsets + (2 * direction);
-}
-int Rook::getNumDirections() {
-	return Rook::numDirections;
-}
-
-char const Rook::symbol = 'R';
-float const Rook::points = 5;
-int const Rook::numDirections = 4;
-int const Rook::directionsOffsets[Rook::numDirections * 2] = {
-	-1,0,
-	0,-1,
-	0,1,
-	1,0
-};
-
-Queen::Queen(square_t square, int id) : DirectionPiece(square, id) {
-
-}
-
-char Queen::getClassSymbol() {
-	return Queen::symbol;
-}
-float Queen::getClassPoints() {
-	return Queen::points;
-}
-int const* const Queen::getDirectionOffsets(int direction) {
-	return Queen::directionsOffsets + (2 * direction);
-}
-int Queen::getNumDirections() {
-	return Queen::numDirections;
-}
-
-char const Queen::symbol = 'Q';
-float const Queen::points = 9;
-int const Queen::numDirections = 8;
-int const Queen::directionsOffsets[Queen::numDirections * 2] = {
-	-1,-1,
-	-1,0,
-	-1,1,
-	0,-1,
-	0,1,
-	1,-1,
-	1,0,
-	1,1
-};
-
-Pawn::Pawn(Square::square_t square, int id, int increment, int startRank) : Piece(square, id), increment(increment), startRank(startRank) {
-
-}
-
-char Pawn::getClassSymbol() {
-	return Pawn::symbol;
-}
-
-float Pawn::getClassPoints() {
-	return Pawn::points;
-}
-
-squareset_t Pawn::calculateAttackSet(SquareSet::squareset_t friendlyActivePieceLocations, SquareSet::squareset_t oppositionActivePieceLocations) {
-	squareset_t attackset = SquareSet::emptySet();
-	square_t currentSquare = this->getSquare();
-	int rank = Square::rank(currentSquare);
-	int nextRank = rank + this->increment;
-	int file = Square::file(currentSquare);
-	int leftFile = file - 1;
-	int rightFile = file + 1;
-	square_t leftCaptureSquare = Square::make(nextRank, leftFile);
-	square_t rightCaptureSquare = Square::make(nextRank, rightFile);
-	if (Square::validRankAndFile(nextRank, leftFile) && SquareSet::has(oppositionActivePieceLocations, leftCaptureSquare)) {
-		attackset = SquareSet::add(attackset, leftCaptureSquare);
+namespace Queen {
+	int numOffsetPairs = 8;
+	int offsetPairs[] = {
+		-1,-1,
+		-1,0,
+		-1,1,
+		0,-1,
+		0,1,
+		1,-1,
+		1,0,
+		1,1
+	};
+	squareset_t calculateAttackSet(square_t square, squareset_t sameTeamAlivePieceLocations, squareset_t opposingTeamAlivePieceLocations) {
+		return calculateAttackSet_directionOffsetPairs(square, sameTeamAlivePieceLocations, opposingTeamAlivePieceLocations, numOffsetPairs, offsetPairs);
 	}
-	if (Square::validRankAndFile(nextRank, rightFile) && SquareSet::has(oppositionActivePieceLocations, rightCaptureSquare)) {
-		attackset = SquareSet::add(attackset, rightCaptureSquare);
-	}
-	return attackset;
 }
 
-vector<Move*> Pawn::calculateConsideredMoves(SquareSet::squareset_t friendlyActivePieceLocations, SquareSet::squareset_t oppositionActivePieceLocations) {
-	vector<Move*> consideredMoves = Piece::calculateConsideredMoves(friendlyActivePieceLocations, oppositionActivePieceLocations);
-	square_t currentSquare = this->getSquare();
-	int rank = Square::rank(currentSquare);
-	int nextRank = rank + this->increment;
-	int file = Square::file(currentSquare);
-	squareset_t obstacles = SquareSet::unify(friendlyActivePieceLocations, oppositionActivePieceLocations);
-	int nextSquare = Square::make(nextRank, file);
-	if (!SquareSet::has(obstacles, nextSquare)) {
-		consideredMoves.push_back(new PlainMove(currentSquare, nextSquare));
-		square_t nextnextSquare = Square::make(rank + (2* this->increment), file);
-		if ((rank == this->startRank) && (!SquareSet::has(obstacles, nextnextSquare))) {
-			consideredMoves.push_back(new PlainMove(currentSquare, nextnextSquare));
+namespace Rook {
+	int numOffsetPairs = 4;
+	int offsetPairs[] = {
+		-1,0,
+		0,-1,
+		0,1,
+		1,0
+	};
+	squareset_t calculateAttackSet(square_t square, squareset_t sameTeamAlivePieceLocations, squareset_t opposingTeamAlivePieceLocations) {
+		return calculateAttackSet_directionOffsetPairs(square, sameTeamAlivePieceLocations, opposingTeamAlivePieceLocations, numOffsetPairs, offsetPairs);
+	}
+}
+
+namespace Bishop {
+	int numOffsetPairs = 4;
+	int offsetPairs[] = {
+		-1,-1,
+		-1,1,
+		1,-1,
+		1,1
+	};
+	squareset_t calculateAttackSet(square_t square, squareset_t sameTeamAlivePieceLocations, squareset_t opposingTeamAlivePieceLocations) {
+		return calculateAttackSet_directionOffsetPairs(square, sameTeamAlivePieceLocations, opposingTeamAlivePieceLocations, numOffsetPairs, offsetPairs);
+	}
+}
+
+namespace Pawn {
+	squareset_t calculateAttackSet(square_t square, squareset_t sameTeamAlivePieceLocations, squareset_t opposingTeamAlivePieceLocations, int rankIncrement) {
+		squareset_t attackset = SquareSet::emptySet();
+		rank_t rank = Square::rank(square);
+		rank_t nextRank = rank + rankIncrement;
+		file_t file = Square::file(square);
+		file_t leftFile = file - 1;
+		file_t rightFile = file + 1;
+		square_t leftCaptureSquare = Square::make(nextRank, leftFile);
+		square_t rightCaptureSquare = Square::make(nextRank, rightFile);
+		if (Square::validRankAndFile(nextRank, leftFile) && SquareSet::has(opposingTeamAlivePieceLocations, leftCaptureSquare)) {
+			attackset = SquareSet::add(attackset, leftCaptureSquare);
 		}
+		if (Square::validRankAndFile(nextRank, rightFile) && SquareSet::has(opposingTeamAlivePieceLocations, rightCaptureSquare)) {
+			attackset = SquareSet::add(attackset, rightCaptureSquare);
+		}
+		return SquareSet::differ(attackset, sameTeamAlivePieceLocations);
 	}
-	return consideredMoves;
+
+	squareset_t calculateAttackSet_positiveIncrement(square_t square, squareset_t sameTeamAlivePieceLocations, squareset_t opposingTeamAlivePieceLocations) 
+	{
+		return calculateAttackSet(square, sameTeamAlivePieceLocations, opposingTeamAlivePieceLocations, +1);
+	}
+
+	squareset_t calculateAttackSet_negativeIncrement(square_t square, squareset_t sameTeamAlivePieceLocations, squareset_t opposingTeamAlivePieceLocations)
+	{
+		return calculateAttackSet(square, sameTeamAlivePieceLocations, opposingTeamAlivePieceLocations, -1);
+	}
 }
 
-char const Pawn::symbol = 'P';
-float const Pawn::points = 1;
+squareset_t(*const Piece::attackSetCalculators[])(square_t square, squareset_t sameTeamAlivePieceLocations, squareset_t opposingTeamAlivePieceLocations) = {
+	King::calculateAttackSet,
+	Queen::calculateAttackSet,
+	Rook::calculateAttackSet,
+	Bishop::calculateAttackSet,
+	Knight::calculateAttackSet,
+};
+
+squareset_t Piece::calculateAttackSet(squareset_t sameTeamAlivePieceLocations, squareset_t opposingTeamAlivePieceLocations) {
+	return this->attackSetCalculator(this->getSquare(), sameTeamAlivePieceLocations, opposingTeamAlivePieceLocations);
+}
+
+Piece::Piece(type_t type, square_t square, int id, squareset_t(*attackSetCalculator)(square_t square, squareset_t sameTeamAlivePieceLocations, squareset_t opposingTeamAlivePieceLocations)) :
+	BoardAgent(square, id), type(type), symbol(Piece::symbols[type]), attackSetCalculator(attackSetCalculator), pointsValue(Piece::pointsValues[type])
+{}
+
+Piece::type_t Piece::getType() {
+	return this->type;
+}
+
+char Piece::getSymbol() {
+	return this->symbol;
+}
+
+float Piece::getPointsValue() {
+	return this->pointsValue;
+}

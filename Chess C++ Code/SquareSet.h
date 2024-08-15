@@ -18,4 +18,6 @@ namespace SquareSet {
 	squareset_t differ(squareset_t mainset, squareset_t removedset);
 
 	Square::square_t getLowestSquare(squareset_t set);
+
+	void print(squareset_t set);
 }

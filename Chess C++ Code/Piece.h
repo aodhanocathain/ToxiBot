@@ -1,139 +1,35 @@
 #pragma once
 
-#include <vector>
-
-#include "Move.h"
+#include "BoardAgent.h"
 #include "Square.h"
 #include "SquareSet.h"
 
-class Piece {
+struct Piece final : BoardAgent {
 public:
-	Square::square_t getSquare();
-	int getId();
+	//NONE greater than all valid types for bounds checking when iterating through types
+	enum type_t {KING=0, QUEEN=1, ROOK=2, BISHOP=3, KNIGHT=4, PAWN=5, NONE=6};
+	static char const symbols[];
+	static float const pointsValues[];
+	static SquareSet::squareset_t(*const attackSetCalculators[])(Square::square_t square, SquareSet::squareset_t sameTeamAlivePieceLocations, SquareSet::squareset_t opposingTeamAlivePieceLocations);
 
-	virtual char getClassSymbol() = 0;
-	virtual float getClassPoints() = 0;
-
-	void setSquare(Square::square_t square);
-
-	virtual SquareSet::squareset_t calculateAttackSet(SquareSet::squareset_t friendlyActivePieceLocations, SquareSet::squareset_t oppositionActivePieceLocations) = 0;
-	virtual std::vector<Move*> calculateConsideredMoves(SquareSet::squareset_t friendlyActivePieceLocations, SquareSet::squareset_t oppositionActivePieceLocations);
-
-	static Piece* createFrom(char symbol, Square::square_t square, int id);
 	static char getPlainSymbolFromTeamedSymbol(char teamedSymbol);
+	static type_t getTypeOfPlainSymbol(char plainSymbol);
 
-protected:
-	Piece(Square::square_t square, int id);
+	Piece(type_t type=NONE, Square::square_t square=Square::DUMMY_SQUARE, int id=BoardAgent::DUMMY_ID, SquareSet::squareset_t(*attackSetCalculator)(Square::square_t square, SquareSet::squareset_t sameTeamAlivePieceLocations, SquareSet::squareset_t opposingTeamAlivePieceLocations)=nullptr);
 
+	type_t getType();
+	char getSymbol();
+	float getPointsValue();
+	SquareSet::squareset_t calculateAttackSet(SquareSet::squareset_t sameTeamPieceLocations, SquareSet::squareset_t opposingTeamPieceLocations);
 private:
-	Square::square_t square;
-	int id;
+	type_t type;
+	float pointsValue;
+	SquareSet::squareset_t(*attackSetCalculator)(Square::square_t square, SquareSet::squareset_t sameTeamAlivePieceLocations, SquareSet::squareset_t opposingTeamAlivePieceLocations);
+	char symbol;
 };
 
-class FixedOffsetPiece : public Piece {
-public:
-	virtual SquareSet::squareset_t calculateAttackSet(SquareSet::squareset_t friendlies, SquareSet::squareset_t opposition) override;
-protected:
-	FixedOffsetPiece(Square::square_t square, int id);
-	virtual int const * const getOffsetPair(int pair) = 0;
-	virtual int getNumOffsetPairs() = 0;
-};
-
-class King final : public FixedOffsetPiece {
-public:
-	King(Square::square_t square, int id);
-	static char const symbol;
-	virtual char getClassSymbol() override;
-	virtual float getClassPoints() override;
-protected:
-	virtual int const * const getOffsetPair(int pair) override;
-	virtual int getNumOffsetPairs() override;
-private:
-	static float const points;
-	static int const numOffsetPairs;
-	static int const offsets[];
-};
-
-class Knight final : public FixedOffsetPiece {
-public:
-	Knight(Square::square_t square, int id);
-	static char const symbol;
-	virtual char getClassSymbol() override;
-	virtual float getClassPoints() override;
-protected:
-	virtual int const* const getOffsetPair(int pair) override;
-	virtual int getNumOffsetPairs() override;
-private:
-	static float const points;
-	static int const numOffsetPairs;
-	static int const offsets[];
-};
-
-class DirectionPiece : public Piece {
-public:
-	virtual SquareSet::squareset_t calculateAttackSet(SquareSet::squareset_t friendlies, SquareSet::squareset_t opposition) override;
-protected:
-	DirectionPiece(Square::square_t square, int id);
-	virtual int const* const getDirectionOffsets(int direction) = 0;
-	virtual int getNumDirections() = 0;
-};
-
-class Bishop final : public DirectionPiece {
-public:
-	Bishop(Square::square_t square, int id);
-	static char const symbol;
-	virtual char getClassSymbol() override;
-	virtual float getClassPoints() override;
-protected:
-	virtual int const* const getDirectionOffsets(int direction) override;
-	virtual int getNumDirections() override;
-private:
-	static float const points;
-	static int const numDirections;
-	static int const directionsOffsets[];
-};
-
-class Rook final : public DirectionPiece {
-public:
-	Rook(Square::square_t square, int id);
-	static char const symbol;
-	virtual char getClassSymbol() override;
-	virtual float getClassPoints() override;
-protected:
-	virtual int const* const getDirectionOffsets(int direction) override;
-	virtual int getNumDirections() override;
-private:
-	static float const points;
-	static int const numDirections;
-	static int const directionsOffsets[];
-};
-
-class Queen final : public DirectionPiece {
-public:
-	Queen(Square::square_t square, int id);
-	static char const symbol;
-	virtual char getClassSymbol() override;
-	virtual float getClassPoints() override;
-protected:
-	virtual int const* const getDirectionOffsets(int direction) override;
-	virtual int getNumDirections() override;
-private:
-	static float const points;
-	static int const numDirections;
-	static int const directionsOffsets[];
-};
-
-class Pawn final : public Piece {
-public:
-	Pawn(Square::square_t square, int id, int increment, int startRank);
-	virtual char getClassSymbol() override;
-	virtual float getClassPoints() override;
-	virtual SquareSet::squareset_t calculateAttackSet(SquareSet::squareset_t friendlyActivePieceLocations, SquareSet::squareset_t oppositionActivePieceLocations) override;
-	virtual std::vector<Move*> calculateConsideredMoves(SquareSet::squareset_t friendlyActivePieceLocations, SquareSet::squareset_t oppositionActivePieceLocations) override;
-	static char const symbol;
-	static float const points;
-private:
-
-	int increment;
-	int startRank;
-};
+namespace Pawn {
+	extern SquareSet::squareset_t calculateAttackSet(Square::square_t square, SquareSet::squareset_t sameTeamAlivePieceLocations, SquareSet::squareset_t opposingTeamAlivePieceLocations, int rankIncrement);
+	extern SquareSet::squareset_t calculateAttackSet_positiveIncrement(Square::square_t square, SquareSet::squareset_t sameTeamAlivePieceLocations, SquareSet::squareset_t opposingTeamAlivePieceLocations);
+	extern SquareSet::squareset_t calculateAttackSet_negativeIncrement(Square::square_t square, SquareSet::squareset_t sameTeamAlivePieceLocations, SquareSet::squareset_t opposingTeamAlivePieceLocations);
+}

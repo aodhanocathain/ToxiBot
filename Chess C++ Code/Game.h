@@ -1,56 +1,59 @@
 #pragma once
 
-#include <array>
-#include <map>
-#include <memory>
 #include <string>
-#include <vector>
 
 #include "Constants.h"
 #include "Move.h"
 #include "Piece.h"
+#include "StackContainer.h"
 #include "Team.h"
 
 class Game {
 public:
+	class UnderivedState {
+	public:
+		UnderivedState(PlainMove playedMove = PlainMove::DUMMY_PLAINMOVE, int enPassantFile = Square::DUMMY_FILE, int halfMoveClock = -1, int fullMoveClock = -1, Piece* movedPiece = nullptr, Piece* targettedPiece = nullptr) :
+			playedMove(playedMove), enPassantFile(enPassantFile), halfMoveClock(halfMoveClock), fullMoveClock(fullMoveClock), movedPiece(movedPiece), targettedPiece(targettedPiece)
+		{}
+		PlainMove playedMove;
+		int enPassantFile;
+		int halfMoveClock;
+		int fullMoveClock;
+		Piece* movedPiece;
+		Piece* targettedPiece;
+	};
+
 	Game(std::string fen = Game::DEFAULT_FEN);
 
-	Team& getMovingTeam();
-	WhiteTeam& getWhite();
-	BlackTeam& getBlack();
+	Team* getWhite();
+	Team* getBlack();
+	Team* getMovingTeam();
+
+	Piece* getPiece(Square::square_t square);
+
+	Team* getTeamOfTeamedChar(char teamedChar);
 
 	std::string calculateFen();
-	std::vector<std::vector<Move*>> calculateConsideredMoves();
-	std::vector<Move*> calculateLegalMoves();
 
 	bool kingCapturable();
 	bool kingChecked();
 
-	bool isCheckmate();
-	bool isStalemate();
-
-	void makeMove(Move* move);
+	void makeMove(PlainMove move);
 	void undoMove();
 
+	int counter;
 private:
 	static std::string DEFAULT_FEN;
-	static int MAX_HISTORY;
+	static const int MAX_HISTORY = 256;
 
-	WhiteTeam white;
-	BlackTeam black;
-	std::map<char, Team*> teams;
+	Team teams[2];
+
+	Team* white;
+	Team* black;
 	Team* movingTeam;
-	std::array<std::shared_ptr<Piece>, NUM_SQUARES> pieces;
-	std::vector<Move*> playedMoves;
 
-	std::vector<int> validEnPassantFile;
-	std::vector<int> halfMoveClock;
-	std::vector<int> fullMoveClock;
-
-	std::vector<std::shared_ptr<Piece>> lastMovedPiece;
-	std::vector<std::shared_ptr<Piece>> lastTargetPiece;
-
-	std::map<std::string, int> positionCounts;
+	StackContainer<Piece*, NUM_SQUARES> pieces;
+	StackContainer<UnderivedState, MAX_HISTORY> history;
 
 	std::string getBoardString();
 	std::string getTurnString();

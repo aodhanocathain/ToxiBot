@@ -9,7 +9,6 @@ namespace BitVector64 {
 	bitvector64_t clear(bitvector64_t bv, int index);
 
 	int read(bitvector64_t bv, int index);
-	bitvector64_t write(bitvector64_t bv, int index, int value);
 
 	bitvector64_t invert(bitvector64_t bv);
 

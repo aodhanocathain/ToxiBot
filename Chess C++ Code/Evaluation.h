@@ -1,19 +1,19 @@
 #pragma once
 
-#include <array>
-#include <vector>
-
 #include "Game.h"
 #include "Move.h"
+#include "StackContainer.h"
 
 class Evaluation {
 public:
+	static int const MAX_DEPTH = 8;
 	float getScore();
-	std::vector<Move*> getBestLine();
-	static Evaluation evaluate(Game& game, int depth);
+	StackContainer<PlainMove, Evaluation::MAX_DEPTH> getBestLine();
+	static Evaluation evaluate(Game& game, int maxDepth = Evaluation::MAX_DEPTH);
+	Evaluation(float score, StackContainer<PlainMove, Evaluation::MAX_DEPTH> bestLine);
 
 private:
-	Evaluation(float score, std::vector<Move*> bestLine);
 	float score;
-	std::vector<Move*> bestLine;
+	StackContainer<PlainMove, Evaluation::MAX_DEPTH> bestLine;
+	static float ABscore(Game& game, StackContainer<PlainMove, Evaluation::MAX_DEPTH>& bestLineReturn, int maxDepth = Evaluation::MAX_DEPTH, int currentDepth = 0, float opposingTeamAssuredScore = NAN);
 };

@@ -7,20 +7,22 @@
 class Move
 {
 public:
-	Square::square_t getMainPieceSquareBefore();
-	Square::square_t getMainPieceSquareAfter();
-	virtual Square::square_t getCaptureSquare() = 0;
+	static const Move DUMMY_MOVE;
+	Square::square_t getMainPieceSquareBefore() const;
+	Square::square_t getMainPieceSquareAfter() const;
+	
+	bool equals(Move& m) const;
 
 	std::string toString();
 protected:
-	Move(Square::square_t mainPieceSquareBefore, Square::square_t mainPieceSquareAfter);
+	Move(Square::square_t mainPieceSquareBefore = Square::DUMMY_SQUARE, Square::square_t mainPieceSquareAfter = Square::DUMMY_SQUARE);
 private:
 	Square::square_t mainPieceSquareBefore;
 	Square::square_t mainPieceSquareAfter;
 };
 
-class PlainMove : public Move {
+class PlainMove final : public Move {
 public: 
-	PlainMove(Square::square_t mainPieceSquareBefore, Square::square_t mainPieceSquareAfter);
-	virtual Square::square_t getCaptureSquare() override;
+	static const PlainMove DUMMY_PLAINMOVE;
+	PlainMove(Square::square_t mainPieceSquareBefore = Square::DUMMY_SQUARE, Square::square_t mainPieceSquareAfter = Square::DUMMY_SQUARE);
 };

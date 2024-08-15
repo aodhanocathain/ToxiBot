@@ -19,10 +19,6 @@ int BitVector64::read(bitvector64_t bv, int index)
 {
 	return (bv >> index) & 1;
 }
-bitvector64_t BitVector64::write(bitvector64_t bv, int index, int value)
-{
-	return BitVector64::clear(bv, index) | (((bitvector64_t)value) << index);
-}
 
 bitvector64_t BitVector64::invert(bitvector64_t bv)
 {
